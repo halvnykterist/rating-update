@@ -124,15 +124,10 @@ pub async fn run() {
         .unwrap();
 
         let (replays, errors): (Vec<_>, Vec<_>) = (replays.0.collect(), replays.1.collect());
-        info!(
-            "Grabbed {} replays and {} errors",
-            replays.len(),
-            errors.len(),
-        );
 
         let tx = conn.transaction().unwrap();
-        for r in replays {
-            add_game(&tx, r);
+        for r in &replays {
+            add_game(&tx, r.clone());
         }
 
         tx.commit().unwrap();
@@ -141,7 +136,12 @@ pub async fn run() {
             .query_row("select count(*) from games", [], |r| r.get(0))
             .unwrap();
 
-        info!("Game count: {}", count);
+        info!(
+            "Grabbed {} and {} errors. New game count: {}",
+            replays.len(),
+            errors.len(),
+            count
+        );
     }
 }
 
@@ -193,5 +193,4 @@ fn update_player(conn: &Transaction, id: i64, name: &str) {
     .unwrap();
 }
 
-fn update_ratings(conn: &Connection) {
-}
+fn update_ratings(conn: &Connection) {}
