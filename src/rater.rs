@@ -115,7 +115,7 @@ pub async fn run() {
 
         let replays = ggst_api::get_replays(
             &ggst_api::Context::default(),
-            10,
+            100,
             127,
             ggst_api::Floor::F1,
             ggst_api::Floor::Celestial,
