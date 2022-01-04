@@ -110,39 +110,44 @@ pub fn load_json_data(path: &str) -> Result<(), Box<dyn Error>> {
 pub async fn run() {
     let mut conn = Connection::open(DB_NAME).unwrap();
 
+    grab_games(&mut conn, 100).await;
+
     loop {
         time::interval(Duration::from_secs(60)).tick().await;
+        grab_games(&mut conn, 5).await;
+    }
+}
 
-        let replays = ggst_api::get_replays(
-            &ggst_api::Context::default(),
-            100,
-            127,
-            ggst_api::Floor::F1,
-            ggst_api::Floor::Celestial,
-        )
-        .await
+async fn grab_games(conn: &mut Connection, pages: usize) {
+    let replays = ggst_api::get_replays(
+        &ggst_api::Context::default(),
+        pages,
+        127,
+        ggst_api::Floor::F1,
+        ggst_api::Floor::Celestial,
+    )
+    .await
+    .unwrap();
+
+    let (replays, errors): (Vec<_>, Vec<_>) = (replays.0.collect(), replays.1.collect());
+
+    let tx = conn.transaction().unwrap();
+    for r in &replays {
+        add_game(&tx, r.clone());
+    }
+
+    tx.commit().unwrap();
+
+    let count: i64 = conn
+        .query_row("select count(*) from games", [], |r| r.get(0))
         .unwrap();
 
-        let (replays, errors): (Vec<_>, Vec<_>) = (replays.0.collect(), replays.1.collect());
-
-        let tx = conn.transaction().unwrap();
-        for r in &replays {
-            add_game(&tx, r.clone());
-        }
-
-        tx.commit().unwrap();
-
-        let count: i64 = conn
-            .query_row("select count(*) from games", [], |r| r.get(0))
-            .unwrap();
-
-        info!(
-            "Grabbed {} and {} errors. New game count: {}",
-            replays.len(),
-            errors.len(),
-            count
-        );
-    }
+    info!(
+        "Grabbed {} games and {} errors. New game count: {}",
+        replays.len(),
+        errors.len(),
+        count
+    );
 }
 
 fn add_game(conn: &Transaction, game: ggst_api::Match) {
