@@ -115,7 +115,7 @@ pub async fn run() {
     let mut interval = time::interval(Duration::from_secs(60));
     loop {
         interval.tick().await;
-        grab_games(&mut conn, 5).await;
+        grab_games(&mut conn, 10).await;
     }
 }
 
@@ -132,6 +132,10 @@ async fn grab_games(conn: &mut Connection, pages: usize) {
 
     let (replays, errors): (Vec<_>, Vec<_>) = (replays.0.collect(), replays.1.collect());
 
+    let old_count: i64 = conn
+        .query_row("select count(*) from games", [], |r| r.get(0))
+        .unwrap();
+
     let tx = conn.transaction().unwrap();
     for r in &replays {
         add_game(&tx, r.clone());
@@ -144,10 +148,11 @@ async fn grab_games(conn: &mut Connection, pages: usize) {
         .unwrap();
 
     info!(
-        "Grabbed {} games and {} errors. New game count: {}",
+        "Grabbed {} games and {} errors. New games: {} ({} total)",
         replays.len(),
         errors.len(),
-        count
+        count - old_count,
+        count,
     );
 }
 
