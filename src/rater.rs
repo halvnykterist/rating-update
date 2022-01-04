@@ -112,8 +112,9 @@ pub async fn run() {
 
     grab_games(&mut conn, 100).await;
 
+    let mut interval = time::interval(Duration::from_secs(60));
     loop {
-        time::interval(Duration::from_secs(60)).tick().await;
+        interval.tick().await;
         grab_games(&mut conn, 5).await;
     }
 }
@@ -198,4 +199,11 @@ fn update_player(conn: &Transaction, id: i64, name: &str) {
     .unwrap();
 }
 
-fn update_ratings(conn: &Connection) {}
+fn update_ratings(conn: &Connection) {
+    //figure out what our last timestamp was
+    //grab all the games from that last timestamp to the next rating period
+    //
+    //for each game:
+    //    either grab or make the player_ratings
+    //
+}
