@@ -115,7 +115,7 @@ pub async fn run() {
 
         let replays = ggst_api::get_replays(
             &ggst_api::Context::default(),
-            100,
+            10,
             127,
             ggst_api::Floor::F1,
             ggst_api::Floor::Celestial,
@@ -124,7 +124,7 @@ pub async fn run() {
         .unwrap();
 
         let (replays, errors): (Vec<_>, Vec<_>) = (replays.0.collect(), replays.1.collect());
-        println!(
+        info!(
             "Grabbed {} replays and {} errors",
             replays.len(),
             errors.len(),
@@ -141,7 +141,7 @@ pub async fn run() {
             .query_row("select count(*) from games", [], |r| r.get(0))
             .unwrap();
 
-        println!("Game count: {}", count);
+        info!("Game count: {}", count);
     }
 }
 
@@ -191,4 +191,7 @@ fn update_player(conn: &Transaction, id: i64, name: &str) {
         params![id, name],
     )
     .unwrap();
+}
+
+fn update_ratings(conn: &Connection) {
 }
