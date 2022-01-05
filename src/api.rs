@@ -305,7 +305,7 @@ pub async fn get_player_data(conn: &RatingsDbConn, id: i64) -> Option<PlayerData
                             }) {
                                 set.timestamp = format!(
                                     "{}",
-                                    NaiveDateTime::from_timestamp(last_timestamp, 0)
+                                    NaiveDateTime::from_timestamp(timestamp, 0)
                                         .format("%Y-%m-%d %H:%M")
                                 );
                                 set.own_rating_value = own_rating.value.round();
@@ -322,7 +322,7 @@ pub async fn get_player_data(conn: &RatingsDbConn, id: i64) -> Option<PlayerData
                                 history.push(PlayerSet {
                                     timestamp: format!(
                                         "{}",
-                                        NaiveDateTime::from_timestamp(last_timestamp, 0)
+                                        NaiveDateTime::from_timestamp(timestamp, 0)
                                             .format("%Y-%m-%d %H:%M")
                                     ),
                                     own_rating_value: own_rating.value.round(),
@@ -333,7 +333,10 @@ pub async fn get_player_data(conn: &RatingsDbConn, id: i64) -> Option<PlayerData
                                     },
                                     opponent_name: opponent_name,
                                     opponent_id: format!("{:X}", opponent_id),
-                                    opponent_character: website::CHAR_NAMES[opponent_character as usize].1.to_owned(),
+                                    opponent_character: website::CHAR_NAMES
+                                        [opponent_character as usize]
+                                        .1
+                                        .to_owned(),
                                     opponent_rating_value: opponent_rating.value.round(),
                                     opponent_rating_deviation: opponent_rating.deviation.round(),
                                     result_wins: match winner {

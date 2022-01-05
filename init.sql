@@ -75,7 +75,7 @@ CREATE TABLE high_rated_matchups(
 );
 
 CREATE TABLE config (
-    last_update INTEGER NOT NULL,
+    last_update INTEGER NOT NULL
 );
 
 INSERT INTO config VALUES(1635717600);
