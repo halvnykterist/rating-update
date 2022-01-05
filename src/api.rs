@@ -275,7 +275,7 @@ pub async fn get_player_data(conn: &RatingsDbConn, id: i64) -> Option<PlayerData
                         while let Some(row) = rows.next().unwrap() {
                             let timestamp: i64 = row.get("timestamp").unwrap();
                             let own_value: f64 = row.get("own_value").unwrap();
-                            let own_deviation: f64 = row.get("own_value").unwrap();
+                            let own_deviation: f64 = row.get("own_deviation").unwrap();
                             let floor: i64 = row.get("game_floor").unwrap();
                             let opponent_name: String = row.get("opponent_name").unwrap();
                             let opponent_id: i64 = row.get("opponent_id").unwrap();

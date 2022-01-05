@@ -373,7 +373,7 @@ fn update_ratings(conn: &mut Connection) -> i64 {
                 .unwrap();
 
                 //TODO I know this is awful
-                if rating_a.value < MAX_DEVIATION && rating_b.value < MAX_DEVIATION {
+                if rating_a.deviation < MAX_DEVIATION && rating_b.deviation < MAX_DEVIATION {
                     tx.execute(
                         "INSERT OR IGNORE INTO global_matchups VALUES(?, ?, 0, 0, 0, 0)",
                         params![g.char_a, g.char_b,],
@@ -469,7 +469,7 @@ fn update_ratings(conn: &mut Connection) -> i64 {
                 .unwrap();
 
                 //TODO make this less repetitive
-                if rating_a.value < MAX_DEVIATION && rating_b.value < MAX_DEVIATION {
+                if rating_a.deviation < MAX_DEVIATION && rating_b.deviation < MAX_DEVIATION {
                     tx.execute(
                         "INSERT OR IGNORE INTO global_matchups VALUES(?, ?, 0, 0, 0, 0)",
                         params![g.char_a, g.char_b,],
@@ -545,6 +545,10 @@ fn update_ratings(conn: &mut Connection) -> i64 {
 
     for (_, (mut player, results)) in players.into_iter() {
         player.rating = glicko2::new_rating(player.rating, &results, SYS_CONSTANT);
+
+        if player.rating.deviation < 0.0 {
+            error!("Negative rating deviation???");
+        }
 
         tx.execute(
             "REPLACE INTO player_ratings VALUES(?, ?, ?, ?, ?, ?, ?)",
