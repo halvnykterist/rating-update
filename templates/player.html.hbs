@@ -1,0 +1,54 @@
+<!DOCTYPE html> 
+<html>
+    <meta charset = "UTF-8">
+    <head>
+        <title>RATING UPDATE</title>
+        <link href="/style.css" rel="stylesheet" type="text/css">
+        <!--Look, if you think you can make this website look better, DM a CSS file to @sov_gott_games or maybe open an issue. -->
+    </head>
+    <body>
+        {{> header stats}}
+
+        <div>
+            <h2>{{player.name}}</h2>
+        </div>
+        <div>
+            {{#if player.other_names}}
+                AKA: |
+                {{#each player.other_names}}
+                    {{this}} |
+                {{/each}}
+            {{/if}}
+        </div>
+        <hr>
+        {{#each player.characters}}
+            <h3>{{this.character_name}} - {{this.rating_value}} ±{{this.rating_deviation}} ({{this.game_count}} games)</h3>
+
+            <table>
+                <tr>
+                    <th>Date</th>
+                    <th>Rating</th>
+                    <th>Floor</th>
+                    <th>Opponent</th>
+                    <th>Opp. Character</th>
+                    <th>Opp. rating</th>
+                    <th>Expected outcome</th>
+                    <th>Result</th>
+                </tr>
+                {{#each this.history}}
+                <tr>
+                    <td>{{this.timestamp}}</td>
+                    <td>{{this.own_rating_value}} ±{{this.own_rating_deviation}}</td>
+                    <td>{{this.floor}}</td>
+                    <td>{{>player_link name=this.opponent_name id=this.opponent_id}}</td>
+                    <td>{{this.opponent_character}}</td>
+                    <td>{{this.opponent_rating_value}} ±{{this.opponent_rating_deviation}}</td>
+                    <td>???</td>
+                    <td>{{this.result_wins}} - {{this.result_losses}}</td>
+                </tr>
+                {{/each}}
+            </table>
+        <hr>
+        {{/each}}
+    </body>
+</html>

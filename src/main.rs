@@ -5,9 +5,10 @@ extern crate rocket;
 #[macro_use]
 extern crate log;
 use simplelog::*;
-use std::{ops::Deref, fs::File};
-use tokio::join;
+use std::{fs::File, ops::Deref};
+use tokio::{join, try_join};
 
+mod api;
 mod rater;
 mod website;
 
@@ -35,7 +36,7 @@ fn init_logging() {
     }
 }
 
-#[rocket::main]
+#[tokio::main(flavor = "multi_thread", worker_threads = 10)]
 async fn main() {
     init_logging();
 
@@ -44,14 +45,20 @@ async fn main() {
         Some("init") => {
             rater::init_database().unwrap();
         }
+        Some("reset") => {
+            rater::reset_database().unwrap();
+        }
         Some("preload") => {
             rater::load_json_data(args.get(1).unwrap()).unwrap();
+        }
+        Some("pull") => {
+            rater::pull().await;
         }
         Some(x) => {
             println!("Unrecognized argument: {}", x);
         }
         None => {
-            join!(website::run(), rater::run());
+            try_join!(tokio::spawn(website::run()), tokio::spawn(rater::run())).unwrap();
         }
     }
 }

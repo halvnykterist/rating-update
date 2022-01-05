@@ -9,8 +9,9 @@ edition = "2021"
 glicko2 = "0.3.1"
 rocket = { version = "0.5.0-rc.1", features = ["json"] }
 rocket_sync_db_pools = { version = "0.1.0-rc.1", default-features = false, features = ["sqlite_pool"] }
+rocket_dyn_templates = { version = "0.1.0-rc.1", default-features = false, features = ["handlebars"] }
 ggst-api = { git = "https://github.com/halvnykterist/ggst-api-rs" }
-tokio = "1"
+tokio = { version = "1", features=["full"] }
 rusqlite = { version = "0.25", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 lazy_static = "1"
@@ -18,3 +19,5 @@ glob = "0.3"
 chrono = "0.4"
 simplelog = "0.9"
 log = "0.4"
+fxhash = "0.2"
+num-format = "0.4"

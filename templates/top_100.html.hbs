@@ -1,0 +1,33 @@
+<!DOCTYPE html> 
+<html>
+    <meta charset = "UTF-8">
+    <head>
+        <title>RATING UPDATE</title>
+        <link href="/style.css" rel="stylesheet" type="text/css">
+        <!--Look, if you think you can make this website look better, DM a CSS file to @sov_gott_games or maybe open an issue. -->
+    </head>
+    <body>
+        {{> header stats}}
+    
+        <div>
+            <table>
+                <tr>
+                    <th>#</th>
+                    <th>Name</th>
+                    <th>Character</th>
+                    <th>Rating</th>
+                    <th>Games played</th>
+                </tr>
+                {{#each players}}
+                    <tr>
+                        <td>{{this.pos}}</td>
+                        <td>{{>player_link name=this.name id=this.id}}</td>
+                        <td>{{this.character}}</td>
+                        <td>{{this.rating_value}} ±{{this.rating_deviation}}</td>
+                        <td>{{this.game_count}}</td>
+                    </tr>
+                {{/each}}
+            </table>
+        </div>
+    </body>
+</html>

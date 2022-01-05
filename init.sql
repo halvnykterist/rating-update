@@ -27,41 +27,55 @@ CREATE TABLE players  (
     name TEXT NOT NULL
 );
 
-CREATE TABLE player_names (
-    id INTEGER NOT NULL,
-    name TEXT NOT NULL,
-    PRIMARY KEY (id, name)
+CREATE VIRTUAL TABLE player_names USING fts5(
+    id,
+    name,
 );
 
 CREATE TABLE player_ratings (
     id INTEGER NOT NULL,
     char_id INTEGER NOT NULL,
-    game_count INTEGER NOT NULL,
+    wins INTEGER NOT NULL,
+    losses INTEGER NOT NULL,
     value REAL NOT NULL,
     deviation REAL NOT NULL,
     volatility REAL NOT NULL,
     PRIMARY KEY(id, char_id)
 );
 
-CREATE TABLE player_matchup (
+CREATE TABLE player_matchups (
     id INTEGER NOT NULL,
     char_id INTEGER NOT NULL,
     opp_char_id INTEGER NOT NULL,
     wins_real REAL NOT NULL,
     wins_adjusted REAL NOT NULL,
-    losses REAL NOT NULL,
+    losses_real REAL NOT NULL,
     losses_adjusted REAL NOT NULL,
     PRIMARY KEY(id, char_id, opp_char_id)
 );
 
-CREATE TABLE player_history (
-    id INTEGER NOT NULL,
+CREATE TABLE global_matchups(
     char_id INTEGER NOT NULL,
-    timestamp INTEGER NOT NULL,
-    opp_id INTEGER NOT NULL,
+    opp_char_id INTEGER NOT NULL,
     wins_real REAL NOT NULL,
     wins_adjusted REAL NOT NULL,
-    losses REAL NOT NULL,
+    losses_real REAL NOT NULL,
     losses_adjusted REAL NOT NULL,
-    PRIMARY KEY(id, char_id, timestamp)
+    PRIMARY KEY(char_id, opp_char_id)
 );
+
+CREATE TABLE high_rated_matchups(
+    char_id INTEGER NOT NULL,
+    opp_char_id INTEGER NOT NULL,
+    wins_real REAL NOT NULL,
+    wins_adjusted REAL NOT NULL,
+    losses_real REAL NOT NULL,
+    losses_adjusted REAL NOT NULL,
+    PRIMARY KEY(char_id, opp_char_id)
+);
+
+CREATE TABLE config (
+    last_update INTEGER NOT NULL,
+);
+
+INSERT INTO config VALUES(1635717600);
