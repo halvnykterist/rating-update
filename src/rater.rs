@@ -39,6 +39,35 @@ pub fn reset_database() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+pub fn reset_names() -> Result<(), Box<dyn Error>> {
+    let mut conn = Connection::open(DB_NAME)?;
+
+    let tx = conn.transaction()?;
+
+    let games = {
+        let mut stmt = tx
+            .prepare("SELECT * FROM games ORDER BY timestamp ASC")
+            .unwrap();
+
+        let mut rows = stmt.query([]).unwrap();
+        let mut games = Vec::new();
+        while let Some(row) = rows.next().unwrap() {
+            games.push(Game::from_row(row));
+        }
+        games
+    };
+
+    for g in games {
+        update_player(&tx, g.id_a, &g.name_a);
+        update_player(&tx, g.id_b, &g.name_b);
+    }
+
+
+    tx.commit()?;
+
+    Ok(())
+}
+
 pub fn load_json_data(path: &str) -> Result<(), Box<dyn Error>> {
     let mut conn = Connection::open(DB_NAME)?;
 

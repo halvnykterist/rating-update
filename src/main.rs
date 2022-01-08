@@ -48,6 +48,9 @@ async fn main() {
         Some("reset") => {
             rater::reset_database().unwrap();
         }
+        Some("names") => {
+            rater::reset_names().unwrap();
+        }
         Some("preload") => {
             rater::load_json_data(args.get(1).unwrap()).unwrap();
         }

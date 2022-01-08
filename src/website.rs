@@ -45,9 +45,11 @@ pub async fn run() {
                 top_all,
                 top_char,
                 player,
+                search,
                 api::stats,
                 api::top_all,
-                api::top_char
+                api::top_char,
+                api::search,
             ],
         )
         .ignite()
@@ -134,6 +136,20 @@ async fn player(conn: RatingsDbConn, player_id: &str) -> Option<Cached<Template>
     } else {
         None
     }
+}
+
+#[get("/?<name>")]
+async fn search(conn: RatingsDbConn, name: String) -> Template {
+    #[derive(Serialize)]
+    struct Context {
+        stats: api::Stats,
+        players: Vec<api::SearchResultPlayer>,
+    }
+
+    let stats = api::stats_inner(&conn).await;
+    let players = api::search_inner(&conn, name).await;
+
+    Template::render("search_results", &Context { stats, players })
 }
 
 #[get("/<file..>")]

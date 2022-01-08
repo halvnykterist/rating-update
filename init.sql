@@ -27,9 +27,10 @@ CREATE TABLE players  (
     name TEXT NOT NULL
 );
 
-CREATE VIRTUAL TABLE player_names USING fts5(
-    id,
-    name,
+CREATE TABLE player_names (
+    id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    PRIMARY KEY(id, name)
 );
 
 CREATE TABLE player_ratings (

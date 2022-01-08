@@ -99,6 +99,62 @@ pub async fn top_all_inner(conn: &RatingsDbConn) -> Vec<RankingPlayer> {
     .await
 }
 
+#[derive(Serialize)]
+pub struct SearchResultPlayer {
+    name: String,
+    id: String,
+    character: String,
+    rating_value: f64,
+    rating_deviation: f64,
+    game_count: i32,
+}
+
+#[get("/api/search?<name>")]
+pub async fn search(conn: RatingsDbConn, name: String) -> Json<Vec<SearchResultPlayer>> {
+    Json(search_inner(&conn, name).await)
+}
+
+pub async fn search_inner(conn: &RatingsDbConn, search: String) -> Vec<SearchResultPlayer> {
+    conn.run(move |c| {
+        info!("Searching for {}", search);
+        let mut stmt = c
+            .prepare(
+                "SELECT * FROM
+                    player_names NATURAL JOIN player_ratings
+                    WHERE name LIKE ?
+                    ORDER BY wins DESC
+                    LIMIT 1000
+                    ",
+            )
+            .unwrap();
+        let mut rows = stmt.query(params![format!("%{}%", search)]).unwrap();
+
+        let mut res = Vec::new();
+
+        while let Some(row) = rows.next().unwrap() {
+            let rating: GlickoRating = Glicko2Rating {
+                value: row.get("value").unwrap(),
+                deviation: row.get("deviation").unwrap(),
+                volatility: 0.0,
+            }
+            .into();
+            res.push(SearchResultPlayer {
+                name: row.get("name").unwrap(),
+                id: format!("{:X}", row.get::<_, i64>("id").unwrap()),
+                character: website::CHAR_NAMES[row.get::<_, usize>("char_id").unwrap()]
+                    .1
+                    .to_owned(),
+                rating_value: rating.value.round(),
+                rating_deviation: rating.deviation.round(),
+                game_count: row.get::<_, i32>("wins").unwrap()
+                    + row.get::<_, i32>("losses").unwrap(),
+            });
+        }
+        res
+    })
+    .await
+}
+
 #[get("/api/top/<char_id>")]
 pub async fn top_char(conn: RatingsDbConn, char_id: i64) -> Json<Vec<RankingPlayer>> {
     Json(top_char_inner(&conn, char_id).await)
