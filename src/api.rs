@@ -356,7 +356,7 @@ pub async fn get_player_data(conn: &RatingsDbConn, id: i64) -> Option<PlayerData
 
                             let own_rating_min = (own_value - own_deviation).exp();
                             let own_rating_max = (own_value + own_deviation).exp();
-                            let opp_rating_min = (opponent_value - opponent_value).exp();
+                            let opp_rating_min = (opponent_value - opponent_deviation).exp();
                             let opp_rating_max = (opponent_value + opponent_deviation).exp();
 
                             let win_min = own_rating_min / (own_rating_min + opp_rating_max);
