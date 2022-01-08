@@ -215,8 +215,8 @@ struct PlayerSet {
     opponent_character: String,
     opponent_rating_value: f64,
     opponent_rating_deviation: f64,
-    //expected_outcome_min: f64,
-    //expected_outcome_max: f64,
+    expected_outcome_min: f64,
+    expected_outcome_max: f64,
     result_wins: i32,
     result_losses: i32,
     //result_percent: f64,
@@ -354,6 +354,14 @@ pub async fn get_player_data(conn: &RatingsDbConn, id: i64) -> Option<PlayerData
                             }
                             .into();
 
+                            let own_rating_min = (own_value - own_deviation).exp();
+                            let own_rating_max = (own_value + own_deviation).exp();
+                            let opp_rating_min = (opponent_value - opponent_value).exp();
+                            let opp_rating_max = (opponent_value + opponent_deviation).exp();
+
+                            let win_min = own_rating_min / (own_rating_min + opp_rating_max);
+                            let win_max = own_rating_max / (own_rating_max + opp_rating_min);
+
                             if let Some(set) = history.last_mut().filter(|set| {
                                 set.opponent_id == format!("{:X}", opponent_id)
                                     && set.opponent_character
@@ -395,6 +403,8 @@ pub async fn get_player_data(conn: &RatingsDbConn, id: i64) -> Option<PlayerData
                                         .to_owned(),
                                     opponent_rating_value: opponent_rating.value.round(),
                                     opponent_rating_deviation: opponent_rating.deviation.round(),
+                                    expected_outcome_min: (win_min * 100.0).round(),
+                                    expected_outcome_max: (win_max * 100.0).round(),
                                     result_wins: match winner {
                                         1 | 4 => 1,
                                         _ => 0,

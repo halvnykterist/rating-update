@@ -43,7 +43,7 @@
                     <td>{{>player_link name=this.opponent_name id=this.opponent_id}}</td>
                     <td>{{this.opponent_character}}</td>
                     <td>{{this.opponent_rating_value}} ±{{this.opponent_rating_deviation}}</td>
-                    <td>???</td>
+                    <td>{{this.expected_outcome_min}}–{{this.expected_outcome_max}}%</td>
                     <td>{{this.result_wins}} - {{this.result_losses}}</td>
                 </tr>
                 {{/each}}
