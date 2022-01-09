@@ -24,6 +24,36 @@
         {{#each player.characters}}
             <h3>{{this.character_name}} - {{this.rating_value}} ±{{this.rating_deviation}} ({{this.game_count}} games)</h3>
 
+
+            {{#if this.recent_games}}
+            <table>
+                <tr>
+                    <th>Date</th>
+                    <th>Rating</th>
+                    <th>Floor</th>
+                    <th>Opponent</th>
+                    <th>Opp. Character</th>
+                    <th>Opp. rating</th>
+                    <th>Expected outcome</th>
+                    <th>Result</th>
+                </tr>
+                {{#each this.recent_games}}
+                <tr>
+                    <td>{{this.timestamp}}</td>
+                    <td>{{this.own_rating_value}} ±{{this.own_rating_deviation}}</td>
+                    <td>{{this.floor}}</td>
+                    <td>{{>player_link name=this.opponent_name id=this.opponent_id}}</td>
+                    <td>{{this.opponent_character}}</td>
+                    <td>{{this.opponent_rating_value}} ±{{this.opponent_rating_deviation}}</td>
+                    <td>{{this.expected_outcome_min}}–{{this.expected_outcome_max}}%</td>
+                    <td><span title="{{this.result_percent}}%">{{this.result_wins}} - {{this.result_losses}}</span></td>
+                </tr>
+                {{/each}}
+            </table>
+            <br>
+            {{/if}}
+
+
             <table>
                 <tr>
                     <th>Date</th>

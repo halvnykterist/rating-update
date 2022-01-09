@@ -62,7 +62,6 @@ pub fn reset_names() -> Result<(), Box<dyn Error>> {
         update_player(&tx, g.id_b, &g.name_b);
     }
 
-
     tx.commit()?;
 
     Ok(())
