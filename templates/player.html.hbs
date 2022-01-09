@@ -44,7 +44,7 @@
                     <td>{{this.opponent_character}}</td>
                     <td>{{this.opponent_rating_value}} ±{{this.opponent_rating_deviation}}</td>
                     <td>{{this.expected_outcome_min}}–{{this.expected_outcome_max}}%</td>
-                    <td>{{this.result_wins}} - {{this.result_losses}}</td>
+                    <td><span title="{{this.result_percent}}%">{{this.result_wins}} - {{this.result_losses}}</span></td>
                 </tr>
                 {{/each}}
             </table>

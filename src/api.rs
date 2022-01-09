@@ -219,7 +219,7 @@ struct PlayerSet {
     expected_outcome_max: f64,
     result_wins: i32,
     result_losses: i32,
-    //result_percent: f64,
+    result_percent: f64,
 }
 //
 //#[derive(Serialize)]
@@ -382,6 +382,11 @@ pub async fn get_player_data(conn: &RatingsDbConn, id: i64) -> Option<PlayerData
                                     2 | 3 => set.result_losses += 1,
                                     _ => panic!("Bad winner"),
                                 }
+
+                                set.result_percent = ((set.result_wins as f64
+                                    / (set.result_wins + set.result_losses) as f64)
+                                    * 100.0)
+                                    .round();
                             } else {
                                 history.push(PlayerSet {
                                     timestamp: format!(
@@ -412,6 +417,10 @@ pub async fn get_player_data(conn: &RatingsDbConn, id: i64) -> Option<PlayerData
                                     result_losses: match winner {
                                         2 | 3 => 1,
                                         _ => 0,
+                                    },
+                                    result_percent: match winner {
+                                        1 | 4 => 100.0,
+                                        _ => 0.0,
                                     },
                                 });
                             }
