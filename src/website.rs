@@ -3,14 +3,17 @@ use chrono::Utc;
 use rocket::{
     fs::NamedFile,
     http::{hyper::header::CACHE_CONTROL, Header},
-    response::{self, Builder, Redirect, Responder},
+    response::{self, Redirect, Responder},
     serde::Serialize,
     Request,
 };
 use rocket_dyn_templates::Template;
 use rocket_sync_db_pools::database;
 use rusqlite::Connection;
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 pub const CHAR_NAMES: &[(&str, &str)] = &[
     ("SO", "Sol"),
@@ -47,12 +50,14 @@ pub async fn run() {
                 matchups,
                 player,
                 search,
+                about,
                 api::stats,
                 api::top_all,
                 api::top_char,
                 api::search,
             ],
         )
+        .register("/", catchers![catch_404, catch_500, catch_503])
         .ignite()
         .await
         .unwrap()
@@ -67,6 +72,20 @@ pub struct RatingsDbConn(Connection);
 #[get("/")]
 async fn index() -> Redirect {
     Redirect::to(uri!(top_all))
+}
+
+#[get("/about")]
+async fn about(conn: RatingsDbConn) -> Cached<Template> {
+    #[derive(Serialize)]
+    struct Context {
+        stats: api::Stats,
+    }
+
+    let context = Context {
+        stats: api::stats_inner(&conn).await,
+    };
+
+    Cached::new(Template::render("about", &context), 999)
 }
 
 #[get("/top/all")]
@@ -172,6 +191,21 @@ async fn search(conn: RatingsDbConn, name: String) -> Template {
     let players = api::search_inner(&conn, name).await;
 
     Template::render("search_results", &Context { stats, players })
+}
+
+#[catch(404)]
+async fn catch_404() -> Redirect {
+    Redirect::to(uri!(files(file = PathBuf::from_str("404.html").unwrap())))
+}
+
+#[catch(500)]
+async fn catch_500() -> Redirect {
+    Redirect::to(uri!(files(file = PathBuf::from_str("500.html").unwrap())))
+}
+
+#[catch(503)]
+async fn catch_503() -> Redirect {
+    Redirect::to(uri!(files(file = PathBuf::from_str("503.html").unwrap())))
 }
 
 #[get("/<file..>")]
