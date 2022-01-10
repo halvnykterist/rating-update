@@ -44,6 +44,7 @@ pub async fn run() {
                 files,
                 top_all,
                 top_char,
+                matchups,
                 player,
                 search,
                 api::stats,
@@ -113,6 +114,27 @@ async fn top_char(conn: RatingsDbConn, character_short: &str) -> Option<Cached<T
     } else {
         None
     }
+}
+
+#[get("/matchups")]
+async fn matchups(conn: RatingsDbConn) -> Cached<Template> {
+    #[derive(Serialize)]
+    struct Context {
+        stats: api::Stats,
+        character_shortnames: Vec<&'static str>,
+        matchups_global: Vec<api::CharacterMatchups>,
+        matchups_high_rated: Vec<api::CharacterMatchups>,
+    }
+
+    let context = Context {
+        stats: api::stats_inner(&conn).await,
+        character_shortnames: CHAR_NAMES.iter().map(|c| c.0).collect(),
+        matchups_global: api::matchups_global_inner(&conn).await,
+        matchups_high_rated: api::matchups_high_rated_inner(&conn).await,
+    };
+
+    let delta = context.stats.last_update + rater::RATING_PERIOD - Utc::now().timestamp();
+    Cached::new(Template::render("matchups", &context), delta)
 }
 
 #[get("/player/<player_id>")]

@@ -1,8 +1,7 @@
 use chrono::{Duration, NaiveDateTime, Utc};
-use ggst_api::Character;
 use glicko2::{Glicko2Rating, GlickoRating};
 use rocket::serde::{json::Json, Serialize};
-use rusqlite::{named_params, params, Connection, OptionalExtension};
+use rusqlite::{named_params, params, OptionalExtension};
 
 use crate::{
     rater::{self, RatedPlayer},
@@ -219,6 +218,8 @@ struct PlayerCharacterData {
     matchups: Vec<PlayerMatchup>,
 }
 
+const MATCHUP_MIN_GAMES: f64 = 250.0;
+
 #[derive(Serialize)]
 struct PlayerSet {
     timestamp: String,
@@ -255,10 +256,6 @@ pub async fn get_player_data(conn: &RatingsDbConn, id: i64) -> Option<PlayerData
             )
             .unwrap()
         {
-            let last_timestamp: i64 = conn
-                .query_row("SELECT last_update FROM config", [], |r| r.get(0))
-                .unwrap();
-
             let name: String = conn
                 .query_row("SELECT name FROM players WHERE id=?", params![id], |r| {
                     r.get(0)
@@ -439,16 +436,6 @@ pub async fn get_player_data(conn: &RatingsDbConn, id: i64) -> Option<PlayerData
                                     },
                                 });
                             }
-
-                            //history.push(PlayerSet {
-                            //    timestamp: format!(
-                            //        "{}",
-                            //        NaiveDateTime::from_timestamp(timestamp, 0)
-                            //            .format("%Y-%m-%d %H:%M")
-                            //    ),
-                            //    opponent_name,
-                            //    opponent_id: format!("{:X}", opponent_id),
-                            //});
                         }
 
                         history
@@ -680,13 +667,162 @@ pub async fn get_player_data(conn: &RatingsDbConn, id: i64) -> Option<PlayerData
         } else {
             None
         }
+    })
+    .await
+}
 
-        //grab the name
-        //grab the other names
-        //iterate over characters
-        //  set name
-        //  grab rating value/deviation
-        //  grab
+#[derive(Serialize)]
+pub struct CharacterMatchups {
+    name: String,
+    matchups: Vec<Matchup>,
+}
+
+#[derive(Serialize)]
+pub struct Matchup {
+    win_rate_real: f64,
+    win_rate_adjusted: f64,
+    game_count: i32,
+    suspicious: bool,
+    evaluation: &'static str,
+}
+
+fn get_evaluation(wins: f64, losses: f64, game_count: f64) -> &'static str {
+    if game_count < MATCHUP_MIN_GAMES {
+        return "none";
+    }
+
+    let r = wins / (wins + losses);
+    if r > 0.6 {
+        "verygood"
+    } else if r > 0.56 {
+        "good"
+    } else if r > 0.52 {
+        "slightlygood"
+    } else if r > 0.48 {
+        "ok"
+    } else if r > 0.44 {
+        "slightlybad"
+    } else if r > 0.40 {
+        "bad"
+    } else {
+        "verybad"
+    }
+}
+
+pub async fn matchups_global_inner(conn: &RatingsDbConn) -> Vec<CharacterMatchups> {
+    conn.run(move |conn| {
+        (0..website::CHAR_NAMES.len())
+            .map(|char_id| CharacterMatchups {
+                name: website::CHAR_NAMES[char_id].1.to_owned(),
+                matchups: (0..website::CHAR_NAMES.len())
+                    .map(|opp_char_id| {
+                        conn.query_row(
+                            "SELECT
+                                wins_real,
+                                wins_adjusted,
+                                losses_real,
+                                losses_adjusted
+                            FROM global_matchups
+                            WHERE char_id = ? AND opp_char_id = ?",
+                            params![char_id, opp_char_id],
+                            |row| {
+                                Ok((
+                                    row.get::<_, f64>(0).unwrap(),
+                                    row.get::<_, f64>(1).unwrap(),
+                                    row.get::<_, f64>(2).unwrap(),
+                                    row.get::<_, f64>(3).unwrap(),
+                                ))
+                            },
+                        )
+                        .optional()
+                        .unwrap()
+                        .map(
+                            |(wins_real, wins_adjusted, losses_real, losses_adjusted)| Matchup {
+                                win_rate_real: (wins_real / (wins_real + losses_real) * 100.0)
+                                    .round(),
+                                win_rate_adjusted: (wins_adjusted
+                                    / (wins_adjusted + losses_adjusted)
+                                    * 100.0)
+                                    .round(),
+                                game_count: (wins_real + losses_real) as i32,
+                                suspicious: wins_real + losses_real < MATCHUP_MIN_GAMES,
+                                evaluation: get_evaluation(
+                                    wins_adjusted,
+                                    losses_adjusted,
+                                    wins_real + losses_real,
+                                ),
+                            },
+                        )
+                        .unwrap_or(Matchup {
+                            win_rate_real: f64::NAN,
+                            win_rate_adjusted: f64::NAN,
+                            game_count: 0,
+                            suspicious: true,
+                            evaluation: "none",
+                        })
+                    })
+                    .collect(),
+            })
+            .collect()
+    })
+    .await
+}
+
+pub async fn matchups_high_rated_inner(conn: &RatingsDbConn) -> Vec<CharacterMatchups> {
+    conn.run(move |conn| {
+        (0..website::CHAR_NAMES.len())
+            .map(|char_id| CharacterMatchups {
+                name: website::CHAR_NAMES[char_id].1.to_owned(),
+                matchups: (0..website::CHAR_NAMES.len())
+                    .map(|opp_char_id| {
+                        conn.query_row(
+                            "SELECT
+                                wins_real,
+                                wins_adjusted,
+                                losses_real,
+                                losses_adjusted
+                            FROM high_rated_matchups
+                            WHERE char_id = ? AND opp_char_id = ?",
+                            params![char_id, opp_char_id],
+                            |row| {
+                                Ok((
+                                    row.get::<_, f64>(0).unwrap(),
+                                    row.get::<_, f64>(1).unwrap(),
+                                    row.get::<_, f64>(2).unwrap(),
+                                    row.get::<_, f64>(3).unwrap(),
+                                ))
+                            },
+                        )
+                        .optional()
+                        .unwrap()
+                        .map(
+                            |(wins_real, wins_adjusted, losses_real, losses_adjusted)| Matchup {
+                                win_rate_real: (wins_real / (wins_real + losses_real) * 100.0)
+                                    .round(),
+                                win_rate_adjusted: (wins_adjusted
+                                    / (wins_adjusted + losses_adjusted)
+                                    * 100.0)
+                                    .round(),
+                                game_count: (wins_real + losses_real) as i32,
+                                suspicious: wins_real + losses_real < MATCHUP_MIN_GAMES,
+                                evaluation: get_evaluation(
+                                    wins_adjusted,
+                                    losses_adjusted,
+                                    wins_real + losses_real,
+                                ),
+                            },
+                        )
+                        .unwrap_or(Matchup {
+                            win_rate_real: f64::NAN,
+                            win_rate_adjusted: f64::NAN,
+                            game_count: 0,
+                            suspicious: true,
+                            evaluation: "none",
+                        })
+                    })
+                    .collect(),
+            })
+            .collect()
     })
     .await
 }

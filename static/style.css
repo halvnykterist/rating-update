@@ -23,12 +23,12 @@ td {
   text-align: center;
 }
 
-.uncertain {
-    color: gray;
-}
 
 tr:nth-child(even) td {
   background-color: rgb(250,250,250);
+  .uncertain {
+    background-color: lightblue;
+  }
 }
 
 tr:nth-child(odd) td {
@@ -37,4 +37,40 @@ tr:nth-child(odd) td {
 
 caption {
   padding: 10px;
+}
+
+.uncertain {
+    color: gray;
+}
+
+tr:nth-child(n) td.uncertain {
+    background-color: hsl(0, 100%, 100%);
+}
+
+tr:nth-child(n) td.verybad {
+    background-color: hsl(0, 100%, 70%);
+}
+
+tr:nth-child(n) td.bad {
+    background-color: hsl(0, 100%, 80%);
+}
+
+tr:nth-child(n) td.slightlybad {
+    background-color: hsl(0, 100%, 90%);
+}
+
+tr:nth-child(n) td.ok {
+    background-color: hsl(0, 100%, 100%);
+}
+
+tr:nth-child(n) td.slightlygood {
+    background-color: hsl(130, 100%, 90%);
+}
+
+tr:nth-child(n) td.good {
+    background-color: hsl(130, 100%, 80%);
+}
+
+tr:nth-child(n) td.verygood {
+    background-color: hsl(130, 100%, 70%);
 }

@@ -8,8 +8,67 @@
     </head>
     <body>
         {{> header stats}}
-        
 
-
+        <br>
+        <div>
+            <h3> Global matchups </h3>
+        </div>
+        <table>
+            <tr>
+                <th>&nbsp;</th>
+                {{#each character_shortnames}}
+                    <th>{{this}}</th>
+                {{/each}}
+            </tr>
+            {{#each matchups_global}}
+                <tr>
+                    <th>{{this.name}}</th>
+                    {{#each this.matchups}}
+                        <td
+                            {{#if this.suspicious}}
+                                class="uncertain"
+                            {{else}}
+                                    class="{{this.evaluation}}"
+                            {{/if}}
+                            title="Raw: {{this.win_rate_real}}%. Based on {{this.game_count}} games"
+                        >
+                            <span {{#if this.suspicious}} class="uncertain" {{/if}}>
+                        {{this.win_rate_adjusted}}% </span>
+                        </td>
+                    {{/each}}
+                </tr>
+            {{/each}}
+        </table>
+        <br>
+        <div>
+            <h3>High rated matchups (≥1800)</h3>
+        </div>
+        <p>Matchups with fewer than 250 games are shown in gray.</p>
+        <table>
+            <tr>
+                <th>&nbsp;</th>
+                {{#each character_shortnames}}
+                    <th>{{this}}</th>
+                {{/each}}
+            </tr>
+            {{#each matchups_high_rated}}
+                <tr>
+                    <th>{{this.name}}</th>
+                    {{#each this.matchups}}
+                        <td
+                            {{#if this.suspicious}}
+                                class="uncertain"
+                            {{else}}
+                                    class="{{this.evaluation}}"
+                            {{/if}}
+                            title="Raw: {{this.win_rate_real}}%. Based on {{this.game_count}} games"
+                        >
+                            <span {{#if this.suspicious}} class="uncertain" {{/if}}>
+                        {{this.win_rate_adjusted}}% </span>
+                        </td>
+                    {{/each}}
+                </tr>
+            {{/each}}
+        </table>
     </body>
 </html>
