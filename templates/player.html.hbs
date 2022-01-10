@@ -53,7 +53,6 @@
             <br>
             {{/if}}
 
-
             <table>
                 <tr>
                     <th>Date</th>
@@ -78,6 +77,31 @@
                 </tr>
                 {{/each}}
             </table>
+
+            {{#if this.matchups}}
+            <br>
+            <table>
+                <tr>
+                    <th>Matchup</th>
+                    <th>Games</th>
+                    <th>Win rate (raw)</th>
+                    <th>Win rate (rating adjusted)</th>
+                </tr>
+                {{#each this.matchups}}
+                <tr>
+                    <td>{{this.character}}</td>
+                    <td>{{this.game_count}}</td>
+                    <td>{{this.win_rate_real}}%</td>
+                    {{#if this.win_rate_adjusted}}
+                        <td>{{this.win_rate_adjusted}}%</td>
+                    {{else}}
+                        <td>N/A</td>
+                    {{/if}}
+                </tr>
+                {{/each}}
+            </table>
+            <br>
+            {{/if}}
         <hr>
         {{/each}}
     </body>

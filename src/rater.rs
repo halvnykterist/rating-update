@@ -394,14 +394,21 @@ fn update_ratings(conn: &mut Connection) -> i64 {
                 .unwrap();
                 tx.execute(
                     "UPDATE player_matchups 
-                    SET losses_real = losses_real + 1, losses_adjusted = losses_adjusted + ?
+                    SET losses_real = losses_real + 1
                     WHERE id=? AND char_id=? AND opp_char_id=?",
-                    params![b_win_prob, g.id_b, g.char_b, g.char_a,],
+                    params![g.id_b, g.char_b, g.char_a,],
                 )
                 .unwrap();
 
                 //TODO I know this is awful
                 if rating_a.deviation < MAX_DEVIATION && rating_b.deviation < MAX_DEVIATION {
+                    tx.execute(
+                        "UPDATE player_matchups 
+                        SET losses_adjusted = losses_adjusted + ?
+                        WHERE id=? AND char_id=? AND opp_char_id=?",
+                        params![b_win_prob, g.id_b, g.char_b, g.char_a,],
+                    )
+                    .unwrap();
                     tx.execute(
                         "INSERT OR IGNORE INTO global_matchups VALUES(?, ?, 0, 0, 0, 0)",
                         params![g.char_a, g.char_b,],
@@ -490,14 +497,22 @@ fn update_ratings(conn: &mut Connection) -> i64 {
                 .unwrap();
                 tx.execute(
                     "UPDATE player_matchups 
-                    SET wins_real = wins_real + 1, wins_adjusted = wins_adjusted + ?
+                    SET wins_real = wins_real + 1
                     WHERE id=? AND char_id=? AND opp_char_id=?",
-                    params![a_win_prob, g.id_b, g.char_b, g.char_a,],
+                    params![g.id_b, g.char_b, g.char_a,],
                 )
                 .unwrap();
 
                 //TODO make this less repetitive
                 if rating_a.deviation < MAX_DEVIATION && rating_b.deviation < MAX_DEVIATION {
+                    tx.execute(
+                        "UPDATE player_matchups 
+                        SET wins_adjusted = wins_adjusted + ?
+                        WHERE id=? AND char_id=? AND opp_char_id=?",
+                        params![a_win_prob, g.id_b, g.char_b, g.char_a,],
+                    )
+                    .unwrap();
+
                     tx.execute(
                         "INSERT OR IGNORE INTO global_matchups VALUES(?, ?, 0, 0, 0, 0)",
                         params![g.char_a, g.char_b,],

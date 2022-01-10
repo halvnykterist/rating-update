@@ -212,11 +212,11 @@ struct PlayerCharacterData {
     character_name: String,
     rating_value: f64,
     rating_deviation: f64,
-    //win_rate: f64,
+    win_rate: f64,
     game_count: i32,
     history: Vec<PlayerSet>,
     recent_games: Vec<PlayerSet>,
-    //matchups: Vec<PlayerMatchup>,
+    matchups: Vec<PlayerMatchup>,
 }
 
 #[derive(Serialize)]
@@ -236,14 +236,14 @@ struct PlayerSet {
     result_losses: i32,
     result_percent: f64,
 }
-//
-//#[derive(Serialize)]
-//struct PlayerMatchup {
-//    character: String,
-//    game_count: i32,
-//    win_rate_real: f64,
-//    win_rated_adjusted: f64,
-//}
+
+#[derive(Serialize)]
+struct PlayerMatchup {
+    character: String,
+    game_count: i32,
+    win_rate_real: f64,
+    win_rate_adjusted: f64,
+}
 
 pub async fn get_player_data(conn: &RatingsDbConn, id: i64) -> Option<PlayerData> {
     conn.run(move |conn| {
@@ -306,36 +306,36 @@ pub async fn get_player_data(conn: &RatingsDbConn, id: i64) -> Option<PlayerData
                         let mut stmt = conn
                             .prepare(
                                 "SELECT
-                            timestamp,
-                            value_a AS own_value,
-                            deviation_a AS own_deviation,
-                            game_floor,
-                            name_b AS opponent_name,
-                            id_b AS opponent_id,
-                            char_b AS opponent_character,
-                            value_b AS opponent_value,
-                            deviation_b AS opponent_deviation,
-                            winner
-                        FROM games NATURAL JOIN game_ratings
-                        WHERE games.id_a= :id AND games.char_a = :char_id
-                    
-                        UNION
+                                    timestamp,
+                                    value_a AS own_value,
+                                    deviation_a AS own_deviation,
+                                    game_floor,
+                                    name_b AS opponent_name,
+                                    id_b AS opponent_id,
+                                    char_b AS opponent_character,
+                                    value_b AS opponent_value,
+                                    deviation_b AS opponent_deviation,
+                                    winner
+                                FROM games NATURAL JOIN game_ratings
+                                WHERE games.id_a= :id AND games.char_a = :char_id
+                            
+                                UNION
 
-                        SELECT
-                            timestamp,
-                            value_b AS own_value,
-                            deviation_b AS own_deviation,
-                            game_floor,
-                            name_a AS opponent_name,
-                            id_a AS opponent_id,
-                            char_a AS opponent_character,
-                            value_a AS opponent_value,
-                            deviation_a AS opponent_deviation,
-                            winner + 2  as winner
-                        FROM games NATURAL JOIN game_ratings
-                        WHERE games.id_b = :id AND games.char_b = :char_id
+                                SELECT
+                                    timestamp,
+                                    value_b AS own_value,
+                                    deviation_b AS own_deviation,
+                                    game_floor,
+                                    name_a AS opponent_name,
+                                    id_a AS opponent_id,
+                                    char_a AS opponent_character,
+                                    value_a AS opponent_value,
+                                    deviation_a AS opponent_deviation,
+                                    winner + 2  as winner
+                                FROM games NATURAL JOIN game_ratings
+                                WHERE games.id_b = :id AND games.char_b = :char_id
 
-                        ORDER BY timestamp DESC LIMIT 200",
+                                ORDER BY timestamp DESC LIMIT 200",
                             )
                             .unwrap();
 
@@ -612,13 +612,56 @@ pub async fn get_player_data(conn: &RatingsDbConn, id: i64) -> Option<PlayerData
                         recent_games
                     };
 
+                    let matchups = {
+                        let mut stmt = conn
+                            .prepare(
+                                "SELECT
+                                    opp_char_id,
+                                    wins_real,
+                                    wins_adjusted,
+                                    losses_real,
+                                    losses_adjusted
+                                FROM player_matchups
+                                WHERE id = ?
+                                    AND char_id = ?
+                                ORDER BY wins_real DESC",
+                            )
+                            .unwrap();
+
+                        let mut rows = stmt.query(params![id, char_id]).unwrap();
+                        let mut matchups = Vec::<PlayerMatchup>::new();
+                        while let Some(row) = rows.next().unwrap() {
+                            let opp_char_id: usize = row.get(0).unwrap();
+                            let wins_real: f64 = row.get(1).unwrap();
+                            let wins_adjusted: f64 = row.get(2).unwrap();
+                            let losses_real: f64 = row.get(3).unwrap();
+                            let losses_adjusted: f64 = row.get(4).unwrap();
+                            matchups.push(PlayerMatchup {
+                                character: website::CHAR_NAMES[opp_char_id].1.to_owned(),
+                                game_count: (wins_real + losses_real) as i32,
+                                win_rate_real: (wins_real / (wins_real + losses_real) * 100.0)
+                                    .round(),
+                                win_rate_adjusted: (wins_adjusted
+                                    / (wins_adjusted + losses_adjusted)
+                                    * 100.0)
+                                    .round(),
+                            });
+                        }
+
+                        matchups.sort_by_key(|m| -(m.win_rate_adjusted as i32));
+
+                        matchups
+                    };
+
                     characters.push(PlayerCharacterData {
                         character_name,
                         game_count: wins + losses,
+                        win_rate: wins as f64 / (wins + losses) as f64,
                         rating_value: (value * 173.7178 + 1500.0).round(),
                         rating_deviation: (deviation * 173.7178).round(),
                         history,
                         recent_games,
+                        matchups,
                     });
                 }
             }
