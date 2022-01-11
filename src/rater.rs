@@ -359,6 +359,37 @@ fn update_ratings(conn: &mut Connection) -> i64 {
         let a_win_prob = rating_a.value.exp() / (rating_a.value.exp() + rating_b.value.exp());
         let b_win_prob = 1.0 - a_win_prob;
 
+        tx.execute(
+            "INSERT OR IGNORE INTO player_matchups VALUES(?, ?, ?, 0, 0, 0, 0)",
+            params![g.id_a, g.char_a, g.char_b,],
+        )
+        .unwrap();
+        tx.execute(
+            "INSERT OR IGNORE INTO player_matchups VALUES(?, ?, ?, 0, 0, 0, 0)",
+            params![g.id_b, g.char_b, g.char_a,],
+        )
+        .unwrap();
+        tx.execute(
+            "INSERT OR IGNORE INTO global_matchups VALUES(?, ?, 0, 0, 0, 0)",
+            params![g.char_a, g.char_b,],
+        )
+        .unwrap();
+        tx.execute(
+            "INSERT OR IGNORE INTO global_matchups VALUES(?, ?, 0, 0, 0, 0)",
+            params![g.char_b, g.char_a,],
+        )
+        .unwrap();
+        tx.execute(
+            "INSERT OR IGNORE INTO high_rated_matchups VALUES(?, ?, 0, 0, 0, 0)",
+            params![g.char_a, g.char_b,],
+        )
+        .unwrap();
+        tx.execute(
+            "INSERT OR IGNORE INTO high_rated_matchups VALUES(?, ?, 0, 0, 0, 0)",
+            params![g.char_b, g.char_a,],
+        )
+        .unwrap();
+
         match g.winner {
             1 => {
                 players
@@ -375,21 +406,10 @@ fn update_ratings(conn: &mut Connection) -> i64 {
                 players.get_mut(&(g.id_b, g.char_b)).unwrap().0.loss_count += 1;
 
                 tx.execute(
-                    "INSERT OR IGNORE INTO player_matchups VALUES(?, ?, ?, 0, 0, 0, 0)",
-                    params![g.id_a, g.char_a, g.char_b,],
-                )
-                .unwrap();
-                tx.execute(
                     "UPDATE player_matchups 
-                    SET wins_real = wins_real + 1, wins_adjusted = wins_adjusted + ?
+                    SET wins_real = wins_real + 1
                     WHERE id=? AND char_id=? AND opp_char_id=?",
-                    params![b_win_prob, g.id_a, g.char_a, g.char_b,],
-                )
-                .unwrap();
-
-                tx.execute(
-                    "INSERT OR IGNORE INTO player_matchups VALUES(?, ?, ?, 0, 0, 0, 0)",
-                    params![g.id_b, g.char_b, g.char_a,],
+                    params![g.id_a, g.char_a, g.char_b,],
                 )
                 .unwrap();
                 tx.execute(
@@ -404,19 +424,16 @@ fn update_ratings(conn: &mut Connection) -> i64 {
                 if rating_a.deviation < MAX_DEVIATION && rating_b.deviation < MAX_DEVIATION {
                     tx.execute(
                         "UPDATE player_matchups 
+                        SET wins_adjusted = wins_adjusted + ?
+                        WHERE id=? AND char_id=? AND opp_char_id=?",
+                        params![b_win_prob, g.id_a, g.char_a, g.char_b,],
+                    )
+                    .unwrap();
+                    tx.execute(
+                        "UPDATE player_matchups 
                         SET losses_adjusted = losses_adjusted + ?
                         WHERE id=? AND char_id=? AND opp_char_id=?",
                         params![b_win_prob, g.id_b, g.char_b, g.char_a,],
-                    )
-                    .unwrap();
-                    tx.execute(
-                        "INSERT OR IGNORE INTO global_matchups VALUES(?, ?, 0, 0, 0, 0)",
-                        params![g.char_a, g.char_b,],
-                    )
-                    .unwrap();
-                    tx.execute(
-                        "INSERT OR IGNORE INTO global_matchups VALUES(?, ?, 0, 0, 0, 0)",
-                        params![g.char_b, g.char_a,],
                     )
                     .unwrap();
                     tx.execute(
@@ -435,16 +452,6 @@ fn update_ratings(conn: &mut Connection) -> i64 {
                     .unwrap();
 
                     if rating_a.value > HIGH_RATING && rating_b.value > HIGH_RATING {
-                        tx.execute(
-                            "INSERT OR IGNORE INTO high_rated_matchups VALUES(?, ?, 0, 0, 0, 0)",
-                            params![g.char_a, g.char_b,],
-                        )
-                        .unwrap();
-                        tx.execute(
-                            "INSERT OR IGNORE INTO high_rated_matchups VALUES(?, ?, 0, 0, 0, 0)",
-                            params![g.char_b, g.char_a,],
-                        )
-                        .unwrap();
                         tx.execute(
                             "UPDATE high_rated_matchups 
                             SET wins_real = wins_real + 1, wins_adjusted = wins_adjusted + ?
@@ -477,24 +484,13 @@ fn update_ratings(conn: &mut Connection) -> i64 {
                 players.get_mut(&(g.id_b, g.char_b)).unwrap().0.win_count += 1;
 
                 tx.execute(
-                    "INSERT OR IGNORE INTO player_matchups VALUES(?, ?, ?, 0, 0, 0, 0)",
+                    "UPDATE player_matchups 
+                    SET losses_real = losses_real + 1
+                    WHERE id=? AND char_id=? AND opp_char_id=?",
                     params![g.id_a, g.char_a, g.char_b,],
                 )
                 .unwrap();
 
-                tx.execute(
-                    "UPDATE player_matchups 
-                    SET losses_real = losses_real + 1, losses_adjusted = losses_adjusted + ?
-                    WHERE id=? AND char_id=? AND opp_char_id=?",
-                    params![a_win_prob, g.id_a, g.char_a, g.char_b,],
-                )
-                .unwrap();
-
-                tx.execute(
-                    "INSERT OR IGNORE INTO player_matchups VALUES(?, ?, ?, 0, 0, 0, 0)",
-                    params![g.id_b, g.char_b, g.char_a,],
-                )
-                .unwrap();
                 tx.execute(
                     "UPDATE player_matchups 
                     SET wins_real = wins_real + 1
@@ -507,22 +503,19 @@ fn update_ratings(conn: &mut Connection) -> i64 {
                 if rating_a.deviation < MAX_DEVIATION && rating_b.deviation < MAX_DEVIATION {
                     tx.execute(
                         "UPDATE player_matchups 
+                        SET losses_adjusted = losses_adjusted + ?
+                        WHERE id=? AND char_id=? AND opp_char_id=?",
+                        params![a_win_prob, g.id_a, g.char_a, g.char_b,],
+                    )
+                    .unwrap();
+                    tx.execute(
+                        "UPDATE player_matchups 
                         SET wins_adjusted = wins_adjusted + ?
                         WHERE id=? AND char_id=? AND opp_char_id=?",
                         params![a_win_prob, g.id_b, g.char_b, g.char_a,],
                     )
                     .unwrap();
 
-                    tx.execute(
-                        "INSERT OR IGNORE INTO global_matchups VALUES(?, ?, 0, 0, 0, 0)",
-                        params![g.char_a, g.char_b,],
-                    )
-                    .unwrap();
-                    tx.execute(
-                        "INSERT OR IGNORE INTO global_matchups VALUES(?, ?, 0, 0, 0, 0)",
-                        params![g.char_b, g.char_a,],
-                    )
-                    .unwrap();
                     tx.execute(
                         "UPDATE global_matchups 
                         SET wins_real = wins_real + 1, wins_adjusted = wins_adjusted + ?
@@ -539,16 +532,6 @@ fn update_ratings(conn: &mut Connection) -> i64 {
                     .unwrap();
 
                     if rating_a.value > HIGH_RATING && rating_b.value > HIGH_RATING {
-                        tx.execute(
-                            "INSERT OR IGNORE INTO high_rated_matchups VALUES(?, ?, 0, 0, 0, 0)",
-                            params![g.char_a, g.char_b,],
-                        )
-                        .unwrap();
-                        tx.execute(
-                            "INSERT OR IGNORE INTO high_rated_matchups VALUES(?, ?, 0, 0, 0, 0)",
-                            params![g.char_b, g.char_a,],
-                        )
-                        .unwrap();
                         tx.execute(
                             "UPDATE high_rated_matchups 
                             SET wins_real = wins_real + 1, wins_adjusted = wins_adjusted + ?
