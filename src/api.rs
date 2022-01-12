@@ -826,3 +826,116 @@ pub async fn matchups_high_rated_inner(conn: &RatingsDbConn) -> Vec<CharacterMat
     })
     .await
 }
+
+#[derive(Serialize)]
+pub struct FloorPlayers {
+    floor: String,
+    player_count: i64,
+    player_percentage: f64,
+    game_count: i64,
+    game_percentage: f64,
+}
+
+pub async fn player_floors_distribution(conn: &RatingsDbConn) -> Vec<FloorPlayers> {
+    conn.run(move |conn| {
+        let total_players: i64 = conn
+            .query_row("SELECT COUNT(*) FROM players", [], |r| r.get(0))
+            .unwrap();
+
+        let total_games: i64 = conn
+            .query_row("SELECT COUNT(*) FROM games", [], |r| r.get(0))
+            .unwrap();
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT
+                floor, player_count, game_count
+                FROM player_floor_distribution
+                ORDER BY floor ASC",
+            )
+            .unwrap();
+
+        let mut rows = stmt.query([]).unwrap();
+
+        let mut res = Vec::<FloorPlayers>::new();
+        while let Some(row) = rows.next().unwrap() {
+            let floor: i64 = row.get(0).unwrap();
+            let player_count: i64 = row.get(1).unwrap();
+            let game_count: i64 = row.get(2).unwrap();
+
+            res.push(FloorPlayers {
+                floor: match floor {
+                    99 => format!("Celestial"),
+                    n => format!("Floor {}", n),
+                },
+                player_count,
+                player_percentage: (1000.0 * player_count as f64 / total_players as f64).round()
+                    / 10.0,
+                game_count,
+                game_percentage: (1000.0 * game_count as f64 / total_games as f64).round() / 10.0,
+            });
+        }
+
+        res
+    })
+    .await
+}
+
+#[derive(Serialize)]
+pub struct RatingPlayers {
+    min_rating: i64,
+    max_rating: i64,
+    player_count: i64,
+    player_percentage: f64,
+    player_count_cum: i64,
+    player_percentage_cum: f64,
+}
+
+pub async fn player_ratings_distribution(conn: &RatingsDbConn) -> Vec<RatingPlayers> {
+    conn.run(move |conn| {
+        let total_players: i64 = conn
+            .query_row(
+                "
+        SELECT COUNT(*)
+        FROM player_ratings
+        WHERE deviation < ?",
+                params![rater::MAX_DEVIATION],
+                |r| r.get(0),
+            )
+            .unwrap();
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT
+                min_rating, max_rating, player_count, player_count_cum
+                FROM player_rating_distribution
+                ORDER BY min_rating ASC",
+            )
+            .unwrap();
+
+        let mut rows = stmt.query([]).unwrap();
+
+        let mut res = Vec::<RatingPlayers>::new();
+        while let Some(row) = rows.next().unwrap() {
+            let min_rating: i64 = row.get(0).unwrap();
+            let max_rating: i64 = row.get(1).unwrap();
+            let player_count: i64 = row.get(2).unwrap();
+            let player_count_cum: i64 = row.get(3).unwrap();
+
+            res.push(RatingPlayers {
+                min_rating,
+                max_rating,
+                player_count,
+                player_percentage: (1000.0 * player_count as f64 / total_players as f64).round()
+                    / 10.0,
+                player_count_cum,
+                player_percentage_cum: (1000.0 * player_count_cum as f64 / total_players as f64)
+                    .round()
+                    / 10.0,
+            });
+        }
+
+        res
+    })
+    .await
+}

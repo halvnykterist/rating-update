@@ -1,0 +1,49 @@
+<!DOCTYPE html> 
+<html>
+    <meta charset = "UTF-8">
+    <head>
+        <title>RATING UPDATE</title>
+        <meta property="og:title" content="RATING UPDATE"/>
+        <meta property="og:type" content="website" />
+        <meta property="og:description" content="Glicko2 ratings for Guilty Gear Strive" />
+        <link href="/style.css" rel="stylesheet" type="text/css">
+        <!--Look, if you think you can make this website look better, DM a CSS file to @sov_gott_games or maybe open an issue. -->
+    </head>
+    <body>
+        {{> header stats}}
+
+        <br>
+        <div>
+            <h3>Player Distribution</h3>
+        </div>
+        <table>
+            <tr>
+                <th>Floor</th>
+                <th>Players</th>
+                <th>Games Played</th>
+            </tr>
+            {{#each floors}}
+                <tr>
+                    <td>{{this.floor}}</td>
+                    <td><span title="{{this.player_count}} players">{{this.player_percentage}}%</span></td>
+                    <td><span title="{{this.game_count}} games">{{this.game_percentage}}%</span></td>
+                </tr>
+            {{/each}}
+        </table>
+        <br>
+        <table>
+            <tr>
+                <th>Rating</th>
+                <th>Players</th>
+                <th>Percentile</th>
+            </tr>
+            {{#each ratings}}
+                <tr>
+                    <td>{{this.min_rating}}-{{this.max_rating}}</td>
+                    <td><span title="{{this.player_count}} players">{{this.player_percentage}}%</span></td>
+                    <td><span title="{{this.player_count_cum}} players at or below this rating">{{this.player_percentage_cum}}%</span></td>
+                </tr>
+            {{/each}}
+        </table>
+    </body>
+</html>

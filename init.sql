@@ -24,6 +24,7 @@ CREATE TABLE game_ratings (
 
 CREATE TABLE players  (
     id INTEGER NOT NULL PRIMARY KEY,
+    floor INTEGER NOT NULL,
     name TEXT NOT NULL
 );
 
@@ -74,6 +75,22 @@ CREATE TABLE high_rated_matchups(
     losses_adjusted REAL NOT NULL,
     PRIMARY KEY(char_id, opp_char_id)
 );
+
+CREATE TABLE player_floor_distribution(
+    floor INTEGER NOT NULL,
+    player_count INTEGER NOT NULL,
+    game_count INTEGER NOT NULL,
+    PRIMARY KEY(floor)
+);
+
+CREATE TABLE player_rating_distribution(
+    min_rating INTEGER NOT NULL,
+    max_rating INTEGER NOT NULL,
+    player_count INTEGER NOT NULL,
+    player_count_cum INTEGER NOT NULL,
+    PRIMARY KEY(min_rating, max_rating)
+);
+
 
 CREATE TABLE config (
     last_update INTEGER NOT NULL

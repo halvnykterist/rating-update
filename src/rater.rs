@@ -5,9 +5,9 @@ use glob::glob;
 use lazy_static::lazy_static;
 use rocket::serde::json::serde_json;
 use rusqlite::{params, Connection, Row, Transaction};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::{error::Error, fs::File, io::BufReader, sync::Mutex, time::Duration};
-use tokio::{join, time, try_join};
+use tokio::{time, try_join};
 
 const SYS_CONSTANT: f64 = 0.01;
 pub const MAX_DEVIATION: f64 = 100.0 / 173.7178;
@@ -15,6 +15,10 @@ pub const HIGH_RATING: f64 = (1800.0 - 1500.0) / 173.7178;
 const DB_NAME: &str = "ratings.sqlite";
 
 pub const RATING_PERIOD: i64 = 4 * 60 * 60;
+
+pub fn glicko_to_glicko2(r: f64) -> f64 {
+    (r - 1500.0) / 173.7178
+}
 
 lazy_static! {
     pub static ref RUNTIME_DATA: Mutex<RuntimeData> = Mutex::new(RuntimeData {});
@@ -58,11 +62,19 @@ pub fn reset_names() -> Result<(), Box<dyn Error>> {
     };
 
     for g in games {
-        update_player(&tx, g.id_a, &g.name_a);
-        update_player(&tx, g.id_b, &g.name_b);
+        update_player(&tx, g.id_a, &g.name_a, g.game_floor);
+        update_player(&tx, g.id_b, &g.name_b, g.game_floor);
     }
 
     tx.commit()?;
+
+    Ok(())
+}
+
+pub fn reset_distribution() -> Result<(), Box<dyn Error>> {
+    let mut conn = Connection::open(DB_NAME)?;
+
+    update_player_distribution(&mut conn);
 
     Ok(())
 }
@@ -179,6 +191,7 @@ async fn update_ratings_continuous() {
         interval.tick().await;
         while Utc::now().timestamp() - last_rating_timestmap > RATING_PERIOD + 60 {
             last_rating_timestmap = update_ratings(&mut conn);
+            update_player_distribution(&mut conn);
         }
     }
 }
@@ -242,8 +255,8 @@ fn add_game(conn: &Transaction, game: ggst_api::Match) {
         floor: game_floor,
         winner,
     } = game;
-    update_player(conn, a.id, &a.name);
-    update_player(conn, b.id, &b.name);
+    update_player(conn, a.id, &a.name, game_floor.to_u8() as i64);
+    update_player(conn, b.id, &b.name, game_floor.to_u8() as i64);
 
     conn.execute(
         "INSERT OR IGNORE INTO games (
@@ -275,10 +288,10 @@ fn add_game(conn: &Transaction, game: ggst_api::Match) {
     .unwrap();
 }
 
-fn update_player(conn: &Transaction, id: i64, name: &str) {
+fn update_player(conn: &Transaction, id: i64, name: &str, floor: i64) {
     conn.execute(
-        "REPLACE INTO players(id, name) VALUES(?, ?)",
-        params![id, name],
+        "REPLACE INTO players(id, name, floor) VALUES(?, ?, ?)",
+        params![id, name, floor],
     )
     .unwrap();
 
@@ -287,6 +300,88 @@ fn update_player(conn: &Transaction, id: i64, name: &str) {
         params![id, name],
     )
     .unwrap();
+}
+
+fn update_player_distribution(conn: &mut Connection) {
+    let tx = conn.transaction().unwrap();
+
+    tx.execute("DELETE FROM player_floor_distribution", [])
+        .unwrap();
+    tx.execute("DELETE FROM player_rating_distribution", [])
+        .unwrap();
+
+    for f in (1..=10).chain(std::iter::once(99)) {
+        let player_count: i64 = tx
+            .query_row(
+                "SELECT COUNT(*) FROM players WHERE floor = ?",
+                params![f],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let game_count: i64 = tx
+            .query_row(
+                "SELECT COUNT(*) FROM games WHERE game_floor = ?",
+                params![f],
+                |r| r.get(0),
+            )
+            .unwrap();
+
+        tx.execute(
+            "INSERT INTO
+            player_floor_distribution
+            (floor, player_count, game_count) 
+            VALUES (?, ?, ?)",
+            params![f, player_count, game_count],
+        )
+        .unwrap();
+    }
+
+    for r in 0..60 {
+        let r_min = r * 50;
+        let r_max = (r + 1) * 50;
+
+        let player_count: i64 = tx
+            .query_row(
+                "SELECT COUNT(*) 
+                FROM player_ratings 
+                WHERE value >= ? AND value < ? AND deviation < ?",
+                params![
+                    glicko_to_glicko2(r_min as f64),
+                    glicko_to_glicko2(r_max as f64),
+                    MAX_DEVIATION
+                ],
+                |r| r.get(0),
+            )
+            .unwrap();
+
+        if player_count < 10 {
+            continue;
+        }
+
+        let player_count_cum: i64 = tx
+            .query_row(
+                "SELECT COUNT(*) 
+                FROM player_ratings 
+                WHERE value < ? AND deviation < ?",
+                params![
+                    glicko_to_glicko2(r_max as f64),
+                    MAX_DEVIATION
+                ],
+                |r| r.get(0),
+            )
+            .unwrap();
+
+        tx.execute(
+            "INSERT INTO
+            player_rating_distribution
+            (min_rating, max_rating, player_count, player_count_cum)
+            VALUES (?, ?, ?, ?)",
+            params![r_min, r_max, player_count, player_count_cum],
+        )
+        .unwrap();
+    }
+
+    tx.commit().unwrap();
 }
 
 fn update_ratings(conn: &mut Connection) -> i64 {
@@ -341,8 +436,8 @@ fn update_ratings(conn: &mut Connection) -> i64 {
     let tx = conn.transaction().unwrap();
 
     for g in games {
-        update_player(&tx, g.id_a, &g.name_a);
-        update_player(&tx, g.id_b, &g.name_b);
+        update_player(&tx, g.id_a, &g.name_a, g.game_floor);
+        update_player(&tx, g.id_b, &g.name_b, g.game_floor);
 
         let rating_a = players
             .entry((g.id_a, g.char_a))

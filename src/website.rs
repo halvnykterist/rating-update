@@ -48,6 +48,7 @@ pub async fn run() {
                 top_all,
                 top_char,
                 matchups,
+                player_distribution,
                 player,
                 search,
                 about,
@@ -154,6 +155,25 @@ async fn matchups(conn: RatingsDbConn) -> Cached<Template> {
 
     let delta = context.stats.last_update + rater::RATING_PERIOD - Utc::now().timestamp();
     Cached::new(Template::render("matchups", &context), delta)
+}
+
+#[get("/player-distribution")]
+async fn player_distribution(conn: RatingsDbConn) -> Cached<Template> {
+    #[derive(Serialize)]
+    struct Context {
+        stats: api::Stats,
+        floors: Vec<api::FloorPlayers>,
+        ratings: Vec<api::RatingPlayers>,
+    }
+
+    let context = Context {
+        stats: api::stats_inner(&conn).await,
+        floors: api::player_floors_distribution(&conn).await,
+        ratings: api::player_ratings_distribution(&conn).await,
+    };
+
+    let delta = context.stats.last_update + rater::RATING_PERIOD - Utc::now().timestamp();
+    Cached::new(Template::render("player_distribution", &context), delta)
 }
 
 #[get("/player/<player_id>")]

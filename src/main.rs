@@ -6,7 +6,7 @@ extern crate rocket;
 extern crate log;
 use simplelog::*;
 use std::{fs::File, ops::Deref};
-use tokio::{join, try_join};
+use tokio::try_join;
 
 mod api;
 mod rater;
@@ -50,6 +50,9 @@ async fn main() {
         }
         Some("names") => {
             rater::reset_names().unwrap();
+        }
+        Some("distribution") => {
+            rater::reset_distribution().unwrap();
         }
         Some("preload") => {
             rater::load_json_data(args.get(1).unwrap()).unwrap();
