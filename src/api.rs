@@ -93,7 +93,7 @@ pub async fn top_all_inner(conn: &RatingsDbConn) -> Vec<RankingPlayer> {
                 " SELECT * FROM player_ratings 
                  JOIN players ON player_ratings.id=players.id
                  WHERE player_ratings.deviation < ?
-                 ORDER BY player_ratings.value DESC LIMIT 100
+                 ORDER BY player_ratings.value - player_ratings.deviation DESC LIMIT 100
                  ",
             )
             .unwrap();
@@ -180,7 +180,7 @@ pub async fn top_char_inner(conn: &RatingsDbConn, char_id: i64) -> Vec<RankingPl
                 " SELECT * FROM player_ratings 
                  JOIN players ON player_ratings.id=players.id
                  WHERE player_ratings.deviation < ? AND player_ratings.char_id = ?
-                 ORDER BY player_ratings.value DESC LIMIT 100
+                 ORDER BY player_ratings.value - player_ratings.deviation DESC LIMIT 100
                  ",
             )
             .unwrap();
@@ -938,4 +938,45 @@ pub async fn player_ratings_distribution(conn: &RatingsDbConn) -> Vec<RatingPlay
         res
     })
     .await
+}
+
+#[get("/api/outcomes")]
+pub async fn outcomes(conn: RatingsDbConn) -> Json<Vec<f64>> {
+    Json(
+        conn.run(move |conn| {
+            let mut outcomes = vec![(0.0, 0.0); 101];
+
+            let mut stmt = conn
+                .prepare(
+                    "SELECT
+                value_a, value_b, winner
+                FROM games NATURAL JOIN game_ratings
+                WHERE deviation_a < ? AND deviation_b < ?;",
+                )
+                .unwrap();
+
+            let mut rows = stmt
+                .query(params![rater::MAX_DEVIATION, rater::MAX_DEVIATION])
+                .unwrap();
+            while let Some(row) = rows.next().unwrap() {
+                let a: f64 = row.get(0).unwrap();
+                let b: f64 = row.get(1).unwrap();
+                let winner: i64 = row.get(2).unwrap();
+
+                let p = a.exp() / (a.exp() + b.exp());
+
+                let o = outcomes.get_mut((p * 100.0).round() as usize).unwrap();
+                if winner == 1 {
+                    o.0 += 1.0;
+                }
+                o.1 += 1.0;
+            }
+
+            outcomes
+                .into_iter()
+                .map(|(wins, total)| wins / total)
+                .collect()
+        })
+        .await,
+    )
 }

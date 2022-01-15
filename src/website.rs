@@ -56,6 +56,7 @@ pub async fn run() {
                 api::top_all,
                 api::top_char,
                 api::search,
+                api::outcomes,
             ],
         )
         .register("/", catchers![catch_404, catch_500, catch_503])
