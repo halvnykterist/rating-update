@@ -76,6 +76,15 @@ CREATE TABLE high_rated_matchups(
     PRIMARY KEY(char_id, opp_char_id)
 );
 
+CREATE TABLE versus_matchups(
+    char_a INTEGER NOT NULL,
+    char_b INTEGER NOT NULL,
+    game_count INTEGER NOT NULL,
+    pair_count INTEGER NOT NULL,
+    win_rate REAL NOT NULL,
+    PRIMARY KEY(char_a, char_b)
+);
+
 CREATE TABLE player_floor_distribution(
     floor INTEGER NOT NULL,
     player_count INTEGER NOT NULL,

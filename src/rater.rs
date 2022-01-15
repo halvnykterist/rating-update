@@ -9,12 +9,14 @@ use serde::Deserialize;
 use std::{error::Error, fs::File, io::BufReader, sync::Mutex, time::Duration};
 use tokio::{time, try_join};
 
-const SYS_CONSTANT: f64 = 0.01;
+use crate::website;
+
+const SYS_CONSTANT: f64 = 0.1;
 pub const MAX_DEVIATION: f64 = 100.0 / 173.7178;
 pub const HIGH_RATING: f64 = (1800.0 - 1500.0) / 173.7178;
 const DB_NAME: &str = "ratings.sqlite";
 
-pub const RATING_PERIOD: i64 = 4 * 60 * 60;
+pub const RATING_PERIOD: i64 = 1 * 60 * 60;
 
 pub fn glicko_to_glicko2(r: f64) -> f64 {
     (r - 1500.0) / 173.7178
@@ -179,8 +181,10 @@ async fn pull_continuous() {
     }
 }
 
-async fn update_ratings_continuous() {
+pub async fn update_ratings_continuous() {
     let mut conn = Connection::open(DB_NAME).unwrap();
+
+    calc_versus_matchups(&mut conn);
 
     let mut last_rating_timestmap: i64 = conn
         .query_row("SELECT (last_update) FROM config", [], |r| r.get(0))
@@ -192,6 +196,7 @@ async fn update_ratings_continuous() {
         while Utc::now().timestamp() - last_rating_timestmap > RATING_PERIOD + 60 {
             last_rating_timestmap = update_ratings(&mut conn);
             update_player_distribution(&mut conn);
+            calc_versus_matchups(&mut conn);
         }
     }
 }
@@ -363,10 +368,7 @@ fn update_player_distribution(conn: &mut Connection) {
                 "SELECT COUNT(*) 
                 FROM player_ratings 
                 WHERE value < ? AND deviation < ?",
-                params![
-                    glicko_to_glicko2(r_max as f64),
-                    MAX_DEVIATION
-                ],
+                params![glicko_to_glicko2(r_max as f64), MAX_DEVIATION],
                 |r| r.get(0),
             )
             .unwrap();
@@ -692,6 +694,110 @@ fn update_ratings(conn: &mut Connection) -> i64 {
     tx.commit().unwrap();
 
     next_timestamp
+}
+
+pub fn calc_versus_matchups(conn: &mut Connection) {
+    let mut pairs = FxHashMap::<((i64, i64), (i64, i64)), (f64, f64, i64)>::default();
+    info!("Calculating matchups");
+
+    {
+        let mut stmt = conn
+            .prepare(
+                "SELECT
+            id_a, char_a, value_a, id_b, char_b, value_b, winner
+            FROM games NATURAL JOIN game_ratings
+            WHERE value_a > ? AND deviation_a < ? AND value_b > ? AND deviation_b < ?;",
+            )
+            .unwrap();
+
+        let mut rows = stmt
+            .query(params![
+                HIGH_RATING,
+                MAX_DEVIATION,
+                HIGH_RATING,
+                MAX_DEVIATION
+            ])
+            .unwrap();
+
+        while let Some(row) = rows.next().unwrap() {
+            let id_a: i64 = row.get(0).unwrap();
+            let char_a: i64 = row.get(1).unwrap();
+            let value_a: f64 = row.get(2).unwrap();
+            let id_b: i64 = row.get(3).unwrap();
+            let char_b: i64 = row.get(4).unwrap();
+            let value_b: f64 = row.get(5).unwrap();
+            let winner: i64 = row.get(6).unwrap();
+
+            if let Some((a, b, v_a, v_b, winner)) = {
+                if char_a < char_b {
+                    Some(((id_a, char_a), (id_b, char_b), value_a, value_b, winner))
+                } else if char_b < char_a {
+                    Some((
+                        (id_b, char_b),
+                        (id_a, char_a),
+                        value_b,
+                        value_a,
+                        if winner == 1 { 2 } else { 1 },
+                    ))
+                } else {
+                    None
+                }
+            } {
+                let p = pairs.entry((a, b)).or_insert((0.0, 0.0, 0));
+                let win_chance = v_a.exp() / (v_a.exp() + v_b.exp());
+                let loss_chance = 1.0 - win_chance;
+
+                match winner {
+                    1 => {
+                        p.0 += loss_chance;
+                    }
+                    2 => {
+                        p.1 += win_chance;
+                    }
+                    _ => panic!("Bad winner"),
+                }
+                p.2 += 1;
+            }
+        }
+    }
+
+    let tx = conn.transaction().unwrap();
+    tx.execute("DELETE FROM versus_matchups", []).unwrap();
+
+    for a in 0..website::CHAR_NAMES.len() - 1 {
+        for b in (a + 1)..website::CHAR_NAMES.len() {
+            let a = a as i64;
+            let b = b as i64;
+            let i = pairs
+                .iter()
+                .filter(|(((_, c_a), (_, c_b)), _)| *c_a == a && *c_b == b);
+            let sum: f64 = i
+                .clone()
+                .map(|(_, (wins, losses, _))| wins / (wins + losses))
+                .sum();
+            let pair_count = i.clone().count();
+            let game_count: i64 = i.clone().map(|(_, (_, _, games))| games).sum();
+            let probability = sum / pair_count as f64;
+            tx.execute(
+                "INSERT INTO 
+                versus_matchups(char_a, char_b, game_count, pair_count, win_rate)
+                VALUES(?, ?, ?, ?, ?)",
+                params![a, b, game_count, pair_count, probability],
+            )
+            .unwrap();
+            tx.execute(
+                "INSERT INTO 
+                versus_matchups(char_a, char_b, game_count, pair_count, win_rate)
+                VALUES(?, ?, ?, ?, ?)",
+                params![b, a, game_count, pair_count, 1.0 - probability],
+            )
+            .unwrap();
+        }
+    }
+
+    tx.commit().unwrap();
+
+    info!("Done");
 }
 
 pub struct Game {

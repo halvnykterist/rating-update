@@ -48,6 +48,9 @@ async fn main() {
         Some("reset") => {
             rater::reset_database().unwrap();
         }
+        Some("update") => {
+            rater::update_ratings_continuous().await;
+        }
         Some("names") => {
             rater::reset_names().unwrap();
         }

@@ -145,6 +145,7 @@ async fn matchups(conn: RatingsDbConn) -> Cached<Template> {
         character_shortnames: Vec<&'static str>,
         matchups_global: Vec<api::CharacterMatchups>,
         matchups_high_rated: Vec<api::CharacterMatchups>,
+        matchups_versus: Vec<api::VersusCharacterMatchups>,
     }
 
     let context = Context {
@@ -152,6 +153,7 @@ async fn matchups(conn: RatingsDbConn) -> Cached<Template> {
         character_shortnames: CHAR_NAMES.iter().map(|c| c.0).collect(),
         matchups_global: api::matchups_global_inner(&conn).await,
         matchups_high_rated: api::matchups_high_rated_inner(&conn).await,
+        matchups_versus: api::matchups_versus(&conn).await,
     };
 
     let delta = context.stats.last_update + rater::RATING_PERIOD - Utc::now().timestamp();

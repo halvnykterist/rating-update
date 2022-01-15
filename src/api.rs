@@ -828,6 +828,75 @@ pub async fn matchups_high_rated_inner(conn: &RatingsDbConn) -> Vec<CharacterMat
 }
 
 #[derive(Serialize)]
+pub struct VersusCharacterMatchups {
+    name: String,
+    matchups: Vec<VersusMatchup>,
+}
+
+#[derive(Serialize)]
+pub struct VersusMatchup {
+    win_rate: f64,
+    game_count: i32,
+    pair_count: i32,
+    suspicious: bool,
+    evaluation: &'static str,
+}
+
+pub async fn matchups_versus(conn: &RatingsDbConn) -> Vec<VersusCharacterMatchups> {
+    conn.run(move |conn| {
+        (0..website::CHAR_NAMES.len())
+            .map(|char_id| VersusCharacterMatchups {
+                name: website::CHAR_NAMES[char_id].1.to_owned(),
+                matchups: (0..website::CHAR_NAMES.len())
+                    .map(|opp_char_id| {
+                        if char_id == opp_char_id {
+                            VersusMatchup {
+                                win_rate: 50.0,
+                                game_count: 0,
+                                pair_count: 0,
+                                suspicious: false,
+                                evaluation: "ok",
+                            }
+                        } else {
+                            conn.query_row(
+                                "SELECT win_rate, game_count, pair_count
+                                FROM versus_matchups
+                                WHERE char_a = ? AND char_b = ?",
+                                params![char_id, opp_char_id],
+                                |row| {
+                                    Ok((
+                                        row.get::<_, f64>(0)?,
+                                        row.get::<_, i32>(1)?,
+                                        row.get::<_, i32>(2)?,
+                                    ))
+                                },
+                            )
+                            .optional()
+                            .unwrap()
+                            .map(|(win_rate, game_count, pair_count)| VersusMatchup {
+                                win_rate: (win_rate * 100.0).round(),
+                                game_count,
+                                pair_count,
+                                suspicious: pair_count < 50 || game_count < 250,
+                                evaluation: get_evaluation(win_rate, 1.0 - win_rate, f64::INFINITY),
+                            })
+                            .unwrap_or(VersusMatchup {
+                                win_rate: f64::NAN,
+                                game_count: 0,
+                                pair_count: 0,
+                                suspicious: true,
+                                evaluation: "none",
+                            })
+                        }
+                    })
+                    .collect(),
+            })
+            .collect()
+    })
+    .await
+}
+
+#[derive(Serialize)]
 pub struct FloorPlayers {
     floor: String,
     player_count: i64,
