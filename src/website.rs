@@ -77,17 +77,8 @@ async fn index() -> Redirect {
 }
 
 #[get("/about")]
-async fn about(conn: RatingsDbConn) -> Cached<Template> {
-    #[derive(Serialize)]
-    struct Context {
-        stats: api::Stats,
-    }
-
-    let context = Context {
-        stats: api::stats_inner(&conn).await,
-    };
-
-    Cached::new(Template::render("about", &context), 999)
+async fn about() -> Cached<Template> {
+    Cached::new(Template::render("about", &()), 999)
 }
 
 #[get("/top/all")]

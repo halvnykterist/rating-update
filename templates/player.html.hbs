@@ -38,7 +38,7 @@
                     <th>Opponent</th>
                     <th>Opp. Character</th>
                     <th>Opp. rating</th>
-                    <th>Expected outcome</th>
+                    <th>Expected wins</th>
                     <th>Result</th>
                 </tr>
                 {{#each this.recent_games}}
@@ -49,7 +49,14 @@
                     <td>{{>player_link name=this.opponent_name id=this.opponent_id}}</td>
                     <td>{{this.opponent_character}}</td>
                     <td>{{this.opponent_rating_value}} ±{{this.opponent_rating_deviation}}</td>
-                    <td>{{this.expected_outcome_min}}–{{this.expected_outcome_max}}%</td>
+                    <td>
+                            <span title="{{this.expected_outcome_min}}–{{this.expected_outcome_max}}%">
+                                {{#if this.expected_outcome}}
+                                    {{this.expected_outcome}}%
+                                {{/if}}
+                                {{this.expected_outcome_evaluation}}
+                            </span>
+                    </td>
                     <td><span title="{{this.result_percent}}%">{{this.result_wins}} - {{this.result_losses}}</span></td>
                 </tr>
                 {{/each}}
@@ -65,7 +72,7 @@
                     <th>Opponent</th>
                     <th>Opp. Character</th>
                     <th>Opp. rating</th>
-                    <th>Expected outcome</th>
+                    <th>Expected wins</th>
                     <th>Result</th>
                 </tr>
                 {{#each this.history}}
@@ -76,7 +83,14 @@
                     <td>{{>player_link name=this.opponent_name id=this.opponent_id}}</td>
                     <td>{{this.opponent_character}}</td>
                     <td>{{this.opponent_rating_value}} ±{{this.opponent_rating_deviation}}</td>
-                    <td>{{this.expected_outcome_min}}–{{this.expected_outcome_max}}%</td>
+                    <td>
+                            <span title="{{this.expected_outcome_min}}–{{this.expected_outcome_max}}%">
+                                {{#if this.expected_outcome}}
+                                    {{this.expected_outcome}}%
+                                {{/if}}
+                                {{this.expected_outcome_evaluation}}
+                            </span>
+                    </td>
                     <td><span title="{{this.result_percent}}%">{{this.result_wins}} - {{this.result_losses}}</span></td>
                 </tr>
                 {{/each}}

@@ -77,7 +77,7 @@ impl RankingPlayer {
                 .to_owned(),
             game_count: (rated_player.win_count + rated_player.loss_count) as i32,
             rating_value: GlickoRating::from(rated_player.rating).value.round(),
-            rating_deviation: GlickoRating::from(rated_player.rating).deviation.round(),
+            rating_deviation: (GlickoRating::from(rated_player.rating).deviation * 2.0).round(),
         }
     }
 }
@@ -93,7 +93,7 @@ pub async fn top_all_inner(conn: &RatingsDbConn) -> Vec<RankingPlayer> {
                 " SELECT * FROM player_ratings 
                  JOIN players ON player_ratings.id=players.id
                  WHERE player_ratings.deviation < ?
-                 ORDER BY player_ratings.value - player_ratings.deviation DESC LIMIT 100
+                 ORDER BY player_ratings.value - 2.0 * player_ratings.deviation DESC LIMIT 100
                  ",
             )
             .unwrap();
@@ -158,7 +158,7 @@ pub async fn search_inner(conn: &RatingsDbConn, search: String) -> Vec<SearchRes
                     .1
                     .to_owned(),
                 rating_value: rating.value.round(),
-                rating_deviation: rating.deviation.round(),
+                rating_deviation: (rating.deviation * 2.0).round(),
                 game_count: row.get::<_, i32>("wins").unwrap()
                     + row.get::<_, i32>("losses").unwrap(),
             });
@@ -180,7 +180,7 @@ pub async fn top_char_inner(conn: &RatingsDbConn, char_id: i64) -> Vec<RankingPl
                 " SELECT * FROM player_ratings 
                  JOIN players ON player_ratings.id=players.id
                  WHERE player_ratings.deviation < ? AND player_ratings.char_id = ?
-                 ORDER BY player_ratings.value - player_ratings.deviation DESC LIMIT 100
+                 ORDER BY player_ratings.value - 2.0 * player_ratings.deviation DESC LIMIT 100
                  ",
             )
             .unwrap();
@@ -231,11 +231,52 @@ struct PlayerSet {
     opponent_character: String,
     opponent_rating_value: f64,
     opponent_rating_deviation: f64,
+    expected_outcome: f64,
+    expected_outcome_evaluation: &'static str,
     expected_outcome_min: f64,
     expected_outcome_max: f64,
     result_wins: i32,
     result_losses: i32,
     result_percent: f64,
+}
+
+fn get_expected_outcomes(
+    own_value: f64,
+    own_deviation: f64,
+    opp_value: f64,
+    opp_deviation: f64,
+) -> (f64, f64, f64, &'static str) {
+    let own_min = (own_value - own_deviation).exp();
+    let own_avg = (own_value).exp();
+    let own_max = (own_value + own_deviation).exp();
+
+    let opp_min = (opp_value - opp_deviation).exp();
+    let opp_avg = (opp_value).exp();
+    let opp_max = (opp_value + opp_deviation).exp();
+
+    let win_min = own_min / (own_min + opp_max);
+    let mut win_avg = own_avg / (own_avg + opp_avg);
+    let win_max = own_max / (own_max + opp_min);
+
+    let delta = win_max - win_min;
+
+    let evaluation = if delta < 0.15 {
+        ""
+    } else if delta < 0.3 {
+        "?"
+    } else if delta < 0.6 {
+        "??"
+    } else {
+        win_avg = f64::NAN;
+        "???"
+    };
+
+    (
+        (win_min * 100.0).round(),
+        (win_avg * 100.0).round(),
+        (win_max * 100.0).round(),
+        evaluation,
+    )
 }
 
 #[derive(Serialize)]
@@ -366,13 +407,17 @@ pub async fn get_player_data(conn: &RatingsDbConn, id: i64) -> Option<PlayerData
                             }
                             .into();
 
-                            let own_rating_min = (own_value - own_deviation).exp();
-                            let own_rating_max = (own_value + own_deviation).exp();
-                            let opp_rating_min = (opponent_value - opponent_deviation).exp();
-                            let opp_rating_max = (opponent_value + opponent_deviation).exp();
-
-                            let win_min = own_rating_min / (own_rating_min + opp_rating_max);
-                            let win_max = own_rating_max / (own_rating_max + opp_rating_min);
+                            let (
+                                expected_outcome_min,
+                                expected_outcome,
+                                expected_outcome_max,
+                                expected_outcome_evaluation,
+                            ) = get_expected_outcomes(
+                                own_value,
+                                own_deviation,
+                                opponent_value,
+                                opponent_deviation,
+                            );
 
                             if let Some(set) = history.last_mut().filter(|set| {
                                 set.opponent_id == format!("{:X}", opponent_id)
@@ -385,9 +430,10 @@ pub async fn get_player_data(conn: &RatingsDbConn, id: i64) -> Option<PlayerData
                                         .format("%Y-%m-%d %H:%M")
                                 );
                                 set.own_rating_value = own_rating.value.round();
-                                set.own_rating_deviation = own_rating.deviation.round();
+                                set.own_rating_deviation = (own_rating.deviation * 2.0).round();
                                 set.opponent_rating_value = opponent_rating.value.round();
-                                set.opponent_rating_deviation = opponent_rating.deviation.round();
+                                set.opponent_rating_deviation =
+                                    (opponent_rating.deviation * 2.0).round();
 
                                 match winner {
                                     1 | 4 => set.result_wins += 1,
@@ -407,7 +453,7 @@ pub async fn get_player_data(conn: &RatingsDbConn, id: i64) -> Option<PlayerData
                                             .format("%Y-%m-%d %H:%M")
                                     ),
                                     own_rating_value: own_rating.value.round(),
-                                    own_rating_deviation: own_rating.deviation.round(),
+                                    own_rating_deviation: (own_rating.deviation * 2.0).round(),
                                     floor: match floor {
                                         99 => format!("Celestial"),
                                         n => format!("Floor {}", n),
@@ -419,9 +465,12 @@ pub async fn get_player_data(conn: &RatingsDbConn, id: i64) -> Option<PlayerData
                                         .1
                                         .to_owned(),
                                     opponent_rating_value: opponent_rating.value.round(),
-                                    opponent_rating_deviation: opponent_rating.deviation.round(),
-                                    expected_outcome_min: (win_min * 100.0).round(),
-                                    expected_outcome_max: (win_max * 100.0).round(),
+                                    opponent_rating_deviation: (opponent_rating.deviation * 2.0)
+                                        .round(),
+                                    expected_outcome,
+                                    expected_outcome_evaluation,
+                                    expected_outcome_min,
+                                    expected_outcome_max,
                                     result_wins: match winner {
                                         1 | 4 => 1,
                                         _ => 0,
@@ -524,13 +573,17 @@ pub async fn get_player_data(conn: &RatingsDbConn, id: i64) -> Option<PlayerData
                             }
                             .into();
 
-                            let own_rating_min = (value - deviation).exp();
-                            let own_rating_max = (value + deviation).exp();
-                            let opp_rating_min = (opponent_value - opponent_deviation).exp();
-                            let opp_rating_max = (opponent_value + opponent_deviation).exp();
-
-                            let win_min = own_rating_min / (own_rating_min + opp_rating_max);
-                            let win_max = own_rating_max / (own_rating_max + opp_rating_min);
+                            let (
+                                expected_outcome_min,
+                                expected_outcome,
+                                expected_outcome_max,
+                                expected_outcome_evaluation,
+                            ) = get_expected_outcomes(
+                                value,
+                                deviation,
+                                opponent_value,
+                                opponent_deviation,
+                            );
 
                             if let Some(set) = recent_games.last_mut().filter(|set| {
                                 set.opponent_id == format!("{:X}", opponent_id)
@@ -543,9 +596,10 @@ pub async fn get_player_data(conn: &RatingsDbConn, id: i64) -> Option<PlayerData
                                         .format("%Y-%m-%d %H:%M")
                                 );
                                 set.own_rating_value = own_rating.value.round();
-                                set.own_rating_deviation = own_rating.deviation.round();
+                                set.own_rating_deviation = (own_rating.deviation * 2.0).round();
                                 set.opponent_rating_value = opponent_rating.value.round();
-                                set.opponent_rating_deviation = opponent_rating.deviation.round();
+                                set.opponent_rating_deviation =
+                                    (opponent_rating.deviation * 2.0).round();
 
                                 match winner {
                                     1 | 4 => set.result_wins += 1,
@@ -565,7 +619,7 @@ pub async fn get_player_data(conn: &RatingsDbConn, id: i64) -> Option<PlayerData
                                             .format("%Y-%m-%d %H:%M")
                                     ),
                                     own_rating_value: own_rating.value.round(),
-                                    own_rating_deviation: own_rating.deviation.round(),
+                                    own_rating_deviation: (own_rating.deviation * 2.0).round(),
                                     floor: match floor {
                                         99 => format!("Celestial"),
                                         n => format!("Floor {}", n),
@@ -577,9 +631,12 @@ pub async fn get_player_data(conn: &RatingsDbConn, id: i64) -> Option<PlayerData
                                         .1
                                         .to_owned(),
                                     opponent_rating_value: opponent_rating.value.round(),
-                                    opponent_rating_deviation: opponent_rating.deviation.round(),
-                                    expected_outcome_min: (win_min * 100.0).round(),
-                                    expected_outcome_max: (win_max * 100.0).round(),
+                                    opponent_rating_deviation: (opponent_rating.deviation * 2.0)
+                                        .round(),
+                                    expected_outcome,
+                                    expected_outcome_evaluation,
+                                    expected_outcome_min,
+                                    expected_outcome_max,
                                     result_wins: match winner {
                                         1 | 4 => 1,
                                         _ => 0,
@@ -645,7 +702,7 @@ pub async fn get_player_data(conn: &RatingsDbConn, id: i64) -> Option<PlayerData
                         game_count: wins + losses,
                         win_rate: wins as f64 / (wins + losses) as f64,
                         rating_value: (value * 173.7178 + 1500.0).round(),
-                        rating_deviation: (deviation * 173.7178).round(),
+                        rating_deviation: (deviation * 173.7178 * 2.0).round(),
                         history,
                         recent_games,
                         matchups,

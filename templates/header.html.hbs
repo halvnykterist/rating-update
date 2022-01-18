@@ -5,7 +5,7 @@
     <a href="/top/SO">(per character)</a>  |
     <a href="/matchups">Matchups</a>  |
     <a href="/player-distribution">Player Distribution</a>  |
-    <a href="/about">About</a>  |
+    <a href="/about">FAQ</a>  |
     <a href="https://github.com/halvnykterist/rating-update/">Github</a> |
     <a href="https://twitter.com/sov_gott_games">Twitter</a> | 
         <input type="text" id="name" name="name" required autocomplete="on" placeholder="GG Player">
@@ -13,8 +13,10 @@
     </span>
     </form>
 </div>
+{{#if this}}
 <div>
     <p> Data from {{game_count}} games between {{player_count}} players.
-    Leaderboards require a rating deviation ≤100. 
+    Leaderboards require a rating deviation ≤200. <br>
     Time until next update is {{next_update_in}} (last update was at {{last_update_string}}.)</p>
 </div
+{{/if}}
