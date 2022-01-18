@@ -11,7 +11,7 @@ use tokio::{time, try_join};
 
 use crate::website;
 
-const SYS_CONSTANT: f64 = 0.04;
+const SYS_CONSTANT: f64 = 0.01;
 pub const MAX_DEVIATION: f64 = 100.0 / 173.7178;
 pub const HIGH_RATING: f64 = (1800.0 - 1500.0) / 173.7178;
 const DB_NAME: &str = "ratings.sqlite";
