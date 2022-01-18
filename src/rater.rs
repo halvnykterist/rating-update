@@ -11,7 +11,7 @@ use tokio::{time, try_join};
 
 use crate::website;
 
-const SYS_CONSTANT: f64 = 0.1;
+const SYS_CONSTANT: f64 = 0.04;
 pub const MAX_DEVIATION: f64 = 100.0 / 173.7178;
 pub const HIGH_RATING: f64 = (1800.0 - 1500.0) / 173.7178;
 const DB_NAME: &str = "ratings.sqlite";
@@ -186,15 +186,17 @@ pub async fn update_ratings_continuous() {
 
     calc_versus_matchups(&mut conn);
 
-    let mut last_rating_timestmap: i64 = conn
+    let mut last_rating_timestamp: i64 = conn
         .query_row("SELECT (last_update) FROM config", [], |r| r.get(0))
         .unwrap();
 
     let mut interval = time::interval(Duration::from_secs(60));
     loop {
         interval.tick().await;
-        while Utc::now().timestamp() - last_rating_timestmap > RATING_PERIOD + 60 {
-            last_rating_timestmap = update_ratings(&mut conn);
+        if Utc::now().timestamp() - last_rating_timestamp > RATING_PERIOD + 60 {
+            while Utc::now().timestamp() - last_rating_timestamp > RATING_PERIOD + 60 {
+                last_rating_timestamp = update_ratings(&mut conn);
+            }
             update_player_distribution(&mut conn);
             calc_versus_matchups(&mut conn);
         }
@@ -778,20 +780,22 @@ pub fn calc_versus_matchups(conn: &mut Connection) {
             let pair_count = i.clone().count();
             let game_count: i64 = i.clone().map(|(_, (_, _, games))| games).sum();
             let probability = sum / pair_count as f64;
-            tx.execute(
-                "INSERT INTO 
+            if game_count > 0 {
+                tx.execute(
+                    "INSERT INTO 
                 versus_matchups(char_a, char_b, game_count, pair_count, win_rate)
                 VALUES(?, ?, ?, ?, ?)",
-                params![a, b, game_count, pair_count, probability],
-            )
-            .unwrap();
-            tx.execute(
-                "INSERT INTO 
+                    params![a, b, game_count, pair_count, probability],
+                )
+                .unwrap();
+                tx.execute(
+                    "INSERT INTO 
                 versus_matchups(char_a, char_b, game_count, pair_count, win_rate)
                 VALUES(?, ?, ?, ?, ?)",
-                params![b, a, game_count, pair_count, 1.0 - probability],
-            )
-            .unwrap();
+                    params![b, a, game_count, pair_count, 1.0 - probability],
+                )
+                .unwrap();
+            }
         }
     }
 
