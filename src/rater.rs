@@ -185,6 +185,8 @@ async fn pull_continuous() {
 pub async fn update_ratings_continuous() {
     let mut conn = Connection::open(DB_NAME).unwrap();
 
+    update_rankings(&mut conn).unwrap();
+
     let mut last_rating_timestamp: i64 = conn
         .query_row("SELECT (last_update) FROM config", [], |r| r.get(0))
         .unwrap();
@@ -197,7 +199,12 @@ pub async fn update_ratings_continuous() {
                 last_rating_timestamp = update_ratings(&mut conn);
             }
             update_player_distribution(&mut conn);
-            calc_versus_matchups(&mut conn);
+            if let Err(e) = calc_versus_matchups(&mut conn) {
+                error!("{}", e);
+            }
+            if let Err(e) = update_rankings(&mut conn) {
+                error!("{}", e);
+            }
         }
     }
 }
@@ -694,37 +701,65 @@ fn update_ratings(conn: &mut Connection) -> i64 {
     next_timestamp
 }
 
-pub fn calc_versus_matchups(conn: &mut Connection) {
+pub fn update_rankings(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
+    let tx = conn.transaction()?;
+    tx.execute("DELETE FROM ranking_global", [])?;
+    tx.execute("DELETE FROM ranking_character", [])?;
+
+    tx.execute(
+        "INSERT INTO ranking_global (global_rank, id, char_id)
+         SELECT ROW_NUMBER() OVER (ORDER BY value - 2.0 * deviation DESC) as global_rank, id, char_id
+         FROM player_ratings 
+         WHERE deviation < ?
+         ORDER BY value - 2.0 * deviation DESC
+         LIMIT 1000",
+        params![MAX_DEVIATION],
+    )?;
+
+    for c in 0..website::CHAR_NAMES.len() {
+        tx.execute(
+            "INSERT INTO ranking_character (character_rank, id, char_id)
+             SELECT ROW_NUMBER() OVER (ORDER BY value - 2.0 * deviation DESC) as character_rank, id, char_id
+             FROM player_ratings 
+             WHERE deviation < ? AND char_id = ?
+             ORDER BY value - 2.0 * deviation DESC
+             LIMIT 1000",
+            params![MAX_DEVIATION, c],
+        )?;
+    }
+
+    tx.commit()?;
+    info!("Updated rankings");
+    Ok(())
+}
+
+pub fn calc_versus_matchups(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
     let mut pairs = FxHashMap::<((i64, i64), (i64, i64)), (f64, f64, i64)>::default();
     info!("Calculating matchups");
 
     {
-        let mut stmt = conn
-            .prepare(
-                "SELECT
+        let mut stmt = conn.prepare(
+            "SELECT
             id_a, char_a, value_a, id_b, char_b, value_b, winner
             FROM games NATURAL JOIN game_ratings
             WHERE value_a > ? AND deviation_a < ? AND value_b > ? AND deviation_b < ?;",
-            )
-            .unwrap();
+        )?;
 
-        let mut rows = stmt
-            .query(params![
-                HIGH_RATING,
-                MAX_DEVIATION,
-                HIGH_RATING,
-                MAX_DEVIATION
-            ])
-            .unwrap();
+        let mut rows = stmt.query(params![
+            HIGH_RATING,
+            MAX_DEVIATION,
+            HIGH_RATING,
+            MAX_DEVIATION
+        ])?;
 
-        while let Some(row) = rows.next().unwrap() {
-            let id_a: i64 = row.get(0).unwrap();
-            let char_a: i64 = row.get(1).unwrap();
-            let value_a: f64 = row.get(2).unwrap();
-            let id_b: i64 = row.get(3).unwrap();
-            let char_b: i64 = row.get(4).unwrap();
-            let value_b: f64 = row.get(5).unwrap();
-            let winner: i64 = row.get(6).unwrap();
+        while let Some(row) = rows.next()? {
+            let id_a: i64 = row.get(0)?;
+            let char_a: i64 = row.get(1)?;
+            let value_a: f64 = row.get(2)?;
+            let id_b: i64 = row.get(3)?;
+            let char_b: i64 = row.get(4)?;
+            let value_b: f64 = row.get(5)?;
+            let winner: i64 = row.get(6)?;
 
             if let Some((a, b, v_a, v_b, winner)) = {
                 if char_a < char_b {
@@ -759,8 +794,8 @@ pub fn calc_versus_matchups(conn: &mut Connection) {
         }
     }
 
-    let tx = conn.transaction().unwrap();
-    tx.execute("DELETE FROM versus_matchups", []).unwrap();
+    let tx = conn.transaction()?;
+    tx.execute("DELETE FROM versus_matchups", [])?;
 
     for a in 0..website::CHAR_NAMES.len() - 1 {
         for b in (a + 1)..website::CHAR_NAMES.len() {
@@ -782,22 +817,22 @@ pub fn calc_versus_matchups(conn: &mut Connection) {
                 versus_matchups(char_a, char_b, game_count, pair_count, win_rate)
                 VALUES(?, ?, ?, ?, ?)",
                     params![a, b, game_count, pair_count, probability],
-                )
-                .unwrap();
+                )?;
                 tx.execute(
                     "INSERT INTO 
                 versus_matchups(char_a, char_b, game_count, pair_count, win_rate)
                 VALUES(?, ?, ?, ?, ?)",
                     params![b, a, game_count, pair_count, 1.0 - probability],
-                )
-                .unwrap();
+                )?;
             }
         }
     }
 
-    tx.commit().unwrap();
+    tx.commit()?;
 
     info!("Done");
+
+    Ok(())
 }
 
 pub struct Game {

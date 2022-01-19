@@ -100,6 +100,20 @@ CREATE TABLE player_rating_distribution(
     PRIMARY KEY(min_rating, max_rating)
 );
 
+CREATE TABLE ranking_global (
+    global_rank INTEGER NOT NULL,
+    id INTEGER NOT NULL,
+    char_id INTEGER NOT NULL,
+    PRIMARY KEY(global_rank)
+);
+
+CREATE TABLE ranking_character (
+    character_rank INTEGER NOT NULL,
+    char_id INTEGER NOT NULL,
+    id INTEGER NOT NULL,
+    PRIMARY KEY(character_rank, char_id)
+);
+
 
 CREATE TABLE config (
     last_update INTEGER NOT NULL

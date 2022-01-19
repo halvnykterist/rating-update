@@ -26,7 +26,7 @@
         <br>
 
         <div>
-            <h2>{{player.name}}</h2>
+            <h1>{{player.name}}</h1>
         </div>
         <div>
             {{#if player.other_names}}
@@ -36,10 +36,18 @@
                 {{/each}}
             {{/if}}
         </div>
-        <hr>
 
 
-        <h3>{{player.data.character_name}} - {{player.data.rating_value}} ±{{player.data.rating_deviation}} ({{player.data.game_count}} games)</h3>
+        <h2>
+            {{player.data.character_name}}<br>
+            {{player.data.rating_value}} ±{{player.data.rating_deviation}} ({{player.data.game_count}} games)
+            {{#if player.data.character_rank}}
+                <br>#{{player.data.character_rank}} {{player.data.character_name}}
+            {{/if}}
+            {{#if player.data.global_rank}}
+                <br>#{{player.data.global_rank}} overall
+            {{/if}}
+        </h2>
 
 
         {{#if player.data.recent_games}}
