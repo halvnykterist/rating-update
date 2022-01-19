@@ -34,7 +34,7 @@
                 {{#each players}}
                     <tr>
                         <td>{{this.pos}}</td>
-                        <td>{{>player_link name=this.name id=this.id}}</td>
+                        <td>{{>player_link name=this.name id=this.id char=this.shortname}}</td>
                         <td>{{this.rating_value}} ±{{this.rating_deviation}}</td>
                         <td>{{this.game_count}}</td>
                     </tr>

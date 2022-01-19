@@ -50,6 +50,7 @@ pub async fn run() {
                 matchups,
                 player_distribution,
                 player,
+                player_char,
                 search,
                 about,
                 api::stats,
@@ -171,21 +172,65 @@ async fn player_distribution(conn: RatingsDbConn) -> Cached<Template> {
 }
 
 #[get("/player/<player_id>")]
-async fn player(conn: RatingsDbConn, player_id: &str) -> Option<Cached<Template>> {
+async fn player(conn: RatingsDbConn, player_id: &str) -> Option<Redirect> {
     let id = i64::from_str_radix(player_id, 16).unwrap();
+
+    if let Some(char_id) = api::get_player_highest_rated_character(&conn, id).await {
+        let char_short = CHAR_NAMES[char_id as usize].0;
+        Some(Redirect::to(uri!(player_char(
+            player_id = player_id,
+            char_id = char_short
+        ))))
+    } else {
+        None
+    }
+}
+
+//#[get("/player/<player_id>")]
+//async fn player(conn: RatingsDbConn, player_id: &str) -> Option<Cached<Template>> {
+//    let id = i64::from_str_radix(player_id, 16).unwrap();
+//
+//    #[derive(Serialize)]
+//    struct Context {
+//        stats: api::Stats,
+//        player: api::PlayerData,
+//    }
+//
+//    let stats = api::stats_inner(&conn).await;
+//
+//    if let Some(player) = api::get_player_data(&conn, id).await {
+//        let context = Context { stats, player };
+//        Some(Cached::new(
+//            Template::render("player", &context),
+//            context.stats.last_update + rater::RATING_PERIOD - Utc::now().timestamp(),
+//        ))
+//    } else {
+//        None
+//    }
+//}
+
+#[get("/player/<player_id>/<char_id>")]
+async fn player_char(
+    conn: RatingsDbConn,
+    player_id: &str,
+    char_id: &str,
+) -> Option<Cached<Template>> {
+    let id = i64::from_str_radix(player_id, 16).unwrap();
+
+    let char_id = CHAR_NAMES.iter().position(|(c, _)| *c == char_id)? as i64;
 
     #[derive(Serialize)]
     struct Context {
         stats: api::Stats,
-        player: api::PlayerData,
+        player: api::PlayerDataChar,
     }
 
     let stats = api::stats_inner(&conn).await;
 
-    if let Some(player) = api::get_player_data(&conn, id).await {
+    if let Some(player) = api::get_player_data_char(&conn, id, char_id).await {
         let context = Context { stats, player };
         Some(Cached::new(
-            Template::render("player", &context),
+            Template::render("player_char", &context),
             context.stats.last_update + rater::RATING_PERIOD - Utc::now().timestamp(),
         ))
     } else {
@@ -208,18 +253,18 @@ async fn search(conn: RatingsDbConn, name: String) -> Template {
 }
 
 #[catch(404)]
-async fn catch_404() -> Redirect {
-    Redirect::to(uri!(files(file = PathBuf::from_str("404.html").unwrap())))
+async fn catch_404() -> NamedFile {
+    NamedFile::open(Path::new("static/404.html")).await.unwrap()
 }
 
 #[catch(500)]
-async fn catch_500() -> Redirect {
-    Redirect::to(uri!(files(file = PathBuf::from_str("500.html").unwrap())))
+async fn catch_500() -> NamedFile {
+    NamedFile::open(Path::new("static/500.html")).await.unwrap()
 }
 
 #[catch(503)]
-async fn catch_503() -> Redirect {
-    Redirect::to(uri!(files(file = PathBuf::from_str("503.html").unwrap())))
+async fn catch_503() -> NamedFile {
+    NamedFile::open(Path::new("static/503.html")).await.unwrap()
 }
 
 #[get("/<file..>")]

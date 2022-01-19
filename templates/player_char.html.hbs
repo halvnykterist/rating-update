@@ -1,0 +1,138 @@
+<!DOCTYPE html> 
+<html>
+    <meta charset = "UTF-8">
+    <head>
+        <title>RATING UPDATE</title>
+        <meta 
+            property="og:title" 
+            content="{{player.name}} - {{player.data.character_name}} {{player.data.value}} ±{{player.data.deviation}} ({{player.data.game_count}} games)"/>
+        <meta property="og:type" content="website" />
+        <meta property="og:description" content="Glicko2 ratings for Guilty Gear Strive" />
+        <link href="/style.css" rel="stylesheet" type="text/css">
+        
+        <!--Look, if you think you can make this website look better, DM a CSS file to @sov_gott_games or maybe open an issue. -->
+    </head>
+    <body>
+        {{> header stats}}
+
+        <span>
+            {{#each player.other_characters}}
+                <a href="/player/{{../player.id}}/{{this.character_shortname}}">
+                    {{this.character_name}} {{this.rating_value}} ±{{this.rating_deviation}} ({{this.game_count}} games)
+                </a>
+                <br>
+            {{/each}}
+        </span>
+        <br>
+
+        <div>
+            <h2>{{player.name}}</h2>
+        </div>
+        <div>
+            {{#if player.other_names}}
+                AKA: |
+                {{#each player.other_names}}
+                    {{this}} |
+                {{/each}}
+            {{/if}}
+        </div>
+        <hr>
+
+
+        <h3>{{player.data.character_name}} - {{player.data.rating_value}} ±{{player.data.rating_deviation}} ({{player.data.game_count}} games)</h3>
+
+
+        {{#if player.data.recent_games}}
+        <table>
+            <tr>
+                <th>Date</th>
+                <th>Rating</th>
+                <th>Floor</th>
+                <th>Opponent</th>
+                <th>Opp. Character</th>
+                <th>Opp. rating</th>
+                <th>Expected wins</th>
+                <th>Result</th>
+            </tr>
+            {{#each player.data.recent_games}}
+            <tr>
+                <td>{{this.timestamp}}</td>
+                <td>{{this.own_rating_value}} ±{{this.own_rating_deviation}}</td>
+                <td>{{this.floor}}</td>
+                <td>{{>player_link name=this.opponent_name id=this.opponent_id char=this.opponent_character_short}}</td>
+                <td>{{this.opponent_character}}</td>
+                <td>{{this.opponent_rating_value}} ±{{this.opponent_rating_deviation}}</td>
+                <td>
+                        <span title="{{this.expected_outcome_min}}–{{this.expected_outcome_max}}%">
+                            {{#if this.expected_outcome}}
+                                {{this.expected_outcome}}%
+                            {{/if}}
+                            {{this.expected_outcome_evaluation}}
+                        </span>
+                </td>
+                <td><span title="{{this.result_percent}}%">{{this.result_wins}} - {{this.result_losses}}</span></td>
+            </tr>
+            {{/each}}
+        </table>
+        <br>
+        {{/if}}
+
+        <table>
+            <tr>
+                <th>Date</th>
+                <th>Rating</th>
+                <th>Floor</th>
+                <th>Opponent</th>
+                <th>Opp. Character</th>
+                <th>Opp. rating</th>
+                <th>Expected wins</th>
+                <th>Result</th>
+            </tr>
+            {{#each player.data.history}}
+            <tr>
+                <td>{{this.timestamp}}</td>
+                <td>{{this.own_rating_value}} ±{{this.own_rating_deviation}}</td>
+                <td>{{this.floor}}</td>
+                <td>{{>player_link name=this.opponent_name id=this.opponent_id char=this.opponent_character_short}}</td>
+                <td>{{this.opponent_character}}</td>
+                <td>{{this.opponent_rating_value}} ±{{this.opponent_rating_deviation}}</td>
+                <td>
+                        <span title="{{this.expected_outcome_min}}–{{this.expected_outcome_max}}%">
+                            {{#if this.expected_outcome}}
+                                {{this.expected_outcome}}%
+                            {{/if}}
+                            {{this.expected_outcome_evaluation}}
+                        </span>
+                </td>
+                <td><span title="{{this.result_percent}}%">{{this.result_wins}} - {{this.result_losses}}</span></td>
+            </tr>
+            {{/each}}
+        </table>
+
+        {{#if player.data.matchups}}
+        <br>
+        <table>
+            <tr>
+                <th>Matchup</th>
+                <th>Games</th>
+                <th>Win rate (raw)</th>
+                <th>Win rate (rating adjusted)</th>
+            </tr>
+            {{#each player.data.matchups}}
+            <tr>
+                <td>{{this.character}}</td>
+                <td>{{this.game_count}}</td>
+                <td>{{this.win_rate_real}}%</td>
+                {{#if this.win_rate_adjusted}}
+                    <td>{{this.win_rate_adjusted}}%</td>
+                {{else}}
+                    <td>N/A</td>
+                {{/if}}
+            </tr>
+            {{/each}}
+        </table>
+        <br>
+        {{/if}}
+    <hr>
+    </body>
+</html>

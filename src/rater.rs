@@ -17,7 +17,6 @@ pub const HIGH_RATING: f64 = (1800.0 - 1500.0) / 173.7178;
 const DB_NAME: &str = "ratings.sqlite";
 
 pub const RATING_PERIOD: i64 = 1 * 60 * 60;
-
 pub fn glicko_to_glicko2(r: f64) -> f64 {
     (r - 1500.0) / 173.7178
 }
@@ -173,11 +172,13 @@ pub async fn run() {
 
 async fn pull_continuous() {
     let mut conn = Connection::open(DB_NAME).unwrap();
-    grab_games(&mut conn, 100).await;
+    grab_games(&mut conn, 100).await.unwrap();
     let mut interval = time::interval(Duration::from_secs(60));
     loop {
         interval.tick().await;
-        grab_games(&mut conn, 10).await;
+        if let Err(e) = grab_games(&mut conn, 10).await {
+            error!("{}", e)
+        }
     }
 }
 
@@ -204,10 +205,10 @@ pub async fn update_ratings_continuous() {
 pub async fn pull() {
     let mut conn = Connection::open(DB_NAME).unwrap();
 
-    grab_games(&mut conn, 100).await;
+    grab_games(&mut conn, 100).await.unwrap();
 }
 
-async fn grab_games(conn: &mut Connection, pages: usize) {
+async fn grab_games(conn: &mut Connection, pages: usize) -> Result<(), Box<dyn Error>> {
     let replays = ggst_api::get_replays(
         &ggst_api::Context::default(),
         pages,
@@ -215,25 +216,20 @@ async fn grab_games(conn: &mut Connection, pages: usize) {
         ggst_api::Floor::F1,
         ggst_api::Floor::Celestial,
     )
-    .await
-    .unwrap();
+    .await?;
 
     let (replays, errors): (Vec<_>, Vec<_>) = (replays.0.collect(), replays.1.collect());
 
-    let old_count: i64 = conn
-        .query_row("SELECT COUNT(*) FROM games", [], |r| r.get(0))
-        .unwrap();
+    let old_count: i64 = conn.query_row("SELECT COUNT(*) FROM games", [], |r| r.get(0))?;
 
-    let tx = conn.transaction().unwrap();
+    let tx = conn.transaction()?;
     for r in &replays {
         add_game(&tx, r.clone());
     }
 
-    tx.commit().unwrap();
+    tx.commit()?;
 
-    let count: i64 = conn
-        .query_row("SELECT COUNT(*) FROM games", [], |r| r.get(0))
-        .unwrap();
+    let count: i64 = conn.query_row("SELECT COUNT(*) FROM games", [], |r| r.get(0))?;
 
     info!(
         "Grabbed {} games -  new games: {} ({} total)",
@@ -251,6 +247,8 @@ async fn grab_games(conn: &mut Connection, pages: usize) {
     if errors.len() > 0 {
         warn!("{} replays failed to parse!", errors.len());
     }
+
+    Ok(())
 }
 
 fn add_game(conn: &Transaction, game: ggst_api::Match) {
