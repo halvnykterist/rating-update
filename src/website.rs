@@ -32,7 +32,7 @@ pub const CHAR_NAMES: &[(&str, &str)] = &[
     ("AN", "Anji"),
     ("IN", "I-No"),
     ("GO", "Goldlewis"),
-    ("JA", "Jack-O'"),
+    ("JC", "Jack-O'"),
     ("HA", "Happy Chaos"),
 ];
 
