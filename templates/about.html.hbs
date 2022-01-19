@@ -19,6 +19,7 @@
             <li><a href="#Plus_minus">What does the '±' part mean?</a></li>
             <li><a href="#Updates">How often does this page update?</a></li>
             <li><a href="#Expected_outcome">What's does 'expected wins' mean?</a></li>
+            <li><a href="#Raw_vs_adjusted">What's the difference between 'Win rate (raw)' and 'Win rate (rating adjusted)'?</a></li>
             <li><a href="#Gaming">Can I gain more rating by farming lower skilled players?</a></li>
             <li><a href="#PC_only">Is this PC only?</a></li>
             <li><a href="#Missing_games">Some of my games are missing.</a></li>
@@ -57,6 +58,10 @@
         <h2 id="Expected_outcome">What's does 'expected wins' mean?</h2>
         <p>This is how often the system expects you be able to beat your opponent in a game, based on your relative ratings. It doesn't take your personal matchup history into account. </p>
         <p>This is also the number that you need to exceed on average if you want your rating to go up. If you can take down opponents the system thought was stronger than you, then clearly it was wrong!</p>
+
+        <h2 id="Raw_vs_adjusted">What's the difference between 'Win rate (raw)' and 'Win rate (rating adjusted)'?</h2>
+        <p>Raw win rate is what it sounds like - all of your wins vs that character divided by all your games against this character.</p>
+        <p>Adjusted win rate takes into account your chance of winning based on diference in rating. Instead of simply adding together wins and losses, wins and losses are weighted by your expected win rate. If you beat someone that you had a 90% chance to win against, you only get .1 added to your "wins" total. If you lose to someone who you had a 70% chance to win against, you get the full .7 added to your loss bucket. Then at the end the adjusted win rate is your win bucket divided by your win bucket plus your loss bucket. Final estimation is (win_bucket) / (win_bucket + loss+bucket)</p>
 
         <h2 id="Gaming">Can I gain more rating by farming lower skilled players?</h2>
         <p>No, not unless you can beat them even more consistently than the game thought you should. If anything, going up against lower sklled players carries an element of risk, since losses to them causes you to lose a lot more rating than losing to a similarly rated opponent would.</p>
