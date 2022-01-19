@@ -522,6 +522,11 @@ pub async fn get_player_data_char(
                                 set.opponent_rating_deviation =
                                     (opponent_rating.deviation * 2.0).round();
 
+                                set.expected_outcome = expected_outcome;
+                                set.expected_outcome_evaluation = expected_outcome_evaluation;
+                                set.expected_outcome_min = expected_outcome_min;
+                                set.expected_outcome_max = set.expected_outcome_max;
+
                                 match winner {
                                     1 | 4 => set.result_wins += 1,
                                     2 | 3 => set.result_losses += 1,
@@ -691,6 +696,11 @@ pub async fn get_player_data_char(
                                 set.opponent_rating_value = opponent_rating.value.round();
                                 set.opponent_rating_deviation =
                                     (opponent_rating.deviation * 2.0).round();
+
+                                set.expected_outcome = expected_outcome;
+                                set.expected_outcome_evaluation = expected_outcome_evaluation;
+                                set.expected_outcome_min = expected_outcome_min;
+                                set.expected_outcome_max = set.expected_outcome_max;
 
                                 match winner {
                                     1 | 4 => set.result_wins += 1,
