@@ -1230,6 +1230,103 @@ pub async fn player_ratings_distribution(conn: &RatingsDbConn) -> Vec<RatingPlay
 }
 
 #[derive(Serialize)]
+pub struct RankCharacterPopularities {
+    rating_min: usize,
+    rating_max: usize,
+    characters: Vec<RankCharacterPopularity>,
+}
+
+#[derive(Serialize)]
+struct RankCharacterPopularity {
+    popularity: f64,
+    delta: f64,
+    evaluation: &'static str,
+}
+
+pub async fn character_popularity(
+    conn: &RatingsDbConn,
+) -> (Vec<f64>, Vec<RankCharacterPopularities>) {
+    conn.run(move |conn| {
+        let global_popularities = {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT
+                        popularity
+                        FROM character_popularity_global
+                        ORDER BY char_id ASC",
+                )
+                .unwrap();
+
+            let mut rows = stmt.query([]).unwrap();
+            let mut v = Vec::with_capacity(website::CHAR_NAMES.len());
+
+            while let Some(row) = rows.next().unwrap() {
+                let popularity: f64 = row.get(0).unwrap();
+                v.push((popularity * 1000.0).round() / 10.0);
+            }
+
+            v
+        };
+
+        let rank_popularites = {
+            let mut rank_popularities = Vec::with_capacity(rater::POP_RATING_BRACKETS);
+
+            for r in 0..rater::POP_RATING_BRACKETS {
+                let mut stmt = conn
+                    .prepare(
+                        "SELECT
+                        char_id, popularity
+                        FROM character_popularity_rating
+                        WHERE rating_bracket = ?
+                        ORDER BY char_id ASC",
+                    )
+                    .unwrap();
+
+                let mut rows = stmt.query(params![r]).unwrap();
+
+                let mut res = RankCharacterPopularities {
+                    rating_min: 800 + r * 200,
+                    rating_max: 800 + (r + 1) * 200,
+                    characters: Vec::with_capacity(website::CHAR_NAMES.len()),
+                };
+
+                while let Some(row) = rows.next().unwrap() {
+                    let char_id: usize = row.get(0).unwrap();
+                    let popularity: f64 = row.get(1).unwrap();
+                    let popularity = (popularity * 1000.0).round() / 10.0;
+                    let delta =
+                        (popularity - global_popularities[char_id]) / global_popularities[char_id];
+                    let delta = (delta * 1000.0).round() / 10.0;
+
+                    res.characters.push(RankCharacterPopularity {
+                        popularity,
+                        delta,
+                        evaluation: if delta > 50.0 {
+                            "verygood"
+                        } else if delta > 15.0 {
+                            "good"
+                        } else if delta > -15.0 {
+                            "ok"
+                        } else if delta > -50.0 {
+                            "bad"
+                        } else {
+                            "verybad"
+                        },
+                    });
+                }
+
+                rank_popularities.push(res);
+            }
+
+            rank_popularities
+        };
+
+        (global_popularities, rank_popularites)
+    })
+    .await
+}
+
+#[derive(Serialize)]
 pub struct VipPlayer {
     id: String,
     name: String,

@@ -11,6 +11,9 @@ CREATE TABLE games (
     PRIMARY KEY (timestamp, id_a, id_b)
 );
 
+CREATE INDEX games_char_a ON games(char_a);
+CREATE INDEX games_char_b ON games(char_b);
+
 CREATE TABLE game_ratings (
     timestamp INTEGER NOT NULL,
     id_a INTEGER NOT NULL,
@@ -21,6 +24,11 @@ CREATE TABLE game_ratings (
     deviation_b REAL NOT NULL,
     PRIMARY KEY (timestamp, id_a, id_b)
 );
+
+CREATE INDEX ratings_value_a ON game_ratings(value_a);
+CREATE INDEX ratings_value_b ON game_ratings(value_b);
+CREATE INDEX ratings_dev_a ON game_ratings(deviation_a);
+CREATE INDEX ratings_dev_b ON game_ratings(deviation_b);
 
 CREATE TABLE players  (
     id INTEGER NOT NULL PRIMARY KEY,
@@ -44,6 +52,9 @@ CREATE TABLE player_ratings (
     volatility REAL NOT NULL,
     PRIMARY KEY(id, char_id)
 );
+
+CREATE INDEX player_value ON player_ratings(value);
+CREATE INDEX player_dev ON player_ratings(deviation);
 
 CREATE TABLE player_matchups (
     id INTEGER NOT NULL,
@@ -112,6 +123,19 @@ CREATE TABLE ranking_character (
     char_id INTEGER NOT NULL,
     id INTEGER NOT NULL,
     PRIMARY KEY(character_rank, char_id)
+);
+
+CREATE TABLE character_popularity_global (
+    char_id INTEGER NOT NULL,
+    popularity REAL NOT NULL,
+    PRIMARY KEY(char_id)
+);
+
+CREATE TABLE character_popularity_rating (
+    char_id INTEGER NOT NULL,
+    rating_bracket INTEGER NOT NULL,
+    popularity REAL NOT NULL,
+    PRIMARY KEY(char_id, rating_bracket)
 );
 
 CREATE TABLE vip_status (

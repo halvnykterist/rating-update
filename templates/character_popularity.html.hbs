@@ -1,0 +1,43 @@
+<!DOCTYPE html> 
+<html>
+    <meta charset = "UTF-8">
+    <head>
+        <title>RATING UPDATE</title>
+        <meta property="og:title" content="RATING UPDATE"/>
+        <meta property="og:type" content="website" />
+        <meta property="og:description" content="Glicko2 ratings for Guilty Gear Strive" />
+        <link href="/style.css" rel="stylesheet" type="text/css">
+        <!--Look, if you think you can make this website look better, DM a CSS file to @sov_gott_games or maybe open an issue. -->
+    </head>
+    <body>
+        {{> header stats}}
+
+        <br>
+        <h1>Character popularity</h1>
+        <p>Each row shows popularity for that character within the rating range, with colors indicating how much more or less popular it is than the baseline global popularity. Data is from the last week of games.</p>
+        <table>
+            <tr>
+                <th>&nbsp;</th>
+                {{#each character_shortnames}}
+                    <th>{{this}}</th>
+                {{/each}}
+            </tr>
+            <tr>
+                <th>Global character popularity</th>
+                {{#each global_character_popularity}}
+                    <td>{{this}}%</td>
+                {{/each}}
+            </tr>
+
+            {{#each rank_character_popularity}}
+                <tr>
+                    <th>{{this.rating_min}}–{{this.rating_max}}</th>
+                    {{#each characters}}
+                        <td class="{{this.evaluation}}" title="Delta: {{this.delta}}%">
+                            {{this.popularity}}%
+                        </td>
+                    {{/each}}
+                </tr>
+            {{/each}}
+    </body>
+</html>

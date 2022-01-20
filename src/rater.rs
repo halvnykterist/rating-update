@@ -16,6 +16,9 @@ pub const MAX_DEVIATION: f64 = 100.0 / 173.7178;
 pub const HIGH_RATING: f64 = (1800.0 - 1500.0) / 173.7178;
 const DB_NAME: &str = "ratings.sqlite";
 
+const CHAR_COUNT: usize = website::CHAR_NAMES.len();
+pub const POP_RATING_BRACKETS: usize = 9;
+
 pub const RATING_PERIOD: i64 = 1 * 60 * 60;
 pub fn glicko_to_glicko2(r: f64) -> f64 {
     (r - 1500.0) / 173.7178
@@ -186,8 +189,10 @@ pub async fn update_ratings_continuous() {
     let mut conn = Connection::open(DB_NAME).unwrap();
 
     let mut last_rating_timestamp: i64 = conn
-        .query_row("SELECT (last_update) FROM config", [], |r| r.get(0))
+        .query_row("SELECT last_update FROM config", [], |r| r.get(0))
         .unwrap();
+
+    calc_character_popularity(&mut conn, last_rating_timestamp).unwrap();
 
     let mut interval = time::interval(Duration::from_secs(60));
     loop {
@@ -201,6 +206,9 @@ pub async fn update_ratings_continuous() {
                 error!("{}", e);
             }
             if let Err(e) = update_rankings(&mut conn) {
+                error!("{}", e);
+            }
+            if let Err(e) = calc_character_popularity(&mut conn, last_rating_timestamp) {
                 error!("{}", e);
             }
         }
@@ -297,17 +305,19 @@ fn add_game(conn: &Transaction, game: ggst_api::Match) {
 }
 
 fn update_player(conn: &Transaction, id: i64, name: &str, floor: i64) {
-    conn.execute(
+    while let Err(e) = conn.execute(
         "REPLACE INTO players(id, name, floor) VALUES(?, ?, ?)",
         params![id, name, floor],
-    )
-    .unwrap();
+    ) {
+        warn!("{}", e);
+    }
 
-    conn.execute(
+    while let Err(e) = conn.execute(
         "INSERT OR IGNORE INTO player_names(id, name) VALUES(?, ?)",
         params![id, name],
-    )
-    .unwrap();
+    ) {
+        warn!("{}", e);
+    }
 }
 
 fn update_player_distribution(conn: &mut Connection) {
@@ -699,6 +709,128 @@ fn update_ratings(conn: &mut Connection) -> i64 {
     next_timestamp
 }
 
+pub fn calc_character_popularity(
+    conn: &mut Connection,
+    last_timestamp: i64,
+) -> Result<(), Box<dyn Error>> {
+    info!("Calculating character popularity stats..");
+    let one_week_ago = last_timestamp - 60 * 60 * 24 * 7;
+
+    let tx = conn.transaction()?;
+    info!("making temp table");
+    tx.execute("DROP TABLE IF EXISTS temp.recent_games", [])?;
+    tx.execute(
+        "CREATE TEMP TABLE temp.recent_games AS 
+        SELECT 
+            char_a, 
+            value_a, 
+            deviation_a, 
+            char_b, 
+            value_b, 
+            deviation_b 
+        FROM 
+            games NATURAL JOIN game_ratings
+        WHERE timestamp > ? AND (deviation_a < ? OR deviation_b < ?)",
+        params![one_week_ago, MAX_DEVIATION, MAX_DEVIATION],
+    )?;
+    info!("making indices");
+    tx.execute("CREATE INDEX temp.i_char_a ON recent_games(char_a)", [])?;
+    tx.execute("CREATE INDEX temp.i_char_b ON recent_games(char_b)", [])?;
+    tx.commit()?;
+    info!("indices made");
+
+    let tx = conn.transaction()?;
+
+    tx.execute("DELETE FROM character_popularity_global", [])?;
+    tx.execute("DELETE FROM character_popularity_rating", [])?;
+
+    let global_game_count: f64 =
+        tx.query_row("SELECT COUNT(*) FROM  temp.recent_games", params![], |r| {
+            r.get(0)
+        })?;
+
+    for c in 0..CHAR_COUNT {
+        let char_count: f64 = tx.query_row(
+            "SELECT
+                    (SELECT COUNT(*) FROM temp.recent_games
+                    WHERE char_a = ?)
+                    +
+                    (SELECT COUNT(*) FROM temp.recent_games 
+                    WHERE char_b = ?)",
+            params![c, c],
+            |r| r.get(0),
+        )?;
+
+        tx.execute(
+            "INSERT INTO character_popularity_global VALUES(?, ?)",
+            params![c, char_count / global_game_count],
+        )?;
+    }
+
+    for r in 0..POP_RATING_BRACKETS {
+        let rating_min = glicko_to_glicko2((800 + r * 200) as f64);
+        let rating_max = glicko_to_glicko2((800 + (r + 1) * 200) as f64);
+
+        let rating_game_count: f64 = tx.query_row(
+            "SELECT 
+                (SELECT COUNT(*) FROM temp.recent_games
+                WHERE value_a >= ? AND value_a < ? AND deviation_a < ?) 
+                + 
+                (SELECT COUNT(*) FROM temp.recent_games
+                WHERE value_b >= ? AND value_b < ? AND deviation_b < ?) 
+                ",
+            params![
+                rating_min,
+                rating_max,
+                MAX_DEVIATION,
+                rating_min,
+                rating_max,
+                MAX_DEVIATION
+            ],
+            |r| r.get(0),
+        )?;
+
+        for c in 0..CHAR_COUNT {
+            let char_count: f64 = tx.query_row(
+                "SELECT
+                    (SELECT COUNT(*) FROM temp.recent_games
+                        WHERE char_a =? 
+                            AND value_a >= ?
+                            AND value_a < ?
+                            AND deviation_a < ?) 
+                    +
+                    (SELECT COUNT(*) FROM temp.recent_games
+                        WHERE char_b =? 
+                            AND value_b >= ? 
+                            AND value_b < ?
+                            AND deviation_b < ?)",
+                params![
+                    c,
+                    rating_min,
+                    rating_max,
+                    MAX_DEVIATION,
+                    c,
+                    rating_min,
+                    rating_max,
+                    MAX_DEVIATION
+                ],
+                |r| r.get(0),
+            )?;
+
+            tx.execute(
+                "INSERT INTO character_popularity_rating VALUES(?, ?, ?)",
+                params![c, r, 2.0 * char_count / rating_game_count],
+            )?;
+        }
+    }
+
+    tx.execute("DROP TABLE temp.recent_games", [])?;
+
+    tx.commit()?;
+    info!("Updated character popularity");
+    Ok(())
+}
+
 pub fn update_rankings(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
     let tx = conn.transaction()?;
     tx.execute("DELETE FROM ranking_global", [])?;
@@ -714,7 +846,7 @@ pub fn update_rankings(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
         params![MAX_DEVIATION],
     )?;
 
-    for c in 0..website::CHAR_NAMES.len() {
+    for c in 0..CHAR_COUNT {
         tx.execute(
             "INSERT INTO ranking_character (character_rank, id, char_id)
              SELECT ROW_NUMBER() OVER (ORDER BY value - 2.0 * deviation DESC) as character_rank, id, char_id
@@ -795,8 +927,8 @@ pub fn calc_versus_matchups(conn: &mut Connection) -> Result<(), Box<dyn Error>>
     let tx = conn.transaction()?;
     tx.execute("DELETE FROM versus_matchups", [])?;
 
-    for a in 0..website::CHAR_NAMES.len() - 1 {
-        for b in (a + 1)..website::CHAR_NAMES.len() {
+    for a in 0..CHAR_COUNT - 1 {
+        for b in (a + 1)..CHAR_COUNT {
             let a = a as i64;
             let b = b as i64;
             let i = pairs

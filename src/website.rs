@@ -45,6 +45,7 @@ pub async fn run() {
                 top_all,
                 top_char,
                 matchups,
+                character_popularity,
                 player_distribution,
                 player,
                 player_char,
@@ -166,6 +167,29 @@ async fn matchups(conn: RatingsDbConn) -> Cached<Template> {
 
     let delta = context.stats.last_update + rater::RATING_PERIOD - Utc::now().timestamp();
     Cached::new(Template::render("matchups", &context), delta)
+}
+
+#[get("/character_popularity")]
+async fn character_popularity(conn: RatingsDbConn) -> Cached<Template> {
+    #[derive(Serialize)]
+    struct Context {
+        stats: api::Stats,
+        character_shortnames: Vec<&'static str>,
+        global_character_popularity: Vec<f64>,
+        rank_character_popularity: Vec<api::RankCharacterPopularities>,
+    }
+
+    let (global_character_popularity, rank_character_popularity) = api::character_popularity(&conn).await;
+
+    let context = Context {
+        stats: api::stats_inner(&conn).await,
+        character_shortnames: CHAR_NAMES.iter().map(|c| c.0).collect(),
+        global_character_popularity,
+        rank_character_popularity,
+    };
+
+    let delta = context.stats.last_update + rater::RATING_PERIOD - Utc::now().timestamp();
+    Cached::new(Template::render("character_popularity", &context), delta)
 }
 
 #[get("/player-distribution")]
