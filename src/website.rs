@@ -10,10 +10,7 @@ use rocket::{
 use rocket_dyn_templates::Template;
 use rocket_sync_db_pools::database;
 use rusqlite::Connection;
-use std::{
-    path::{Path, PathBuf},
-    str::FromStr,
-};
+use std::path::{Path, PathBuf};
 
 pub const CHAR_NAMES: &[(&str, &str)] = &[
     ("SO", "Sol"),
@@ -53,6 +50,7 @@ pub async fn run() {
                 player_char,
                 search,
                 about,
+                supporters,
                 api::stats,
                 api::top_all,
                 api::top_char,
@@ -80,6 +78,24 @@ async fn index() -> Redirect {
 #[get("/about")]
 async fn about() -> Cached<Template> {
     Cached::new(Template::render("about", &()), 999)
+}
+
+#[get("/supporters")]
+async fn supporters(conn: RatingsDbConn) -> Cached<Template> {
+    #[derive(Serialize)]
+    struct Context {
+        players: Vec<api::VipPlayer>,
+    }
+
+    Cached::new(
+        Template::render(
+            "supporters",
+            &Context {
+                players: api::get_supporters(&conn).await,
+            },
+        ),
+        999,
+    )
 }
 
 #[get("/top/all")]

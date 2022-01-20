@@ -26,7 +26,12 @@
         <br>
 
         <div>
-            <h1>{{player.name}}</h1>
+            <h1>
+                {{player.name}}
+                {{#if player.vip_status}}
+                    <span class="vip" title="This user supports the site!">VIP</span>
+                {{/if}}
+            </h1>
         </div>
         <div>
             {{#if player.other_names}}
@@ -39,7 +44,8 @@
 
 
         <h2>
-            {{player.data.character_name}}<br>
+            {{player.data.character_name}}
+            <br>
             {{player.data.rating_value}} ±{{player.data.rating_deviation}} ({{player.data.game_count}} games)
             {{#if player.data.character_rank}}
                 <br>#{{player.data.character_rank}} {{player.data.character_name}}
@@ -67,7 +73,12 @@
                 <td>{{this.timestamp}}</td>
                 <td>{{this.own_rating_value}} ±{{this.own_rating_deviation}}</td>
                 <td>{{this.floor}}</td>
-                <td>{{>player_link name=this.opponent_name id=this.opponent_id char=this.opponent_character_short}}</td>
+                <td>{{>player_link 
+                        name=this.opponent_name 
+                        id=this.opponent_id char=this.opponent_character_short
+                        vip_status=this.opponent_vip
+                        }}
+                </td>
                 <td>{{this.opponent_character}}</td>
                 <td>{{this.opponent_rating_value}} ±{{this.opponent_rating_deviation}}</td>
                 <td>
@@ -101,7 +112,12 @@
                 <td>{{this.timestamp}}</td>
                 <td>{{this.own_rating_value}} ±{{this.own_rating_deviation}}</td>
                 <td>{{this.floor}}</td>
-                <td>{{>player_link name=this.opponent_name id=this.opponent_id char=this.opponent_character_short}}</td>
+                <td>{{>player_link 
+                        name=this.opponent_name 
+                        id=this.opponent_id char=this.opponent_character_short
+                        vip_status=this.opponent_vip
+                        }}
+                </td>
                 <td>{{this.opponent_character}}</td>
                 <td>{{this.opponent_rating_value}} ±{{this.opponent_rating_deviation}}</td>
                 <td>

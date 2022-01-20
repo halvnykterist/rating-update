@@ -114,6 +114,13 @@ CREATE TABLE ranking_character (
     PRIMARY KEY(character_rank, char_id)
 );
 
+CREATE TABLE vip_status (
+    id INTEGER NOT NULL,
+    vip_status TEXT NOT NULL,
+    notes TEXT NOT NULL,
+    PRIMARY KEY(id)
+);
+
 
 CREATE TABLE config (
     last_update INTEGER NOT NULL

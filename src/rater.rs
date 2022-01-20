@@ -185,8 +185,6 @@ async fn pull_continuous() {
 pub async fn update_ratings_continuous() {
     let mut conn = Connection::open(DB_NAME).unwrap();
 
-    update_rankings(&mut conn).unwrap();
-
     let mut last_rating_timestamp: i64 = conn
         .query_row("SELECT (last_update) FROM config", [], |r| r.get(0))
         .unwrap();

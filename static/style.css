@@ -78,3 +78,12 @@ tr:nth-child(n) td.verygood {
 p {
     max-width: 120ch;
 }
+
+
+.vip {
+    font-style: oblique;
+    color: coral;
+    text-shadow: 1px 1px 4px lightcoral;
+    font-variant-caps: petite-caps;
+}
+

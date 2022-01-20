@@ -65,10 +65,16 @@ pub struct RankingPlayer {
     game_count: i32,
     rating_value: f64,
     rating_deviation: f64,
+    vip_status: Option<String>,
 }
 
 impl RankingPlayer {
-    fn from_db(pos: i32, name: String, rated_player: RatedPlayer) -> Self {
+    fn from_db(
+        pos: i32,
+        name: String,
+        vip_status: Option<String>,
+        rated_player: RatedPlayer,
+    ) -> Self {
         Self {
             pos,
             name,
@@ -82,6 +88,7 @@ impl RankingPlayer {
             game_count: (rated_player.win_count + rated_player.loss_count) as i32,
             rating_value: GlickoRating::from(rated_player.rating).value.round(),
             rating_deviation: (GlickoRating::from(rated_player.rating).deviation * 2.0).round(),
+            vip_status,
         }
     }
 }
@@ -94,10 +101,11 @@ pub async fn top_all_inner(conn: &RatingsDbConn) -> Vec<RankingPlayer> {
     conn.run(|c| {
         let mut stmt = c
             .prepare(
-                "SELECT id, char_id, wins, losses, value, deviation, volatility, name
+                "SELECT player_ratings.id as id, char_id, wins, losses, value, deviation, volatility, name, vip_status
                  FROM ranking_global 
                  NATURAL JOIN player_ratings
                  NATURAL JOIN players
+                 LEFT JOIN vip_status ON vip_status.id = player_ratings.id
                  LIMIT 100",
             )
             .unwrap();
@@ -108,7 +116,13 @@ pub async fn top_all_inner(conn: &RatingsDbConn) -> Vec<RankingPlayer> {
 
         while let Some(row) = rows.next().unwrap() {
             let name = row.get("name").unwrap();
-            res.push(RankingPlayer::from_db(i, name, RatedPlayer::from_row(row)));
+            let vip_status = row.get("vip_status").unwrap();
+            res.push(RankingPlayer::from_db(
+                i,
+                name,
+                vip_status,
+                RatedPlayer::from_row(row),
+            ));
             i += 1;
         }
 
@@ -120,6 +134,7 @@ pub async fn top_all_inner(conn: &RatingsDbConn) -> Vec<RankingPlayer> {
 #[derive(Serialize)]
 pub struct SearchResultPlayer {
     name: String,
+    vip_status: Option<String>,
     id: String,
     character: String,
     character_short: String,
@@ -141,6 +156,7 @@ pub async fn search_inner(conn: &RatingsDbConn, search: String) -> Vec<SearchRes
                 "SELECT * FROM
                     player_names 
                     NATURAL JOIN player_ratings
+                    LEFT JOIN vip_status ON vip_status.id = player_names.id
                     WHERE name LIKE ?
                     ORDER BY wins DESC
                     LIMIT 1000
@@ -171,6 +187,7 @@ pub async fn search_inner(conn: &RatingsDbConn, search: String) -> Vec<SearchRes
                 rating_deviation: (rating.deviation * 2.0).round(),
                 game_count: row.get::<_, i32>("wins").unwrap()
                     + row.get::<_, i32>("losses").unwrap(),
+                vip_status: row.get::<_, Option<String>>("vip_status").unwrap(),
             });
         }
         res
@@ -187,10 +204,11 @@ pub async fn top_char_inner(conn: &RatingsDbConn, char_id: i64) -> Vec<RankingPl
     conn.run(move |c| {
         let mut stmt = c
             .prepare(
-                "SELECT id, char_id, wins, losses, value, deviation, volatility, name
+                "SELECT player_ratings.id as id, char_id, wins, losses, value, deviation, volatility, name, vip_status
                  FROM ranking_character 
                  NATURAL JOIN player_ratings
                  NATURAL JOIN players
+                 LEFT JOIN vip_status ON vip_status.id = player_ratings.id
                  WHERE char_id = ?
                  LIMIT 100
                  ",
@@ -202,7 +220,13 @@ pub async fn top_char_inner(conn: &RatingsDbConn, char_id: i64) -> Vec<RankingPl
         let mut i = 1;
         while let Some(row) = rows.next().unwrap() {
             let name = row.get("name").unwrap();
-            res.push(RankingPlayer::from_db(i, name, RatedPlayer::from_row(row)));
+            let vip_status = row.get("vip_status").unwrap();
+            res.push(RankingPlayer::from_db(
+                i,
+                name,
+                vip_status,
+                RatedPlayer::from_row(row),
+            ));
             i += 1;
         }
 
@@ -222,6 +246,7 @@ pub struct PlayerData {
 pub struct PlayerDataChar {
     id: String,
     name: String,
+    vip_status: Option<String>,
     other_names: Option<Vec<String>>,
     other_characters: Vec<OtherPlayerCharacter>,
     data: PlayerCharacterData,
@@ -259,6 +284,7 @@ struct PlayerSet {
     own_rating_deviation: f64,
     floor: String,
     opponent_name: String,
+    opponent_vip: Option<String>,
     opponent_id: String,
     opponent_character: String,
     opponent_character_short: String,
@@ -351,10 +377,14 @@ pub async fn get_player_data_char(
             )
             .unwrap()
         {
-            let name: String = conn
-                .query_row("SELECT name FROM players WHERE id=?", params![id], |r| {
-                    r.get(0)
-                })
+            let (name, vip_status): (String, Option<String>) = conn
+                .query_row(
+                    "SELECT name, vip_status FROM players 
+                        LEFT JOIN vip_status ON vip_status.id = players.id
+                           WHERE players.id=?",
+                    params![id],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
+                )
                 .unwrap();
             let other_names = {
                 let mut stmt = conn
@@ -454,8 +484,10 @@ pub async fn get_player_data_char(
                                     char_b AS opponent_character,
                                     value_b AS opponent_value,
                                     deviation_b AS opponent_deviation,
-                                    winner
+                                    winner,
+                                    vip_status
                                 FROM games NATURAL JOIN game_ratings
+                                LEFT JOIN vip_status ON vip_status.id = games.id_b
                                 WHERE games.id_a= :id AND games.char_a = :char_id
                             
                                 UNION
@@ -470,8 +502,10 @@ pub async fn get_player_data_char(
                                     char_a AS opponent_character,
                                     value_a AS opponent_value,
                                     deviation_a AS opponent_deviation,
-                                    winner + 2  as winner
+                                    winner + 2  as winner,
+                                    vip_status
                                 FROM games NATURAL JOIN game_ratings
+                                LEFT JOIN vip_status ON vip_status.id = games.id_a
                                 WHERE games.id_b = :id AND games.char_b = :char_id
 
                                 ORDER BY timestamp DESC LIMIT 200",
@@ -493,6 +527,7 @@ pub async fn get_player_data_char(
                             let opponent_value: f64 = row.get("opponent_value").unwrap();
                             let opponent_deviation: f64 = row.get("opponent_deviation").unwrap();
                             let winner: i64 = row.get("winner").unwrap();
+                            let opponent_vip: Option<String> = row.get("vip_status").unwrap();
 
                             let own_rating: GlickoRating = Glicko2Rating {
                                 value: own_value,
@@ -565,6 +600,7 @@ pub async fn get_player_data_char(
                                         n => format!("Floor {}", n),
                                     },
                                     opponent_name: opponent_name,
+                                    opponent_vip,
                                     opponent_id: format!("{:X}", opponent_id),
                                     opponent_character: website::CHAR_NAMES
                                         [opponent_character as usize]
@@ -609,11 +645,13 @@ pub async fn get_player_data_char(
                             name_b AS opponent_name,
                             games.id_b AS opponent_id,
                             games.char_b AS opponent_character,
-                            winner
+                            winner,
+                            vip_status
                         FROM games LEFT JOIN game_ratings 
                         ON games.id_a = game_ratings.id_a 
                             AND games.id_b = game_ratings.id_b 
                             AND games.timestamp = game_ratings.timestamp
+                        LEFT JOIN vip_status ON vip_status.id = games.id_b
                         WHERE games.id_a= :id 
                             AND games.char_a = :char_id 
                             AND game_ratings.id_a IS NULL
@@ -626,12 +664,13 @@ pub async fn get_player_data_char(
                             name_a AS opponent_name,
                             games.id_a AS opponent_id,
                             games.char_a AS opponent_character,
-                            winner + 2  as winner
-
+                            winner + 2  as winner,
+                            vip_status
                         FROM games LEFT JOIN game_ratings 
                         ON games.id_a = game_ratings.id_a 
                             AND games.id_b = game_ratings.id_b 
                             AND games.timestamp = game_ratings.timestamp
+                        LEFT JOIN vip_status ON vip_status.id = games.id_a
                         WHERE games.id_b= :id 
                             AND games.char_b = :char_id 
                             AND game_ratings.id_a IS NULL
@@ -651,6 +690,7 @@ pub async fn get_player_data_char(
                             let opponent_id: i64 = row.get("opponent_id").unwrap();
                             let opponent_character: i64 = row.get("opponent_character").unwrap();
                             let winner: i64 = row.get("winner").unwrap();
+                            let opponent_vip: Option<String> = row.get("vip_status").unwrap();
 
                             let own_rating: GlickoRating = Glicko2Rating {
                                 value: value,
@@ -740,6 +780,7 @@ pub async fn get_player_data_char(
                                         n => format!("Floor {}", n),
                                     },
                                     opponent_name: opponent_name,
+                                    opponent_vip,
                                     opponent_id: format!("{:X}", opponent_id),
                                     opponent_character: website::CHAR_NAMES
                                         [opponent_character as usize]
@@ -834,6 +875,7 @@ pub async fn get_player_data_char(
             Some(PlayerDataChar {
                 id: format!("{:X}", id),
                 name,
+                vip_status,
                 other_characters,
                 other_names: if other_names.is_empty() {
                     None
@@ -1179,6 +1221,38 @@ pub async fn player_ratings_distribution(conn: &RatingsDbConn) -> Vec<RatingPlay
                 player_percentage_cum: (1000.0 * player_count_cum as f64 / total_players as f64)
                     .round()
                     / 10.0,
+            });
+        }
+
+        res
+    })
+    .await
+}
+
+#[derive(Serialize)]
+pub struct VipPlayer {
+    id: String,
+    name: String,
+    vip_status: Option<String>,
+}
+
+pub async fn get_supporters(conn: &RatingsDbConn) -> Vec<VipPlayer> {
+    conn.run(move |conn| {
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, name, vip_status
+                    FROM vip_status NATURAL JOIN players",
+            )
+            .unwrap();
+
+        let mut rows = stmt.query(params![]).unwrap();
+
+        let mut res = Vec::new();
+        while let Some(row) = rows.next().unwrap() {
+            res.push(VipPlayer {
+                id: format!("{:X}", row.get::<_, i64>(0).unwrap()),
+                name: row.get(1).unwrap(),
+                vip_status: row.get(2).unwrap(),
             });
         }
 

@@ -63,6 +63,9 @@ async fn main() {
         Some("pull") => {
             rater::pull().await;
         }
+        Some("nothoughts") => {
+            website::run().await;
+        }
         Some(x) => {
             println!("Unrecognized argument: {}", x);
         }
