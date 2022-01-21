@@ -1014,7 +1014,12 @@ impl RatedPlayer {
             char_id,
             win_count: 0,
             loss_count: 0,
-            rating: Glicko2Rating::unrated(),
+            //rating: Glicko2Rating::unrated(),
+            rating: Glicko2Rating {
+                value: 0.0,
+                deviation: 350.0 / 173.0,
+                volatility: 0.02,
+            },
         }
     }
     pub fn from_row(row: &Row) -> Self {

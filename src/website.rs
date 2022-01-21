@@ -53,6 +53,7 @@ pub async fn run() {
                 about,
                 supporters,
                 api::stats,
+                api::player_rating,
                 api::top_all,
                 api::top_char,
                 api::search,

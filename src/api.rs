@@ -97,6 +97,57 @@ pub async fn top_all(conn: RatingsDbConn) -> Json<Vec<RankingPlayer>> {
     Json(top_all_inner(&conn).await)
 }
 
+#[derive(Serialize)]
+pub struct Rating {
+    value: f64,
+    deviation: f64,
+    volatility: f64,
+}
+
+#[get("/api/player_rating/<player>/<character_short>")]
+pub async fn player_rating(
+    conn: RatingsDbConn,
+    player: &str,
+    character_short: &str,
+) -> Option<Json<Rating>> {
+    let id = i64::from_str_radix(&player, 16).unwrap();
+    if let Some(char_id) = website::CHAR_NAMES
+        .iter()
+        .position(|(c, _)| *c == character_short)
+    {
+        conn.run(move |conn| {
+            if let Some((value, deviation, volatility)) = conn
+                .query_row(
+                    "SELECT value, deviation, volatility
+                                FROM player_ratings
+                                WHERE id=? AND char_id=?",
+                    params![id, char_id],
+                    |r| {
+                        Ok((
+                            r.get::<_, f64>(0)?,
+                            r.get::<_, f64>(1)?,
+                            r.get::<_, f64>(2)?,
+                        ))
+                    },
+                )
+                .optional()
+                .unwrap()
+            {
+                Some(Json(Rating {
+                    value,
+                    deviation,
+                    volatility,
+                }))
+            } else {
+                None
+            }
+        })
+        .await
+    } else {
+        None
+    }
+}
+
 pub async fn top_all_inner(conn: &RatingsDbConn) -> Vec<RankingPlayer> {
     conn.run(|c| {
         let mut stmt = c
@@ -1356,6 +1407,8 @@ pub async fn get_supporters(conn: &RatingsDbConn) -> Vec<VipPlayer> {
                 vip_status: row.get(2).unwrap(),
             });
         }
+
+        res.reverse();
 
         res
     })
