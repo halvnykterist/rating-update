@@ -1018,7 +1018,7 @@ impl RatedPlayer {
             rating: Glicko2Rating {
                 value: 0.0,
                 deviation: 350.0 / 173.0,
-                volatility: 0.02,
+                volatility: 0.01,
             },
         }
     }
