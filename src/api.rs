@@ -1285,8 +1285,12 @@ pub async fn character_popularity(
                 let mut rows = stmt.query(params![r]).unwrap();
 
                 let mut res = RankCharacterPopularities {
-                    rating_min: 800 + r * 200,
-                    rating_max: 800 + (r + 1) * 200,
+                    rating_min: if r > 0 { 1000 + r * 200 } else { 0 },
+                    rating_max: if r < rater::POP_RATING_BRACKETS - 1 {
+                        1000 + (r + 1) * 200
+                    } else {
+                        3000
+                    },
                     characters: Vec::with_capacity(website::CHAR_NAMES.len()),
                 };
 
