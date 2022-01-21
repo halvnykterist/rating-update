@@ -17,7 +17,7 @@ pub const HIGH_RATING: f64 = (1800.0 - 1500.0) / 173.7178;
 const DB_NAME: &str = "ratings.sqlite";
 
 const CHAR_COUNT: usize = website::CHAR_NAMES.len();
-pub const POP_RATING_BRACKETS: usize = 7;
+pub const POP_RATING_BRACKETS: usize = 11;
 
 pub const RATING_PERIOD: i64 = 1 * 60 * 60;
 pub fn glicko_to_glicko2(r: f64) -> f64 {
@@ -191,6 +191,10 @@ pub async fn update_ratings_continuous() {
     let mut last_rating_timestamp: i64 = conn
         .query_row("SELECT last_update FROM config", [], |r| r.get(0))
         .unwrap();
+
+    if let Err(e) = calc_character_popularity(&mut conn, last_rating_timestamp) {
+        error!("{}", e);
+    }
 
     let mut interval = time::interval(Duration::from_secs(60));
     loop {
@@ -767,12 +771,12 @@ pub fn calc_character_popularity(
 
     for r in 0..POP_RATING_BRACKETS {
         let rating_min = if r > 0 {
-            glicko_to_glicko2((1000 + r * 200) as f64)
+            glicko_to_glicko2((900 + r * 100) as f64)
         } else {
             -99.0
         };
         let rating_max = if r < POP_RATING_BRACKETS - 1 {
-            glicko_to_glicko2((1000 + (r + 1) * 200) as f64)
+            glicko_to_glicko2((1000 + (r + 1) * 100) as f64)
         } else {
             99.0
         };
