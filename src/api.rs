@@ -1401,7 +1401,7 @@ pub async fn get_fraud(conn: &RatingsDbConn) -> Vec<FraudStats> {
             res.push(FraudStats {
                 character_name: website::CHAR_NAMES[row.get::<_, usize>(0).unwrap()].1,
                 player_count: row.get(1).unwrap(),
-                average_offset: format!("{:+.0}", (row.get::<_, f64>(2).unwrap() * 173.7178)),
+                average_offset: format!("{:+.1}", (row.get::<_, f64>(2).unwrap() * 173.7178)),
             });
         }
 
