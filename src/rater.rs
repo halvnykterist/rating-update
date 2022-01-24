@@ -11,7 +11,7 @@ use tokio::{time, try_join};
 
 use crate::website;
 
-const SYS_CONSTANT: f64 = 0.01;
+const SYS_CONSTANT: f64 = 0.8;
 pub const MAX_DEVIATION: f64 = 100.0 / 173.7178;
 pub const HIGH_RATING: f64 = (1800.0 - 1500.0) / 173.7178;
 const DB_NAME: &str = "ratings.sqlite";
@@ -192,10 +192,6 @@ pub async fn update_ratings_continuous() {
         .query_row("SELECT last_update FROM config", [], |r| r.get(0))
         .unwrap();
 
-    if let Err(e) = calc_character_popularity(&mut conn, last_rating_timestamp) {
-        error!("{}", e);
-    }
-
     let mut interval = time::interval(Duration::from_secs(60));
     loop {
         interval.tick().await;
@@ -224,16 +220,16 @@ pub async fn pull() {
 }
 
 async fn grab_games(conn: &mut Connection, pages: usize) -> Result<(), Box<dyn Error>> {
-    let replays = ggst_api::get_replays(
+    let (replays, errors) = ggst_api::get_replays(
         &ggst_api::Context::default(),
         pages,
         127,
-        ggst_api::Floor::F1,
-        ggst_api::Floor::Celestial,
+        ggst_api::QueryParameters::default(),
     )
     .await?;
 
-    let (replays, errors): (Vec<_>, Vec<_>) = (replays.0.collect(), replays.1.collect());
+    let replays: Vec<_> = replays.collect();
+    let errors: Vec<_> = errors.collect();
 
     let old_count: i64 = conn.query_row("SELECT COUNT(*) FROM games", [], |r| r.get(0))?;
 
@@ -1022,7 +1018,7 @@ impl RatedPlayer {
             rating: Glicko2Rating {
                 value: 0.0,
                 deviation: 350.0 / 173.0,
-                volatility: 0.01,
+                volatility: 0.02,
             },
         }
     }
