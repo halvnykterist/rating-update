@@ -152,6 +152,13 @@ CREATE TABLE fraud_index_higher_rated (
     PRIMARY KEY(char_id)
 );
 
+CREATE TABLE fraud_index_highest_rated (
+    char_id INTEGER NOT NULL,
+    player_count INTEGER NOT NULL,
+    avg_delta REAL NOT NULL,
+    PRIMARY KEY(char_id)
+);
+
 CREATE TABLE vip_status (
     id INTEGER NOT NULL,
     vip_status TEXT NOT NULL,

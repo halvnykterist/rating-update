@@ -49,7 +49,7 @@
         </table>
 
         <h2> Fraud index</h2>
-        <p> For fun, I've calculated a "fraud index" estimating how much playing a character boosts your rating. This is done by looking at players who've got multiple characters with ≥200 games and ≤200 deviation, looking at their average rating, and then checking to see how far away their various characters are from the average. This isn't a perfect method, but I hope it yields interesting results. The table on the right limits to people with an average rating over 1500.</p>
+        <p> For fun, I've calculated a "fraud index" estimating how much playing a character boosts your rating. This is done by looking at players who've got multiple characters with ≥200 games and ≤200 deviation, looking at their average rating, and then checking to see how far away their various characters are from the average. This isn't a perfect method, but I hope it yields interesting results. Middle table limits to people with an average rating over 1500, right is over 1800.</p>
         <div>
             <table style="display: inline-block">
             <tr>
@@ -59,7 +59,7 @@
                 {{#each fraud_stats}} 
                     <tr>
                         <td>{{this.character_name}}</td>
-                        <td title="{{this.player_count}} players.">{{this.average_offset}}</td>
+                        <td title="{{this.player_count}} players">{{this.average_offset}}</td>
                     </tr>
                 {{/each}}
             </table>
@@ -72,7 +72,20 @@
                 {{#each fraud_stats_higher_rated}} 
                     <tr>
                         <td>{{this.character_name}}</td>
-                        <td title="{{this.player_count}} players.">{{this.average_offset}}</td>
+                        <td title="{{this.player_count}} players">{{this.average_offset}}</td>
+                    </tr>
+                {{/each}}
+            </table>
+
+            <table style="display: inline-block">
+            <tr>
+                <th>Character</th>
+                <th>Rating offset</th>
+            </tr>
+                {{#each fraud_stats_highest_rated}} 
+                    <tr>
+                        <td>{{this.character_name}}</td>
+                        <td title="{{this.player_count}} players">{{this.average_offset}}</td>
                     </tr>
                 {{/each}}
             </table>

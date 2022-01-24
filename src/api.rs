@@ -1434,6 +1434,28 @@ pub async fn get_fraud_higher_rated(conn: &RatingsDbConn) -> Vec<FraudStats> {
     .await
 }
 
+pub async fn get_fraud_highest_rated(conn: &RatingsDbConn) -> Vec<FraudStats> {
+    conn.run(move |conn| {
+        let mut stmt = conn
+            .prepare("SELECT char_id, player_count, avg_delta FROM fraud_index_highest_rated ORDER BY avg_delta DESC")
+            .unwrap();
+
+        let mut rows = stmt.query(params![]).unwrap();
+
+        let mut res = Vec::new();
+        while let Some(row) = rows.next().unwrap() {
+            res.push(FraudStats {
+                character_name: website::CHAR_NAMES[row.get::<_, usize>(0).unwrap()].1,
+                player_count: row.get(1).unwrap(),
+                average_offset: format!("{:+.1}", (row.get::<_, f64>(2).unwrap() * 173.7178)),
+            });
+        }
+
+        res
+    })
+    .await
+}
+
 #[derive(Serialize)]
 pub struct VipPlayer {
     id: String,
