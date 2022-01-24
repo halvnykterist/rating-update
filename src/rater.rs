@@ -894,7 +894,7 @@ pub fn calc_fraud_index(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
                     (
                         select id, avg(value) as avg_value, count(char_id) as char_count
                         from player_ratings
-                        where deviation < ? and wins + losses >= 200
+                        where deviation < ? and wins + losses >= 100
                         group by id
                     ) as averages
                     where char_count > 1
@@ -905,7 +905,7 @@ pub fn calc_fraud_index(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
                 (
                     select id, char_id, value
                     from player_ratings
-                    where deviation < ? and wins + losses >= 200
+                    where deviation < ? and wins + losses >= 100
                 ) as char_ratings
                 
                 on filtered_averages.id = char_ratings.id
@@ -936,7 +936,7 @@ pub fn calc_fraud_index(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
                     (
                         select id, avg(value) as avg_value, count(char_id) as char_count
                         from player_ratings
-                        where deviation < ? and wins + losses >= 200
+                        where deviation < ? and wins + losses >= 100
                         group by id
                     ) as averages
                     where char_count > 1 AND avg_value > 0.0
@@ -947,7 +947,7 @@ pub fn calc_fraud_index(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
                 (
                     select id, char_id, value
                     from player_ratings
-                    where deviation < ? and wins + losses >= 200
+                    where deviation < ? and wins + losses >= 100
                 ) as char_ratings
                 
                 on filtered_averages.id = char_ratings.id
@@ -978,7 +978,7 @@ pub fn calc_fraud_index(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
                     (
                         select id, avg(value) as avg_value, count(char_id) as char_count
                         from player_ratings
-                        where deviation < ? and wins + losses >= 200
+                        where deviation < ? and wins + losses >= 100
                         group by id
                     ) as averages
                     where char_count > 1 AND avg_value > 1.7
@@ -989,7 +989,7 @@ pub fn calc_fraud_index(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
                 (
                     select id, char_id, value
                     from player_ratings
-                    where deviation < ? and wins + losses >= 200
+                    where deviation < ? and wins + losses >= 100
                 ) as char_ratings
                 
                 on filtered_averages.id = char_ratings.id
