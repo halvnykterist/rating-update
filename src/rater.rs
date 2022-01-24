@@ -12,7 +12,7 @@ use tokio::{time, try_join};
 use crate::website;
 
 const SYS_CONSTANT: f64 = 0.8;
-pub const MAX_DEVIATION: f64 = 100.0 / 173.7178;
+pub const MAX_DEVIATION: f64 = 75.0 / 173.7178;
 pub const HIGH_RATING: f64 = (1800.0 - 1500.0) / 173.7178;
 const DB_NAME: &str = "ratings.sqlite";
 
@@ -218,6 +218,16 @@ pub async fn update_ratings_continuous() {
             }
         }
     }
+}
+
+pub fn get_average_rating(conn: &Transaction, id: i64) -> f64 {
+    conn.query_row(
+        "select avg(value) from player_ratings where id = ?",
+        params![id],
+        |r| r.get::<_, Option<f64>>(0),
+    )
+    .unwrap()
+    .unwrap_or_default()
 }
 
 pub async fn pull() {
@@ -462,13 +472,23 @@ fn update_ratings(conn: &mut Connection) -> i64 {
 
         let rating_a = players
             .entry((g.id_a, g.char_a))
-            .or_insert((RatedPlayer::new(g.id_a, g.char_a), Vec::new()))
+            .or_insert_with(|| {
+                (
+                    RatedPlayer::new(g.id_a, get_average_rating(&tx, g.id_a), g.char_a),
+                    Vec::new(),
+                )
+            })
             .0
             .rating;
 
         let rating_b = players
             .entry((g.id_b, g.char_b))
-            .or_insert((RatedPlayer::new(g.id_b, g.char_b), Vec::new()))
+            .or_insert_with(|| {
+                (
+                    RatedPlayer::new(g.id_b, get_average_rating(&tx, g.id_b), g.char_b),
+                    Vec::new(),
+                )
+            })
             .0
             .rating;
 
@@ -1156,7 +1176,7 @@ pub struct RatedPlayer {
 }
 
 impl RatedPlayer {
-    pub fn new(id: i64, char_id: i64) -> Self {
+    pub fn new(id: i64, initial_rating: f64, char_id: i64) -> Self {
         Self {
             id,
             char_id,
@@ -1164,7 +1184,7 @@ impl RatedPlayer {
             loss_count: 0,
             //rating: Glicko2Rating::unrated(),
             rating: Glicko2Rating {
-                value: 0.0,
+                value: initial_rating,
                 deviation: 350.0 / 173.0,
                 volatility: 0.02,
             },
