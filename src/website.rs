@@ -179,6 +179,7 @@ async fn character_popularity(conn: RatingsDbConn) -> Cached<Template> {
         character_shortnames: Vec<&'static str>,
         global_character_popularity: Vec<f64>,
         rank_character_popularity: Vec<api::RankCharacterPopularities>,
+        fraud_stats: Vec<api::FraudStats>,
     }
 
     let (global_character_popularity, rank_character_popularity) = api::character_popularity(&conn).await;
@@ -188,6 +189,7 @@ async fn character_popularity(conn: RatingsDbConn) -> Cached<Template> {
         character_shortnames: CHAR_NAMES.iter().map(|c| c.0).collect(),
         global_character_popularity,
         rank_character_popularity,
+        fraud_stats: api::get_fraud(&conn).await,
     };
 
     let delta = context.stats.last_update + rater::RATING_PERIOD - Utc::now().timestamp();

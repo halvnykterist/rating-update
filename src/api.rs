@@ -1382,6 +1382,35 @@ pub async fn character_popularity(
 }
 
 #[derive(Serialize)]
+pub struct FraudStats {
+    character_name: &'static str,
+    player_count: i64,
+    average_offset: String,
+}
+
+pub async fn get_fraud(conn: &RatingsDbConn) -> Vec<FraudStats> {
+    conn.run(move |conn| {
+        let mut stmt = conn
+            .prepare("SELECT char_id, player_count, avg_delta FROM fraud_index ORDER BY avg_delta DESC")
+            .unwrap();
+
+        let mut rows = stmt.query(params![]).unwrap();
+
+        let mut res = Vec::new();
+        while let Some(row) = rows.next().unwrap() {
+            res.push(FraudStats {
+                character_name: website::CHAR_NAMES[row.get::<_, usize>(0).unwrap()].1,
+                player_count: row.get(1).unwrap(),
+                average_offset: format!("{:+.0}", (row.get::<_, f64>(2).unwrap() * 173.7178)),
+            });
+        }
+
+        res
+    })
+    .await
+}
+
+#[derive(Serialize)]
 pub struct VipPlayer {
     id: String,
     name: String,

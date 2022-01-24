@@ -192,6 +192,10 @@ pub async fn update_ratings_continuous() {
         .query_row("SELECT last_update FROM config", [], |r| r.get(0))
         .unwrap();
 
+    if let Err(e) = calc_fraud_index(&mut conn) {
+        error!("{}", e);
+    }
+
     let mut interval = time::interval(Duration::from_secs(60));
     loop {
         interval.tick().await;
@@ -201,6 +205,9 @@ pub async fn update_ratings_continuous() {
             }
             update_player_distribution(&mut conn);
             if let Err(e) = calc_versus_matchups(&mut conn) {
+                error!("{}", e);
+            }
+            if let Err(e) = calc_fraud_index(&mut conn) {
                 error!("{}", e);
             }
             if let Err(e) = update_rankings(&mut conn) {
@@ -220,6 +227,7 @@ pub async fn pull() {
 }
 
 async fn grab_games(conn: &mut Connection, pages: usize) -> Result<(), Box<dyn Error>> {
+    info!("Grabbing replays");
     let (replays, errors) = ggst_api::get_replays(
         &ggst_api::Context::default(),
         pages,
@@ -866,6 +874,60 @@ pub fn update_rankings(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
 
     tx.commit()?;
     info!("Updated rankings");
+    Ok(())
+}
+
+pub fn calc_fraud_index(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
+    info!("Calculating fraud index");
+    let tx = conn.transaction()?;
+    tx.execute("DELETE FROM fraud_index", [])?;
+
+    {
+        let mut stmt = tx
+            .prepare(
+                "select char_id, count(*), avg(char_ratings.value - filtered_averages.avg_value)
+            from
+                (
+                    select * from
+                    (
+                        select id, avg(value) as avg_value, count(char_id) as char_count
+                        from player_ratings
+                        where deviation < ? and wins + losses >= 100
+                        group by id
+                    ) as averages
+                    where char_count > 1
+                ) as filtered_averages
+                
+                join
+                
+                (
+                    select id, char_id, value
+                    from player_ratings
+                    where deviation < ? and wins + losses >= 100
+                ) as char_ratings
+                
+                on filtered_averages.id = char_ratings.id
+                
+            group by char_id;",
+            )
+            .unwrap();
+
+        let mut rows = stmt.query(params![MAX_DEVIATION, MAX_DEVIATION]).unwrap();
+
+        while let Some(row) = rows.next().unwrap() {
+            let char_id: i64 = row.get(0).unwrap();
+            let player_count: i64 = row.get(1).unwrap();
+            let avg_delta: f64 = row.get(2).unwrap();
+            tx.execute(
+                "INSERT INTO fraud_index VALUES(?, ?, ?)",
+                params![char_id, player_count, avg_delta],
+            )
+            .unwrap();
+        }
+    }
+
+    tx.commit()?;
+
     Ok(())
 }
 
