@@ -881,6 +881,7 @@ pub fn calc_fraud_index(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
     info!("Calculating fraud index");
     let tx = conn.transaction()?;
     tx.execute("DELETE FROM fraud_index", [])?;
+    tx.execute("DELETE FROM fraud_index_higher_rated", [])?;
 
     {
         let mut stmt = tx
@@ -920,6 +921,48 @@ pub fn calc_fraud_index(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
             let avg_delta: f64 = row.get(2).unwrap();
             tx.execute(
                 "INSERT INTO fraud_index VALUES(?, ?, ?)",
+                params![char_id, player_count, avg_delta],
+            )
+            .unwrap();
+        }
+
+        let mut stmt = tx
+            .prepare(
+                "select char_id, count(*), avg(char_ratings.value - filtered_averages.avg_value)
+            from
+                (
+                    select * from
+                    (
+                        select id, avg(value) as avg_value, count(char_id) as char_count
+                        from player_ratings
+                        where deviation < ? and wins + losses >= 200
+                        group by id
+                    ) as averages
+                    where char_count > 1 AND avg_value > 0.0
+                ) as filtered_averages
+                
+                join
+                
+                (
+                    select id, char_id, value
+                    from player_ratings
+                    where deviation < ? and wins + losses >= 200
+                ) as char_ratings
+                
+                on filtered_averages.id = char_ratings.id
+                
+            group by char_id;",
+            )
+            .unwrap();
+
+        let mut rows = stmt.query(params![MAX_DEVIATION, MAX_DEVIATION]).unwrap();
+
+        while let Some(row) = rows.next().unwrap() {
+            let char_id: i64 = row.get(0).unwrap();
+            let player_count: i64 = row.get(1).unwrap();
+            let avg_delta: f64 = row.get(2).unwrap();
+            tx.execute(
+                "INSERT INTO fraud_index_higher_rated VALUES(?, ?, ?)",
                 params![char_id, player_count, avg_delta],
             )
             .unwrap();
