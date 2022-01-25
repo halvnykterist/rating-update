@@ -1505,6 +1505,145 @@ pub struct RatingDiffStats {
     difference_counts: Vec<f64>,
 }
 
+#[get("/api/player_rating_experience/<player_id>")]
+pub async fn rating_experience_player(
+    conn: RatingsDbConn,
+    player_id: &str,
+) -> Json<RatingDiffStats> {
+    let id = i64::from_str_radix(player_id, 16).unwrap();
+    Json(
+        conn.run(move |conn| {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT id_a, id_b, value_a, value_b
+                    FROM game_ratings
+                    WHERE deviation_a < ?
+                        AND deviation_b < ?
+                        AND (id_a = ?  OR id_b = ?)",
+                )
+                .unwrap();
+
+            let mut rows = stmt
+                .query(params![rater::MAX_DEVIATION, rater::MAX_DEVIATION, id, id,])
+                .unwrap();
+
+            let mut counts: FxHashMap<i64, i64> = Default::default();
+
+            let mut total = 0.0;
+            let mut over_100 = 0.0;
+            let mut over_200 = 0.0;
+            let mut over_300 = 0.0;
+            let mut over_400 = 0.0;
+            let mut below_100 = 0.0;
+            let mut below_200 = 0.0;
+            let mut below_300 = 0.0;
+            let mut below_400 = 0.0;
+
+            while let Some(row) = rows.next().unwrap() {
+                let id_a: i64 = row.get(0).unwrap();
+                let id_b: i64 = row.get(1).unwrap();
+                let a: f64 = row.get(2).unwrap();
+                let b: f64 = row.get(3).unwrap();
+                let a = a * 173.718 + 1500.0;
+                let b = b * 173.718 + 1500.0;
+
+                if id_a == id {
+                    let delta = b - a;
+
+                    if delta > 100.0 {
+                        over_100 += 1.0;
+                    }
+                    if delta > 200.0 {
+                        over_200 += 1.0;
+                    }
+                    if delta > 300.0 {
+                        over_300 += 1.0;
+                    }
+                    if delta > 400.0 {
+                        over_400 += 1.0;
+                    }
+                    if delta < -100.0 {
+                        below_100 += 1.0
+                    }
+                    if delta < -200.0 {
+                        below_200 += 1.0
+                    }
+                    if delta < -300.0 {
+                        below_300 += 1.0
+                    }
+                    if delta < -400.0 {
+                        below_400 += 1.0
+                    }
+                    total += 1.0;
+
+                    let bucket = ((delta + 12.5) / 25.0).floor() as i64;
+
+                    *counts.entry(bucket).or_default() += 1;
+                }
+
+                if id_b == id {
+                    let delta = a - b;
+
+                    if delta > 100.0 {
+                        over_100 += 1.0;
+                    }
+                    if delta > 200.0 {
+                        over_200 += 1.0;
+                    }
+                    if delta > 300.0 {
+                        over_300 += 1.0;
+                    }
+                    if delta > 400.0 {
+                        over_400 += 1.0;
+                    }
+                    if delta < -100.0 {
+                        below_100 += 1.0
+                    }
+                    if delta < -200.0 {
+                        below_200 += 1.0
+                    }
+                    if delta < -300.0 {
+                        below_300 += 1.0
+                    }
+                    if delta < -400.0 {
+                        below_400 += 1.0
+                    }
+                    total += 1.0;
+
+                    let bucket = ((delta + 12.5) / 25.0).floor() as i64;
+
+                    *counts.entry(bucket).or_default() += 1;
+                }
+            }
+
+            let min_bucket = -30;
+            let max_bucket = 30;
+            //let min_bucket = *counts.keys().min().unwrap();
+            //let max_bucket = *counts.keys().max().unwrap();
+
+            RatingDiffStats {
+                over_100: over_100 / total,
+                over_200: over_200 / total,
+                over_300: over_300 / total,
+                over_400: over_400 / total,
+                below_100: below_100 / total,
+                below_200: below_200 / total,
+                below_300: below_300 / total,
+                below_400: below_400 / total,
+                difference_amounts: (min_bucket..=max_bucket)
+                    .into_iter()
+                    .map(|r| r * 25.0 as i64)
+                    .collect(),
+                difference_counts: (min_bucket..=max_bucket)
+                    .into_iter()
+                    .map(|r| (counts.get(&r).copied().unwrap_or(0) as f64 / total * 100.0))
+                    .collect(),
+            }
+        })
+        .await,
+    )
+}
+
 #[get("/api/rating_experience?<min_rating>&<max_rating>")]
 pub async fn rating_experience(
     conn: RatingsDbConn,
