@@ -1493,7 +1493,10 @@ pub async fn get_supporters(conn: &RatingsDbConn) -> Vec<VipPlayer> {
 
 #[derive(Serialize)]
 pub struct RatingDiffStats {
-    over_50: f64,
+    below_400: f64,
+    below_300: f64,
+    below_200: f64,
+    below_100: f64,
     over_100: f64,
     over_200: f64,
     over_300: f64,
@@ -1537,11 +1540,14 @@ pub async fn rating_experience(
             let mut counts: FxHashMap<i64, i64> = Default::default();
 
             let mut total = 0.0;
-            let mut over_50 = 0.0;
             let mut over_100 = 0.0;
             let mut over_200 = 0.0;
             let mut over_300 = 0.0;
             let mut over_400 = 0.0;
+            let mut below_100 = 0.0;
+            let mut below_200 = 0.0;
+            let mut below_300 = 0.0;
+            let mut below_400 = 0.0;
 
             while let Some(row) = rows.next().unwrap() {
                 let a: f64 = row.get(0).unwrap();
@@ -1552,21 +1558,29 @@ pub async fn rating_experience(
                 if a > min_rating as f64 && a < max_rating as f64 {
                     let delta = b - a;
 
-                    let delta_abs = (a - b).abs();
-                    if delta_abs > 50.0 {
-                        over_50 += 1.0;
-                    }
-                    if delta_abs > 100.0 {
+                    if delta > 100.0 {
                         over_100 += 1.0;
                     }
-                    if delta_abs > 200.0 {
+                    if delta > 200.0 {
                         over_200 += 1.0;
                     }
-                    if delta_abs > 300.0 {
+                    if delta > 300.0 {
                         over_300 += 1.0;
                     }
-                    if delta_abs > 400.0 {
+                    if delta > 400.0 {
                         over_400 += 1.0;
+                    }
+                    if delta < -100.0 {
+                        below_100 += 1.0
+                    }
+                    if delta < -200.0 {
+                        below_200 += 1.0
+                    }
+                    if delta < -300.0 {
+                        below_300 += 1.0
+                    }
+                    if delta < -400.0 {
+                        below_400 += 1.0
                     }
                     total += 1.0;
 
@@ -1578,21 +1592,29 @@ pub async fn rating_experience(
                 if b > min_rating as f64 && b < max_rating as f64 {
                     let delta = a - b;
 
-                    let delta_abs = (a - b).abs();
-                    if delta_abs > 50.0 {
-                        over_50 += 1.0;
-                    }
-                    if delta_abs > 100.0 {
+                    if delta > 100.0 {
                         over_100 += 1.0;
                     }
-                    if delta_abs > 200.0 {
+                    if delta > 200.0 {
                         over_200 += 1.0;
                     }
-                    if delta_abs > 300.0 {
+                    if delta > 300.0 {
                         over_300 += 1.0;
                     }
-                    if delta_abs > 400.0 {
+                    if delta > 400.0 {
                         over_400 += 1.0;
+                    }
+                    if delta < -100.0 {
+                        below_100 += 1.0
+                    }
+                    if delta < -200.0 {
+                        below_200 += 1.0
+                    }
+                    if delta < -300.0 {
+                        below_300 += 1.0
+                    }
+                    if delta < -400.0 {
+                        below_400 += 1.0
                     }
                     total += 1.0;
 
@@ -1608,11 +1630,14 @@ pub async fn rating_experience(
             //let max_bucket = *counts.keys().max().unwrap();
 
             RatingDiffStats {
-                over_50: over_50 / total,
                 over_100: over_100 / total,
                 over_200: over_200 / total,
                 over_300: over_300 / total,
                 over_400: over_400 / total,
+                below_100: below_100 / total,
+                below_200: below_200 / total,
+                below_300: below_300 / total,
+                below_400: below_400 / total,
                 difference_amounts: (min_bucket..=max_bucket)
                     .into_iter()
                     .map(|r| r * 25.0 as i64)
