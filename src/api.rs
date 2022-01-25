@@ -1518,6 +1518,7 @@ pub async fn floor_rating_distribution(conn: RatingsDbConn) -> Json<FloorRatingD
             let mut rows = stmt.query(params![rater::MAX_DEVIATION]).unwrap();
 
             let mut totals: FxHashMap<i64, FxHashMap<i64, i64>> = Default::default();
+
             while let Some(row) = rows.next().unwrap() {
                 let floor: i64 = row.get(0).unwrap();
                 let value: f64 = row.get(1).unwrap();
@@ -1539,12 +1540,12 @@ pub async fn floor_rating_distribution(conn: RatingsDbConn) -> Json<FloorRatingD
                 floors: totals
                     .into_iter()
                     .map(|(f, sums)| {
-                        let max: i64 = *sums.values().max().unwrap();
+                        //let max: i64 = *sums.values().max().unwrap();
                         (
                             f,
                             (min_bucket..max_bucket)
                                 .into_iter()
-                                .map(|r| (sums.get(&r).copied().unwrap_or(0) as f64 / max as f64))
+                                .map(|r| (sums.get(&r).copied().unwrap_or(0) as f64))
                                 .collect(),
                         )
                     })
