@@ -1495,6 +1495,7 @@ pub async fn get_supporters(conn: &RatingsDbConn) -> Vec<VipPlayer> {
 pub struct FloorRatingDistributions {
     ratings: Vec<i64>,
     floors: FxHashMap<i64, Vec<f64>>,
+    overall: Vec<f64>,
 }
 
 #[get("/api/floor_rating_distribution")]
@@ -1518,6 +1519,7 @@ pub async fn floor_rating_distribution(conn: RatingsDbConn) -> Json<FloorRatingD
             let mut rows = stmt.query(params![rater::MAX_DEVIATION]).unwrap();
 
             let mut totals: FxHashMap<i64, FxHashMap<i64, i64>> = Default::default();
+            let mut overall: FxHashMap<i64, i64> = Default::default();
 
             while let Some(row) = rows.next().unwrap() {
                 let floor: i64 = row.get(0).unwrap();
@@ -1527,6 +1529,7 @@ pub async fn floor_rating_distribution(conn: RatingsDbConn) -> Json<FloorRatingD
                 let bucket = ((value + 25.0) / 50.0).floor() as i64;
 
                 *totals.entry(floor).or_default().entry(bucket).or_default() += 1;
+                *overalls.entry(bucket).or_default() += 1;
             }
 
             let min_bucket = *totals.values().flat_map(|f| f.keys()).min().unwrap();
@@ -1550,6 +1553,9 @@ pub async fn floor_rating_distribution(conn: RatingsDbConn) -> Json<FloorRatingD
                         )
                     })
                     .collect(),
+                overall: (min_bucket..max_bucket)
+                    .into_ter()
+                    .map(|r| (overall.get(&r).copied().unwrap_or(0) as f64)),
             }
         })
         .await,
