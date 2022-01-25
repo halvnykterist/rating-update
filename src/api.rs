@@ -1492,6 +1492,142 @@ pub async fn get_supporters(conn: &RatingsDbConn) -> Vec<VipPlayer> {
 }
 
 #[derive(Serialize)]
+pub struct RatingDiffStats {
+    over_50: f64,
+    over_100: f64,
+    over_200: f64,
+    over_300: f64,
+    over_400: f64,
+    difference_amounts: Vec<i64>,
+    difference_counts: Vec<f64>,
+}
+
+#[get("/api/rating_experience?<min_rating>&<max_rating>")]
+pub async fn rating_experience(
+    conn: RatingsDbConn,
+    min_rating: i64,
+    max_rating: i64,
+) -> Json<RatingDiffStats> {
+    Json(
+        conn.run(move |conn| {
+            let min_rating_glicko2 = (min_rating as f64 - 1500.0) / 173.718;
+            let max_rating_glicko2 = (max_rating as f64 - 1500.0) / 173.718;
+            let mut stmt = conn
+                .prepare(
+                    "SELECT value_a, value_b
+                    FROM game_ratings
+                    WHERE deviation_a < ? AND deviation_b < ? AND 
+                        ((value_a > ? AND value_a < ?) 
+                        OR
+                        (value_b > ? AND value_b < ?))",
+                )
+                .unwrap();
+
+            let mut rows = stmt
+                .query(params![
+                    rater::MAX_DEVIATION,
+                    rater::MAX_DEVIATION,
+                    min_rating_glicko2,
+                    max_rating_glicko2,
+                    min_rating_glicko2,
+                    max_rating_glicko2,
+                ])
+                .unwrap();
+
+            let mut counts: FxHashMap<i64, i64> = Default::default();
+
+            let mut total = 0.0;
+            let mut over_50 = 0.0;
+            let mut over_100 = 0.0;
+            let mut over_200 = 0.0;
+            let mut over_300 = 0.0;
+            let mut over_400 = 0.0;
+
+            while let Some(row) = rows.next().unwrap() {
+                let a: f64 = row.get(0).unwrap();
+                let b: f64 = row.get(1).unwrap();
+                let a = a * 173.718 + 1500.0;
+                let b = b * 173.718 + 1500.0;
+
+                if a > min_rating as f64 && a < max_rating as f64 {
+                    let delta = b - a;
+
+                    let delta_abs = (a - b).abs();
+                    if delta_abs > 50.0 {
+                        over_50 += 1.0;
+                    }
+                    if delta_abs > 100.0 {
+                        over_100 += 1.0;
+                    }
+                    if delta_abs > 200.0 {
+                        over_200 += 1.0;
+                    }
+                    if delta_abs > 300.0 {
+                        over_300 += 1.0;
+                    }
+                    if delta_abs > 400.0 {
+                        over_400 += 1.0;
+                    }
+                    total += 1.0;
+
+                    let bucket = ((delta + 12.5) / 25.0).floor() as i64;
+
+                    *counts.entry(bucket).or_default() += 1;
+                }
+
+                if b > min_rating as f64 && b < max_rating as f64 {
+                    let delta = a - b;
+
+                    let delta_abs = (a - b).abs();
+                    if delta_abs > 50.0 {
+                        over_50 += 1.0;
+                    }
+                    if delta_abs > 100.0 {
+                        over_100 += 1.0;
+                    }
+                    if delta_abs > 200.0 {
+                        over_200 += 1.0;
+                    }
+                    if delta_abs > 300.0 {
+                        over_300 += 1.0;
+                    }
+                    if delta_abs > 400.0 {
+                        over_400 += 1.0;
+                    }
+                    total += 1.0;
+
+                    let bucket = ((delta + 12.5) / 25.0).floor() as i64;
+
+                    *counts.entry(bucket).or_default() += 1;
+                }
+            }
+
+            let min_bucket = -30;
+            let max_bucket = 30;
+            //let min_bucket = *counts.keys().min().unwrap();
+            //let max_bucket = *counts.keys().max().unwrap();
+
+            RatingDiffStats {
+                over_50: over_50 / total,
+                over_100: over_100 / total,
+                over_200: over_200 / total,
+                over_300: over_300 / total,
+                over_400: over_400 / total,
+                difference_amounts: (min_bucket..=max_bucket)
+                    .into_iter()
+                    .map(|r| r * 25.0 as i64)
+                    .collect(),
+                difference_counts: (min_bucket..=max_bucket)
+                    .into_iter()
+                    .map(|r| (counts.get(&r).copied().unwrap_or(0) as f64 / total * 100.0))
+                    .collect(),
+            }
+        })
+        .await,
+    )
+}
+
+#[derive(Serialize)]
 pub struct FloorRatingDistributions {
     ratings: Vec<i64>,
     floors: FxHashMap<i64, Vec<f64>>,
@@ -1506,13 +1642,7 @@ pub async fn floor_rating_distribution(conn: RatingsDbConn) -> Json<FloorRatingD
                 .prepare(
                     "SELECT floor, value
                     FROM players NATURAL JOIN player_ratings
-                    WHERE deviation < ?"
-                    //"SELECT game_floor, value FROM
-                    //(SELECT game_floor, value_a as value 
-                    //FROM games NATURAL JOIN game_ratings WHERE deviation_a < ?
-                    //UNION 
-                    //SELECT game_floor, value_b as value
-                    //FROM games NATURAL JOIN game_ratings WHERE deviation_b < ?)",
+                    WHERE deviation < ?",
                 )
                 .unwrap();
 
