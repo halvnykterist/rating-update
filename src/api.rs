@@ -1529,7 +1529,7 @@ pub async fn floor_rating_distribution(conn: RatingsDbConn) -> Json<FloorRatingD
                 let bucket = ((value + 25.0) / 50.0).floor() as i64;
 
                 *totals.entry(floor).or_default().entry(bucket).or_default() += 1;
-                *overalls.entry(bucket).or_default() += 1;
+                *overall.entry(bucket).or_default() += 1;
             }
 
             let min_bucket = *totals.values().flat_map(|f| f.keys()).min().unwrap();
@@ -1554,8 +1554,9 @@ pub async fn floor_rating_distribution(conn: RatingsDbConn) -> Json<FloorRatingD
                     })
                     .collect(),
                 overall: (min_bucket..max_bucket)
-                    .into_ter()
-                    .map(|r| (overall.get(&r).copied().unwrap_or(0) as f64)),
+                    .into_iter()
+                    .map(|r| (overall.get(&r).copied().unwrap_or(0) as f64))
+                    .collect(),
             }
         })
         .await,
