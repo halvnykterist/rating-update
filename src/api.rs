@@ -1,4 +1,5 @@
 use chrono::{Duration, NaiveDateTime, Utc};
+use fxhash::FxHashMap;
 use glicko2::{Glicko2Rating, GlickoRating};
 use rocket::serde::{json::Json, Serialize};
 use rusqlite::{named_params, params, OptionalExtension};
@@ -1488,6 +1489,70 @@ pub async fn get_supporters(conn: &RatingsDbConn) -> Vec<VipPlayer> {
         res
     })
     .await
+}
+
+#[derive(Serialize)]
+pub struct FloorRatingDistributions {
+    ratings: Vec<i64>,
+    floors: FxHashMap<i64, Vec<f64>>,
+}
+
+#[get("/api/floor_rating_distribution")]
+pub async fn floor_rating_distribution(conn: RatingsDbConn) -> Json<FloorRatingDistributions> {
+    Json(
+        conn.run(move |conn| {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT floor, value
+                    FROM players NATURAL JOIN player_ratings
+                    WHERE deviation < ?"
+                    //"SELECT game_floor, value FROM
+                    //(SELECT game_floor, value_a as value 
+                    //FROM games NATURAL JOIN game_ratings WHERE deviation_a < ?
+                    //UNION 
+                    //SELECT game_floor, value_b as value
+                    //FROM games NATURAL JOIN game_ratings WHERE deviation_b < ?)",
+                )
+                .unwrap();
+
+            let mut rows = stmt.query(params![rater::MAX_DEVIATION]).unwrap();
+
+            let mut totals: FxHashMap<i64, FxHashMap<i64, i64>> = Default::default();
+            while let Some(row) = rows.next().unwrap() {
+                let floor: i64 = row.get(0).unwrap();
+                let value: f64 = row.get(1).unwrap();
+                let value = value * 173.718 + 1500.0;
+
+                let bucket = ((value + 25.0) / 50.0).floor() as i64;
+
+                *totals.entry(floor).or_default().entry(bucket).or_default() += 1;
+            }
+
+            let min_bucket = *totals.values().flat_map(|f| f.keys()).min().unwrap();
+            let max_bucket = *totals.values().flat_map(|f| f.keys()).max().unwrap();
+
+            FloorRatingDistributions {
+                ratings: (min_bucket..max_bucket)
+                    .into_iter()
+                    .map(|r| r * 50)
+                    .collect(),
+                floors: totals
+                    .into_iter()
+                    .map(|(f, sums)| {
+                        let max: i64 = *sums.values().max().unwrap();
+                        (
+                            f,
+                            (min_bucket..max_bucket)
+                                .into_iter()
+                                .map(|r| (sums.get(&r).copied().unwrap_or(0) as f64 / max as f64))
+                                .collect(),
+                        )
+                    })
+                    .collect(),
+            }
+        })
+        .await,
+    )
 }
 
 #[get("/api/outcomes")]
