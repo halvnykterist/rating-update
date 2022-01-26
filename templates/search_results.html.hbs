@@ -2,7 +2,7 @@
 <html>
     <meta charset = "UTF-8">
     <head>
-        <title>RATING UPDATE</title>
+        <title>Search: "{{search_string}}" | RATING UPDATE</title>
         <meta property="og:title" content="RATING UPDATE"/>
         <meta property="og:type" content="website" />
         <meta property="og:description" content="Glicko2 ratings for Guilty Gear Strive" />
@@ -19,7 +19,7 @@
     <body>
         {{> header stats}}
 
-        <div>{{> search_form}}</div>
+        <div>{{> search_form search_string}}</div>
     
         <div>
             <table>

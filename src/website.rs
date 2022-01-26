@@ -47,6 +47,7 @@ pub async fn run() {
                 top_char,
                 matchups,
                 character_popularity,
+                player_distr_forward,
                 player_distribution,
                 player,
                 player_char,
@@ -205,6 +206,11 @@ async fn character_popularity(conn: RatingsDbConn) -> Cached<Template> {
 }
 
 #[get("/player-distribution")]
+async fn player_distr_forward() -> Redirect {
+    Redirect::to(uri!("player_distribution"))
+}
+
+#[get("/player_distribution")]
 async fn player_distribution(conn: RatingsDbConn) -> Cached<Template> {
     #[derive(Serialize)]
     struct Context {
@@ -295,13 +301,21 @@ async fn search(conn: RatingsDbConn, name: String) -> Template {
     #[derive(Serialize)]
     struct Context {
         stats: api::Stats,
+        search_string: String,
         players: Vec<api::SearchResultPlayer>,
     }
 
     let stats = api::stats_inner(&conn).await;
-    let players = api::search_inner(&conn, name).await;
+    let players = api::search_inner(&conn, name.clone()).await;
 
-    Template::render("search_results", &Context { stats, players })
+    Template::render(
+        "search_results",
+        &Context {
+            stats,
+            players,
+            search_string: name,
+        },
+    )
 }
 
 #[catch(404)]
