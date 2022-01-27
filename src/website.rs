@@ -237,7 +237,8 @@ async fn player(conn: RatingsDbConn, player_id: &str) -> Option<Redirect> {
         let char_short = CHAR_NAMES[char_id as usize].0;
         Some(Redirect::to(uri!(player_char(
             player_id = player_id,
-            char_id = char_short
+            char_id = char_short,
+            history = Option::<i64>::None,
         ))))
     } else {
         None
@@ -267,13 +268,15 @@ async fn player(conn: RatingsDbConn, player_id: &str) -> Option<Redirect> {
 //    }
 //}
 
-#[get("/player/<player_id>/<char_id>")]
+#[get("/player/<player_id>/<char_id>?<history>")]
 async fn player_char(
     conn: RatingsDbConn,
     player_id: &str,
     char_id: &str,
+    history: Option<i64>,
 ) -> Option<Cached<Template>> {
     let id = i64::from_str_radix(player_id, 16).unwrap();
+    let game_count = history.unwrap_or(200);
 
     let char_id = CHAR_NAMES.iter().position(|(c, _)| *c == char_id)? as i64;
 
@@ -285,7 +288,7 @@ async fn player_char(
 
     let stats = api::stats_inner(&conn).await;
 
-    if let Some(player) = api::get_player_data_char(&conn, id, char_id).await {
+    if let Some(player) = api::get_player_data_char(&conn, id, char_id, game_count).await {
         let context = Context { stats, player };
         Some(Cached::new(
             Template::render("player_char", &context),

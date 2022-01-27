@@ -419,6 +419,7 @@ pub async fn get_player_data_char(
     conn: &RatingsDbConn,
     id: i64,
     char_id: i64,
+    game_count: i64,
 ) -> Option<PlayerDataChar> {
     conn.run(move |conn| {
         if conn
@@ -560,12 +561,16 @@ pub async fn get_player_data_char(
                                 LEFT JOIN vip_status ON vip_status.id = games.id_a
                                 WHERE games.id_b = :id AND games.char_b = :char_id
 
-                                ORDER BY timestamp DESC LIMIT 200",
+                                ORDER BY timestamp DESC LIMIT :game_count",
                             )
                             .unwrap();
 
                         let mut rows = stmt
-                            .query(named_params! {":id" : id, ":char_id": char_id})
+                            .query(named_params! {
+                                ":id" : id,
+                                ":char_id": char_id,
+                                ":game_count":game_count,
+                            })
                             .unwrap();
                         let mut history = Vec::<PlayerSet>::new();
                         while let Some(row) = rows.next().unwrap() {
