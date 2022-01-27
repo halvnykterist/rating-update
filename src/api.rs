@@ -420,6 +420,7 @@ pub async fn get_player_data_char(
     id: i64,
     char_id: i64,
     game_count: i64,
+    group_games: bool,
 ) -> Option<PlayerDataChar> {
     conn.run(move |conn| {
         if conn
@@ -616,6 +617,7 @@ pub async fn get_player_data_char(
                                 set.opponent_id == format!("{:X}", opponent_id)
                                     && set.opponent_character
                                         == website::CHAR_NAMES[opponent_character as usize].1
+                                    && group_games
                             }) {
                                 set.timestamp = format!(
                                     "{}",
@@ -796,6 +798,7 @@ pub async fn get_player_data_char(
                                 set.opponent_id == format!("{:X}", opponent_id)
                                     && set.opponent_character
                                         == website::CHAR_NAMES[opponent_character as usize].1
+                                    && group_games
                             }) {
                                 set.timestamp = format!(
                                     "{}",
