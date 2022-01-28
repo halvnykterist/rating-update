@@ -32,7 +32,7 @@
                 </tr>
                 {{#each players}}
                     <tr>
-                        <td>{{>player_link name=this.name id=this.id vip_status=this.vip_status}}</td>
+                        <td>{{>player_link name=this.name id=this.id char=this.character_short vip_status=this.vip_status}}</td>
                         <td>{{this.character}}</td>
                         <td>{{this.rating_value}} ±{{this.rating_deviation}}</td>
                         <td>{{this.game_count}}</td>
