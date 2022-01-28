@@ -422,7 +422,7 @@ fn update_ratings(conn: &mut Connection) -> i64 {
         .unwrap();
     let next_timestamp = last_timestamp + RATING_PERIOD;
 
-    const RATING_PERIOD_OVERLAP: i64 = 60 * 60;
+    const RATING_PERIOD_OVERLAP: i64 = 24 * 60 * 60;
 
     info!(
         "Calculating ratings between {} and {}...",
