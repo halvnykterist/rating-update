@@ -440,6 +440,7 @@ pub async fn get_player_data_char(
                     |r| Ok((r.get(0)?, r.get(1)?)),
                 )
                 .unwrap();
+            info!("Loading data for {} ({})", name, website::CHAR_NAMES[char_id as usize].0);
             let other_names = {
                 let mut stmt = conn
                     .prepare("SELECT name FROM player_names WHERE id=?")
@@ -496,8 +497,6 @@ pub async fn get_player_data_char(
             };
 
             let character_data = {
-                dbg!(id);
-                dbg!(char_id);
                 let (wins, losses, value, deviation, global_rank, character_rank) = conn
                     .query_row(
                         "SELECT wins, losses, value, deviation, global_rank, character_rank
