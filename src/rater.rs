@@ -197,10 +197,11 @@ pub async fn update_ratings_continuous() {
     }
 
     let mut interval = time::interval(Duration::from_secs(60));
+
     loop {
         interval.tick().await;
-        if Utc::now().timestamp() - last_rating_timestamp > RATING_PERIOD + 60 {
-            while Utc::now().timestamp() - last_rating_timestamp > RATING_PERIOD + 60 {
+        if Utc::now().timestamp() - last_rating_timestamp > RATING_PERIOD {
+            while Utc::now().timestamp() - last_rating_timestamp > RATING_PERIOD {
                 last_rating_timestamp = update_ratings(&mut conn);
             }
             update_player_distribution(&mut conn);
@@ -421,6 +422,8 @@ fn update_ratings(conn: &mut Connection) -> i64 {
         .unwrap();
     let next_timestamp = last_timestamp + RATING_PERIOD;
 
+    const RATING_PERIOD_OVERLAP: i64 = 60 * 60;
+
     info!(
         "Calculating ratings between {} and {}...",
         NaiveDateTime::from_timestamp(last_timestamp, 0).format("%Y-%m-%d %H:%M"),
@@ -430,10 +433,32 @@ fn update_ratings(conn: &mut Connection) -> i64 {
     //Fetch the games from the rating period
     let games = {
         let mut stmt = conn
-            .prepare("SELECT * FROM games WHERE timestamp >= ? AND timestamp < ?")
+            .prepare(
+                "SELECT
+                    games.timestamp, 
+                    games.id_a,
+                    games.name_a,
+                    games.char_a,
+                    games.id_b,
+                    games.name_b,
+                    games.char_b,
+                    games.winner,
+                    games.game_floor
+                FROM 
+                    games LEFT JOIN game_ratings ON
+                    games.id_a == game_ratings.id_a 
+                    AND games.id_b == game_ratings.id_b
+                    AND games.timestamp == game_ratings.timestamp
+                WHERE
+                    games.timestamp >= ? 
+                    AND games.timestamp < ? 
+                    AND game_ratings.id_a IS NULL",
+            )
             .unwrap();
 
-        let mut rows = stmt.query([last_timestamp, next_timestamp]).unwrap();
+        let mut rows = stmt
+            .query([last_timestamp - RATING_PERIOD_OVERLAP, next_timestamp])
+            .unwrap();
         let mut games = Vec::new();
         while let Some(row) = rows.next().unwrap() {
             games.push(Game::from_row(row));
