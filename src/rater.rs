@@ -269,7 +269,11 @@ async fn grab_games(conn: &mut Connection, pages: usize) -> Result<(), Box<dyn E
     );
 
     if count - old_count == replays.len() as i64 {
-        error!("Only new replays! We're probably missing some, try increasing the page count.");
+        if replays.len() > 0 {
+            error!("Only new replays! We're probably missing some, try increasing the page count.");
+        } else {
+            error!("No replays! Maybe servers are down?");
+        }
     } else if count - old_count > replays.len() as i64 / 2 {
         warn!("Over half the grabbed replays are new, consider increasing page count.");
     }
