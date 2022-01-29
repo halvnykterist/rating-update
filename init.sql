@@ -168,7 +168,14 @@ CREATE TABLE vip_status (
 
 
 CREATE TABLE config (
-    last_update INTEGER NOT NULL
+    last_update INTEGER NOT NULL,
+    hits INTEGER DEFAULT 0 NOT NULL,
+);
+
+CREATE TABLE hits (
+    page TEXT NOT NULL,
+    hit_count INTEGER NOT NULL,
+    PRIMARY KEY(page)
 );
 
 INSERT INTO config VALUES(1635717600);

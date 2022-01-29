@@ -56,6 +56,19 @@ pub async fn stats_inner(conn: &RatingsDbConn) -> Stats {
     .await
 }
 
+pub async fn add_hit(conn: &RatingsDbConn, page: String) {
+    conn.run(move |conn| {
+        conn.execute("INSERT OR IGNORE INTO hits VALUES(?, 0)", params![&page])
+            .unwrap();
+        conn.execute(
+            "UPDATE hits SET hit_count = hit_count + 1 WHERE page = ?",
+            params![&page],
+        )
+        .unwrap();
+    })
+    .await;
+}
+
 #[derive(Serialize)]
 pub struct RankingPlayer {
     pos: i32,
@@ -440,7 +453,11 @@ pub async fn get_player_data_char(
                     |r| Ok((r.get(0)?, r.get(1)?)),
                 )
                 .unwrap();
-            info!("Loading data for {} ({})", name, website::CHAR_NAMES[char_id as usize].0);
+            info!(
+                "Loading data for {} ({})",
+                name,
+                website::CHAR_NAMES[char_id as usize].0
+            );
             let other_names = {
                 let mut stmt = conn
                     .prepare("SELECT name FROM player_names WHERE id=?")

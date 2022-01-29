@@ -83,12 +83,14 @@ async fn index() -> Redirect {
 }
 
 #[get("/about")]
-async fn about() -> Cached<Template> {
+async fn about(conn: RatingsDbConn) -> Cached<Template> {
+    api::add_hit(&conn, format!("about")).await;
     Cached::new(Template::render("about", &()), 999)
 }
 
 #[get("/supporters")]
 async fn supporters(conn: RatingsDbConn) -> Cached<Template> {
+    api::add_hit(&conn, format!("supporters")).await;
     #[derive(Serialize)]
     struct Context {
         players: Vec<api::VipPlayer>,
@@ -107,6 +109,8 @@ async fn supporters(conn: RatingsDbConn) -> Cached<Template> {
 
 #[get("/top/all")]
 async fn top_all(conn: RatingsDbConn) -> Cached<Template> {
+    api::add_hit(&conn, format!("top/all")).await;
+
     #[derive(Serialize)]
     struct Context {
         stats: api::Stats,
@@ -124,6 +128,8 @@ async fn top_all(conn: RatingsDbConn) -> Cached<Template> {
 
 #[get("/top/<character_short>")]
 async fn top_char(conn: RatingsDbConn, character_short: &str) -> Option<Cached<Template>> {
+    api::add_hit(&conn, format!("top/{}", character_short)).await;
+
     #[derive(Serialize)]
     struct Context {
         stats: api::Stats,
@@ -154,6 +160,8 @@ async fn top_char(conn: RatingsDbConn, character_short: &str) -> Option<Cached<T
 
 #[get("/matchups")]
 async fn matchups(conn: RatingsDbConn) -> Cached<Template> {
+    api::add_hit(&conn, format!("matchups")).await;
+
     #[derive(Serialize)]
     struct Context {
         stats: api::Stats,
@@ -177,6 +185,8 @@ async fn matchups(conn: RatingsDbConn) -> Cached<Template> {
 
 #[get("/character_popularity")]
 async fn character_popularity(conn: RatingsDbConn) -> Cached<Template> {
+    api::add_hit(&conn, format!("character_popularity")).await;
+
     #[derive(Serialize)]
     struct Context {
         stats: api::Stats,
@@ -212,6 +222,8 @@ async fn player_distr_forward() -> Redirect {
 
 #[get("/player_distribution")]
 async fn player_distribution(conn: RatingsDbConn) -> Cached<Template> {
+    api::add_hit(&conn, format!("player_distribution")).await;
+
     #[derive(Serialize)]
     struct Context {
         stats: api::Stats,
@@ -231,6 +243,8 @@ async fn player_distribution(conn: RatingsDbConn) -> Cached<Template> {
 
 #[get("/player/<player_id>")]
 async fn player(conn: RatingsDbConn, player_id: &str) -> Option<Redirect> {
+    api::add_hit(&conn, format!("player/{}", player_id)).await;
+
     let id = i64::from_str_radix(player_id, 16).unwrap();
 
     if let Some(char_id) = api::get_player_highest_rated_character(&conn, id).await {
@@ -277,6 +291,8 @@ async fn player_char(
     history: Option<i64>,
     group_games: Option<bool>,
 ) -> Option<Cached<Template>> {
+    api::add_hit(&conn, format!("player/{}/{}", player_id, char_id)).await;
+
     let id = i64::from_str_radix(player_id, 16).unwrap();
     let game_count = history.unwrap_or(200);
     let group_games = group_games.unwrap_or(true);
@@ -306,6 +322,7 @@ async fn player_char(
 
 #[get("/?<name>")]
 async fn search(conn: RatingsDbConn, name: String) -> Template {
+    api::add_hit(&conn, format!("search/{}", name)).await;
     #[derive(Serialize)]
     struct Context {
         stats: api::Stats,
