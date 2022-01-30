@@ -169,7 +169,6 @@ CREATE TABLE vip_status (
 
 CREATE TABLE config (
     last_update INTEGER NOT NULL,
-    hits INTEGER DEFAULT 0 NOT NULL,
 );
 
 CREATE TABLE hits (
