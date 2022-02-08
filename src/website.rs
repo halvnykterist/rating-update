@@ -117,10 +117,8 @@ async fn top_all(conn: RatingsDbConn) -> Cached<Template> {
         players: Vec<api::RankingPlayer>,
     }
 
-    let context = Context {
-        stats: api::stats_inner(&conn).await,
-        players: api::top_all_inner(&conn).await,
-    };
+    let (stats, players) = tokio::join!(api::stats_inner(&conn), api::top_all_inner(&conn));
+    let context = Context { stats, players };
 
     let delta = context.stats.last_update + rater::RATING_PERIOD - Utc::now().timestamp();
     Cached::new(Template::render("top_100", &context), delta)
@@ -141,9 +139,14 @@ async fn top_char(conn: RatingsDbConn, character_short: &str) -> Option<Cached<T
 
     if let Some(char_code) = CHAR_NAMES.iter().position(|(c, _)| *c == character_short) {
         let (character_short, character) = CHAR_NAMES[char_code];
+
+        let (stats, players) = tokio::join!(
+            api::stats_inner(&conn),
+            api::top_char_inner(&conn, char_code as i64)
+        );
         let context = Context {
-            stats: api::stats_inner(&conn).await,
-            players: api::top_char_inner(&conn, char_code as i64).await,
+            stats,
+            players,
             character,
             character_short,
             all_characters: CHAR_NAMES,
@@ -171,12 +174,19 @@ async fn matchups(conn: RatingsDbConn) -> Cached<Template> {
         matchups_versus: Vec<api::VersusCharacterMatchups>,
     }
 
+    let (stats, matchups_global, matchups_high_rated, matchups_versus) = tokio::join!(
+        api::stats_inner(&conn),
+        api::matchups_global_inner(&conn),
+        api::matchups_high_rated_inner(&conn),
+        api::matchups_versus(&conn),
+    );
+
     let context = Context {
-        stats: api::stats_inner(&conn).await,
+        stats,
         character_shortnames: CHAR_NAMES.iter().map(|c| c.0).collect(),
-        matchups_global: api::matchups_global_inner(&conn).await,
-        matchups_high_rated: api::matchups_high_rated_inner(&conn).await,
-        matchups_versus: api::matchups_versus(&conn).await,
+        matchups_global,
+        matchups_high_rated,
+        matchups_versus,
     };
 
     let delta = context.stats.last_update + rater::RATING_PERIOD - Utc::now().timestamp();
@@ -198,17 +208,28 @@ async fn character_popularity(conn: RatingsDbConn) -> Cached<Template> {
         fraud_stats_highest_rated: Vec<api::FraudStats>,
     }
 
-    let (global_character_popularity, rank_character_popularity) =
-        api::character_popularity(&conn).await;
+    let (
+        (global_character_popularity, rank_character_popularity),
+        stats,
+        fraud_stats,
+        fraud_stats_higher_rated,
+        fraud_stats_highest_rated,
+    ) = tokio::join!(
+        api::character_popularity(&conn),
+        api::stats_inner(&conn),
+        api::get_fraud(&conn),
+        api::get_fraud_higher_rated(&conn),
+        api::get_fraud_highest_rated(&conn),
+    );
 
     let context = Context {
-        stats: api::stats_inner(&conn).await,
+        stats,
         character_shortnames: CHAR_NAMES.iter().map(|c| c.0).collect(),
         global_character_popularity,
         rank_character_popularity,
-        fraud_stats: api::get_fraud(&conn).await,
-        fraud_stats_higher_rated: api::get_fraud_higher_rated(&conn).await,
-        fraud_stats_highest_rated: api::get_fraud_highest_rated(&conn).await,
+        fraud_stats,
+        fraud_stats_higher_rated,
+        fraud_stats_highest_rated,
     };
 
     let delta = context.stats.last_update + rater::RATING_PERIOD - Utc::now().timestamp();
@@ -231,10 +252,15 @@ async fn player_distribution(conn: RatingsDbConn) -> Cached<Template> {
         ratings: Vec<api::RatingPlayers>,
     }
 
+    let (stats, floors, ratings) = tokio::join!(
+        api::stats_inner(&conn),
+        api::player_floors_distribution(&conn),
+        api::player_ratings_distribution(&conn),
+    );
     let context = Context {
-        stats: api::stats_inner(&conn).await,
-        floors: api::player_floors_distribution(&conn).await,
-        ratings: api::player_ratings_distribution(&conn).await,
+        stats,
+        floors,
+        ratings,
     };
 
     let delta = context.stats.last_update + rater::RATING_PERIOD - Utc::now().timestamp();
@@ -330,8 +356,10 @@ async fn search(conn: RatingsDbConn, name: String) -> Template {
         players: Vec<api::SearchResultPlayer>,
     }
 
-    let stats = api::stats_inner(&conn).await;
-    let players = api::search_inner(&conn, name.clone()).await;
+    let (stats, players) = tokio::join!(
+        api::stats_inner(&conn),
+        api::search_inner(&conn, name.clone())
+    );
 
     Template::render(
         "search_results",
