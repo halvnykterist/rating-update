@@ -10,7 +10,7 @@ glicko2 = "0.3.1"
 rocket = { version = "0.5.0-rc.1", features = ["json"] }
 rocket_sync_db_pools = { version = "0.1.0-rc.1", default-features = false, features = ["sqlite_pool"] }
 rocket_dyn_templates = { version = "0.1.0-rc.1", default-features = false, features = ["handlebars"] }
-ggst-api = { git = "https://github.com/halvnykterist/ggst-api-rs" }
+ggst-api = { git = "https://github.com/xynxynxyn/ggst-api-rs" }
 tokio = { version = "1", features=["full"] }
 rusqlite = { version = "0.25", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
