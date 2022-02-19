@@ -59,6 +59,7 @@ pub async fn run() {
                 api::top_all,
                 api::top_char,
                 api::search,
+                api::search_exact,
                 api::outcomes,
                 api::floor_rating_distribution,
                 api::rating_experience,
@@ -358,7 +359,7 @@ async fn search(conn: RatingsDbConn, name: String) -> Template {
 
     let (stats, players) = tokio::join!(
         api::stats_inner(&conn),
-        api::search_inner(&conn, name.clone())
+        api::search_inner(&conn, name.clone(), false)
     );
 
     Template::render(
