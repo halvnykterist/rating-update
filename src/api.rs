@@ -210,25 +210,47 @@ pub struct SearchResultPlayer {
 
 #[get("/api/search?<name>")]
 pub async fn search(conn: RatingsDbConn, name: String) -> Json<Vec<SearchResultPlayer>> {
-    Json(search_inner(&conn, name).await)
+    Json(search_inner(&conn, name, false).await)
 }
 
-pub async fn search_inner(conn: &RatingsDbConn, search: String) -> Vec<SearchResultPlayer> {
+#[get("/api/search_exact?<name>")]
+pub async fn search_exact(conn: RatingsDbConn, name: String) -> Json<Vec<SearchResultPlayer>> {
+    Json(search_inner(&conn, name, true).await)
+}
+
+pub async fn search_inner(conn: &RatingsDbConn, search: String,  exact: bool) -> Vec<SearchResultPlayer> {
     conn.run(move |c| {
         info!("Searching for {}", search);
-        let mut stmt = c
-            .prepare(
+
+        let stmt_str = if exact {
                 "SELECT * FROM
-                    player_names 
-                    NATURAL JOIN player_ratings
-                    LEFT JOIN vip_status ON vip_status.id = player_names.id
-                    WHERE name LIKE ?
-                    ORDER BY wins DESC
-                    LIMIT 1000
-                    ",
-            )
+                player_names 
+                NATURAL JOIN player_ratings
+                LEFT JOIN vip_status ON vip_status.id = player_names.id
+                WHERE name = ?
+                ORDER BY wins DESC
+                LIMIT 1000
+                "
+            } else {
+                "SELECT * FROM
+                player_names 
+                NATURAL JOIN player_ratings
+                LEFT JOIN vip_status ON vip_status.id = player_names.id
+                WHERE name LIKE ?
+                ORDER BY wins DESC
+                LIMIT 1000
+                "
+            };
+
+        let mut stmt = c
+            .prepare(stmt_str)
             .unwrap();
-        let mut rows = stmt.query(params![format!("%{}%", search)]).unwrap();
+
+        let mut rows = if exact {
+            stmt.query(params![search])
+        } else {
+            stmt.query(params![format!("%{}%", search)])
+        }.unwrap();
 
         let mut res = Vec::new();
 
