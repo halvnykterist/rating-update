@@ -222,28 +222,17 @@ pub async fn search_inner(conn: &RatingsDbConn, search: String,  exact: bool) ->
     conn.run(move |c| {
         info!("Searching for {}", search);
 
-        let stmt_str = if exact {
-                "SELECT * FROM
-                player_names 
-                NATURAL JOIN player_ratings
-                LEFT JOIN vip_status ON vip_status.id = player_names.id
-                WHERE name = ?
-                ORDER BY wins DESC
-                LIMIT 1000
-                "
-            } else {
-                "SELECT * FROM
-                player_names 
-                NATURAL JOIN player_ratings
-                LEFT JOIN vip_status ON vip_status.id = player_names.id
-                WHERE name LIKE ?
-                ORDER BY wins DESC
-                LIMIT 1000
-                "
-            };
-
         let mut stmt = c
-            .prepare(stmt_str)
+            .prepare(
+                "SELECT * FROM
+                    player_names 
+                    NATURAL JOIN player_ratings
+                    LEFT JOIN vip_status ON vip_status.id = player_names.id
+                    WHERE name LIKE ?
+                    ORDER BY wins DESC
+                    LIMIT 1000
+                    ",
+            )
             .unwrap();
 
         let mut rows = if exact {
