@@ -49,7 +49,7 @@ async fn main() {
             rater::reset_database().unwrap();
         }
         Some("update") => {
-            rater::update_ratings_continuous().await;
+            rater::update_once().await;
         }
         Some("names") => {
             rater::reset_names().unwrap();

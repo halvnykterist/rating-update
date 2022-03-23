@@ -221,6 +221,26 @@ pub async fn update_ratings_continuous() {
     }
 }
 
+pub async fn update_once() {
+    let mut conn = Connection::open(DB_NAME).unwrap();
+    let mut last_rating_timestamp: i64 = conn
+        .query_row("SELECT last_update FROM config", [], |r| r.get(0))
+        .unwrap();
+    update_player_distribution(&mut conn);
+    if let Err(e) = calc_versus_matchups(&mut conn) {
+        error!("{}", e);
+    }
+    if let Err(e) = calc_fraud_index(&mut conn) {
+        error!("{}", e);
+    }
+    if let Err(e) = update_rankings(&mut conn) {
+        error!("{}", e);
+    }
+    if let Err(e) = calc_character_popularity(&mut conn, last_rating_timestamp) {
+        error!("{}", e);
+    }
+}
+
 pub fn get_average_rating(conn: &Transaction, id: i64) -> f64 {
     conn.query_row(
         "select avg(value) from player_ratings where id = ?",
