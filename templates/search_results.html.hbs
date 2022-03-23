@@ -34,7 +34,11 @@
                     <tr>
                         <td>{{>player_link name=this.name id=this.id char=this.character_short vip_status=this.vip_status}}</td>
                         <td>{{this.character}}</td>
-                        <td>{{this.rating_value}} ±{{this.rating_deviation}}</td>
+                        {{#if this.cheater_status}}
+                            <td><span class="cheater">Cheater</span></td>
+                        {{else}}
+                            <td>{{this.rating_value}} ±{{this.rating_deviation}}</td>
+                        {{/if}}
                         <td>{{this.game_count}}</td>
                     </tr
                 {{/each}}

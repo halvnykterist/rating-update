@@ -80,6 +80,7 @@ pub struct RankingPlayer {
     rating_value: f64,
     rating_deviation: f64,
     vip_status: Option<String>,
+    cheater_status: Option<String>,
 }
 
 impl RankingPlayer {
@@ -87,6 +88,7 @@ impl RankingPlayer {
         pos: i32,
         name: String,
         vip_status: Option<String>,
+        cheater_status: Option<String>,
         rated_player: RatedPlayer,
     ) -> Self {
         Self {
@@ -103,6 +105,7 @@ impl RankingPlayer {
             rating_value: GlickoRating::from(rated_player.rating).value.round(),
             rating_deviation: (GlickoRating::from(rated_player.rating).deviation * 2.0).round(),
             vip_status,
+            cheater_status,
         }
     }
 }
@@ -166,11 +169,12 @@ pub async fn top_all_inner(conn: &RatingsDbConn) -> Vec<RankingPlayer> {
     conn.run(|c| {
         let mut stmt = c
             .prepare(
-                "SELECT player_ratings.id as id, char_id, wins, losses, value, deviation, volatility, name, vip_status
+                "SELECT player_ratings.id as id, char_id, wins, losses, value, deviation, volatility, name, vip_status, cheater_status
                  FROM ranking_global 
                  NATURAL JOIN player_ratings
                  NATURAL JOIN players
                  LEFT JOIN vip_status ON vip_status.id = player_ratings.id
+                 LEFT JOIN cheater_status ON cheater_status.id = player_ratings.id
                  LIMIT 100",
             )
             .unwrap();
@@ -182,10 +186,12 @@ pub async fn top_all_inner(conn: &RatingsDbConn) -> Vec<RankingPlayer> {
         while let Some(row) = rows.next().unwrap() {
             let name = row.get("name").unwrap();
             let vip_status = row.get("vip_status").unwrap();
+            let cheater_status = row.get("cheater_status").unwrap();
             res.push(RankingPlayer::from_db(
                 i,
                 name,
                 vip_status,
+                cheater_status,
                 RatedPlayer::from_row(row),
             ));
             i += 1;
@@ -200,6 +206,7 @@ pub async fn top_all_inner(conn: &RatingsDbConn) -> Vec<RankingPlayer> {
 pub struct SearchResultPlayer {
     name: String,
     vip_status: Option<String>,
+    cheater_status: Option<String>,
     id: String,
     character: String,
     character_short: String,
@@ -218,7 +225,11 @@ pub async fn search_exact(conn: RatingsDbConn, name: String) -> Json<Vec<SearchR
     Json(search_inner(&conn, name, true).await)
 }
 
-pub async fn search_inner(conn: &RatingsDbConn, search: String,  exact: bool) -> Vec<SearchResultPlayer> {
+pub async fn search_inner(
+    conn: &RatingsDbConn,
+    search: String,
+    exact: bool,
+) -> Vec<SearchResultPlayer> {
     conn.run(move |c| {
         info!("Searching for {}", search);
 
@@ -228,6 +239,7 @@ pub async fn search_inner(conn: &RatingsDbConn, search: String,  exact: bool) ->
                     player_names 
                     NATURAL JOIN player_ratings
                     LEFT JOIN vip_status ON vip_status.id = player_names.id
+                    LEFT JOIN cheater_status ON cheater_status.id = player_names.id
                     WHERE name LIKE ?
                     ORDER BY wins DESC
                     LIMIT 1000
@@ -239,7 +251,8 @@ pub async fn search_inner(conn: &RatingsDbConn, search: String,  exact: bool) ->
             stmt.query(params![search])
         } else {
             stmt.query(params![format!("%{}%", search)])
-        }.unwrap();
+        }
+        .unwrap();
 
         let mut res = Vec::new();
 
@@ -264,6 +277,7 @@ pub async fn search_inner(conn: &RatingsDbConn, search: String,  exact: bool) ->
                 game_count: row.get::<_, i32>("wins").unwrap()
                     + row.get::<_, i32>("losses").unwrap(),
                 vip_status: row.get::<_, Option<String>>("vip_status").unwrap(),
+                cheater_status: row.get::<_, Option<String>>("cheater_status").unwrap(),
             });
         }
         res
@@ -297,10 +311,12 @@ pub async fn top_char_inner(conn: &RatingsDbConn, char_id: i64) -> Vec<RankingPl
         while let Some(row) = rows.next().unwrap() {
             let name = row.get("name").unwrap();
             let vip_status = row.get("vip_status").unwrap();
+            let cheater_status = row.get("cheater_status").unwrap();
             res.push(RankingPlayer::from_db(
                 i,
                 name,
                 vip_status,
+                cheater_status,
                 RatedPlayer::from_row(row),
             ));
             i += 1;
@@ -323,6 +339,7 @@ pub struct PlayerDataChar {
     id: String,
     name: String,
     vip_status: Option<String>,
+    cheater_status: Option<String>,
     other_names: Option<Vec<String>>,
     other_characters: Vec<OtherPlayerCharacter>,
     data: PlayerCharacterData,
@@ -361,6 +378,7 @@ struct PlayerSet {
     floor: String,
     opponent_name: String,
     opponent_vip: Option<String>,
+    opponent_cheater: Option<String>,
     opponent_id: String,
     opponent_character: String,
     opponent_character_short: String,
@@ -455,13 +473,15 @@ pub async fn get_player_data_char(
             )
             .unwrap()
         {
-            let (name, vip_status): (String, Option<String>) = conn
+            let (name, vip_status, cheater_status): (String, Option<String>, Option<String>) = conn
                 .query_row(
-                    "SELECT name, vip_status FROM players 
+                    "SELECT name, vip_status, cheater_status FROM players 
                         LEFT JOIN vip_status ON vip_status.id = players.id
-                           WHERE players.id=?",
+                        LEFT JOIN cheater_status ON cheater_status.id = players.id
+                           WHERE players.id=?
+                           ",
                     params![id],
-                    |r| Ok((r.get(0)?, r.get(1)?)),
+                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
                 )
                 .unwrap();
             info!(
@@ -566,9 +586,11 @@ pub async fn get_player_data_char(
                                     value_b AS opponent_value,
                                     deviation_b AS opponent_deviation,
                                     winner,
-                                    vip_status
+                                    vip_status,
+                                    cheater_status
                                 FROM games NATURAL JOIN game_ratings
                                 LEFT JOIN vip_status ON vip_status.id = games.id_b
+                                LEFT JOIN cheater_status ON cheater_status.id = games.id_b
                                 WHERE games.id_a= :id AND games.char_a = :char_id
                             
                                 UNION
@@ -584,9 +606,11 @@ pub async fn get_player_data_char(
                                     value_a AS opponent_value,
                                     deviation_a AS opponent_deviation,
                                     winner + 2  as winner,
-                                    vip_status
+                                    vip_status,
+                                    cheater_status
                                 FROM games NATURAL JOIN game_ratings
                                 LEFT JOIN vip_status ON vip_status.id = games.id_a
+                                LEFT JOIN cheater_status ON cheater_status.id = games.id_a
                                 WHERE games.id_b = :id AND games.char_b = :char_id
 
                                 ORDER BY timestamp DESC LIMIT :game_count",
@@ -613,6 +637,8 @@ pub async fn get_player_data_char(
                             let opponent_deviation: f64 = row.get("opponent_deviation").unwrap();
                             let winner: i64 = row.get("winner").unwrap();
                             let opponent_vip: Option<String> = row.get("vip_status").unwrap();
+                            let opponent_cheater: Option<String> =
+                                row.get("cheater_status").unwrap();
 
                             let own_rating: GlickoRating = Glicko2Rating {
                                 value: own_value,
@@ -687,6 +713,7 @@ pub async fn get_player_data_char(
                                     },
                                     opponent_name: opponent_name,
                                     opponent_vip,
+                                    opponent_cheater,
                                     opponent_id: format!("{:X}", opponent_id),
                                     opponent_character: website::CHAR_NAMES
                                         [opponent_character as usize]
@@ -732,12 +759,14 @@ pub async fn get_player_data_char(
                             games.id_b AS opponent_id,
                             games.char_b AS opponent_character,
                             winner,
-                            vip_status
+                            vip_status,
+                            cheater_status
                         FROM games LEFT JOIN game_ratings 
                         ON games.id_a = game_ratings.id_a 
                             AND games.id_b = game_ratings.id_b 
                             AND games.timestamp = game_ratings.timestamp
                         LEFT JOIN vip_status ON vip_status.id = games.id_b
+                        LEFT JOIN cheater_status ON cheater_status.id = games.id_b
                         WHERE games.id_a= :id 
                             AND games.char_a = :char_id 
                             AND game_ratings.id_a IS NULL
@@ -751,12 +780,14 @@ pub async fn get_player_data_char(
                             games.id_a AS opponent_id,
                             games.char_a AS opponent_character,
                             winner + 2  as winner,
-                            vip_status
+                            vip_status,
+                            cheater_status
                         FROM games LEFT JOIN game_ratings 
                         ON games.id_a = game_ratings.id_a 
                             AND games.id_b = game_ratings.id_b 
                             AND games.timestamp = game_ratings.timestamp
                         LEFT JOIN vip_status ON vip_status.id = games.id_a
+                        LEFT JOIN cheater_status ON cheater_status.id = games.id_a
                         WHERE games.id_b= :id 
                             AND games.char_b = :char_id 
                             AND game_ratings.id_a IS NULL
@@ -777,6 +808,8 @@ pub async fn get_player_data_char(
                             let opponent_character: i64 = row.get("opponent_character").unwrap();
                             let winner: i64 = row.get("winner").unwrap();
                             let opponent_vip: Option<String> = row.get("vip_status").unwrap();
+                            let opponent_cheater: Option<String> =
+                                row.get("cheater_status").unwrap();
 
                             let own_rating: GlickoRating = Glicko2Rating {
                                 value: value,
@@ -868,6 +901,7 @@ pub async fn get_player_data_char(
                                     },
                                     opponent_name: opponent_name,
                                     opponent_vip,
+                                    opponent_cheater,
                                     opponent_id: format!("{:X}", opponent_id),
                                     opponent_character: website::CHAR_NAMES
                                         [opponent_character as usize]
@@ -963,6 +997,7 @@ pub async fn get_player_data_char(
                 id: format!("{:X}", id),
                 name,
                 vip_status,
+                cheater_status,
                 other_characters,
                 other_names: if other_names.is_empty() {
                     None

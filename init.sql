@@ -166,6 +166,13 @@ CREATE TABLE vip_status (
     PRIMARY KEY(id)
 );
 
+CREATE TABLE cheater_status (
+    id INTEGER NOT NULL,
+    cheater_status TEXT NOT NULL,
+    notes TEXT NOT NULL,
+    PRIMARY KEY(id)
+);
+
 
 CREATE TABLE config (
     last_update INTEGER NOT NULL
