@@ -223,7 +223,7 @@ pub async fn update_ratings_continuous() {
 
 pub async fn update_once() {
     let mut conn = Connection::open(DB_NAME).unwrap();
-    let mut last_rating_timestamp: i64 = conn
+    let last_rating_timestamp: i64 = conn
         .query_row("SELECT last_update FROM config", [], |r| r.get(0))
         .unwrap();
     update_player_distribution(&mut conn);
