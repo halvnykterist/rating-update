@@ -294,11 +294,12 @@ pub async fn top_char_inner(conn: &RatingsDbConn, char_id: i64) -> Vec<RankingPl
     conn.run(move |c| {
         let mut stmt = c
             .prepare(
-                "SELECT player_ratings.id as id, char_id, wins, losses, value, deviation, volatility, name, vip_status
+                "SELECT player_ratings.id as id, char_id, wins, losses, value, deviation, volatility, name, vip_status, cheater_status
                  FROM ranking_character 
                  NATURAL JOIN player_ratings
                  NATURAL JOIN players
                  LEFT JOIN vip_status ON vip_status.id = player_ratings.id
+                 LEFT JOIN cheater_status ON cheater_status.id = player_ratings.id
                  WHERE char_id = ?
                  LIMIT 100
                  ",
