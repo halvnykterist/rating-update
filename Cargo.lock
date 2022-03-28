@@ -549,7 +549,7 @@ dependencies = [
 [[package]]
 name = "ggst-api"
 version = "0.2.0"
-source = "git+https://github.com/xynxynxyn/ggst-api-rs#7c995bad47c6c8b4c577da37051316529b0c338f"
+source = "git+https://github.com/halvnykterist/ggst-api-rs#08a59eee9ab83368003ccfcf7589ca891eced731"
 dependencies = [
  "bytes",
  "chrono",
@@ -557,6 +557,7 @@ dependencies = [
  "reqwest",
  "rmp-serde",
  "serde",
+ "serde_json",
  "tokio",
 ]
 
