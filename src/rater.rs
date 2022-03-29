@@ -258,6 +258,7 @@ pub async fn pull() {
 }
 
 async fn grab_games(conn: &mut Connection, pages: usize) -> Result<(), Box<dyn Error>> {
+    let then = Utc::now();
     info!("Grabbing replays");
     let (replays, errors) = ggst_api::get_replays(
         &ggst_api::Context::default(),
@@ -281,11 +282,14 @@ async fn grab_games(conn: &mut Connection, pages: usize) -> Result<(), Box<dyn E
 
     let count: i64 = conn.query_row("SELECT COUNT(*) FROM games", [], |r| r.get(0))?;
 
+    let elapsed = (Utc::now() - then).num_milliseconds();
+
     info!(
-        "Grabbed {} games -  new games: {} ({} total)",
+        "Grabbed {} games -  new games: {} ({} total) - {}ms",
         replays.len(),
         count - old_count,
         count,
+        elapsed,
     );
 
     if count - old_count == replays.len() as i64 {
@@ -362,6 +366,7 @@ fn update_player(conn: &Transaction, id: i64, name: &str, floor: i64) {
 }
 
 fn update_player_distribution(conn: &mut Connection) {
+    let then = Utc::now();
     let tx = conn.transaction().unwrap();
 
     tx.execute("DELETE FROM player_floor_distribution", [])
@@ -438,9 +443,15 @@ fn update_player_distribution(conn: &mut Connection) {
     }
 
     tx.commit().unwrap();
+
+    info!(
+        "Updated player distribution - {}ms",
+        (Utc::now() - then).num_milliseconds()
+    );
 }
 
 fn update_ratings(conn: &mut Connection) -> i64 {
+    let then = Utc::now();
     let last_timestamp: i64 = conn
         .query_row("SELECT last_update FROM config", [], |r| r.get(0))
         .unwrap();
@@ -805,6 +816,11 @@ fn update_ratings(conn: &mut Connection) -> i64 {
 
     tx.commit().unwrap();
 
+    info!(
+        "Calculated ratings - {}ms",
+        (Utc::now() - then).num_milliseconds()
+    );
+
     next_timestamp
 }
 
@@ -812,6 +828,7 @@ pub fn calc_character_popularity(
     conn: &mut Connection,
     last_timestamp: i64,
 ) -> Result<(), Box<dyn Error>> {
+    let then = Utc::now();
     info!("Calculating character popularity stats..");
     let one_week_ago = last_timestamp - 60 * 60 * 24 * 7;
 
@@ -934,11 +951,15 @@ pub fn calc_character_popularity(
     tx.execute("DROP TABLE temp.recent_games", [])?;
 
     tx.commit()?;
-    info!("Updated character popularity");
+    info!(
+        "Updated character popularity - {}ms",
+        (Utc::now() - then).num_milliseconds()
+    );
     Ok(())
 }
 
 pub fn update_rankings(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
+    let then = Utc::now();
     let tx = conn.transaction()?;
     tx.execute("DELETE FROM ranking_global", [])?;
     tx.execute("DELETE FROM ranking_character", [])?;
@@ -966,11 +987,15 @@ pub fn update_rankings(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
     }
 
     tx.commit()?;
-    info!("Updated rankings");
+    info!(
+        "Updated rankings - {}ms",
+        (Utc::now() - then).num_milliseconds()
+    );
     Ok(())
 }
 
 pub fn calc_fraud_index(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
+    let then = Utc::now();
     info!("Calculating fraud index");
     let tx = conn.transaction()?;
     tx.execute("DELETE FROM fraud_index", [])?;
@@ -1107,12 +1132,18 @@ pub fn calc_fraud_index(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
 
     tx.commit()?;
 
+    info!(
+        "Updated fraud index - {}ms",
+        (Utc::now() - then).num_milliseconds()
+    );
+
     Ok(())
 }
 
 pub fn calc_versus_matchups(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
+    let then = Utc::now();
     let mut pairs = FxHashMap::<((i64, i64), (i64, i64)), (f64, f64, i64)>::default();
-    info!("Calculating matchups");
+    info!("Calculating versus matchups");
 
     {
         let mut stmt = conn.prepare(
@@ -1208,6 +1239,11 @@ pub fn calc_versus_matchups(conn: &mut Connection) -> Result<(), Box<dyn Error>>
     tx.commit()?;
 
     info!("Done");
+
+    info!(
+        "calculated matchups - {}ms",
+        (Utc::now() - then).num_milliseconds()
+    );
 
     Ok(())
 }
