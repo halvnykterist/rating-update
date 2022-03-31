@@ -2,7 +2,7 @@
 <html>
     <meta charset = "UTF-8">
     <head>
-        <title>Search: "{{search_string}}" | RATING UPDATE</title>
+        <title>Stats | RATING UPDATE</title>
         <meta property="og:title" content="RATING UPDATE"/>
         <meta property="og:type" content="website" />
         <meta property="og:image" content="/android-chrome-192x192.png">
@@ -18,31 +18,6 @@
         <!--Look, if you think you can make this website look better, DM a CSS file to @sov_gott_games or maybe open an issue. -->
     </head>
     <body>
-        {{> header}}
-
-        <div>{{> search_form search_string}}</div>
-    
-        <div>
-            <table>
-                <tr>
-                    <th>Name</th>
-                    <th>Character</th>
-                    <th>Rating</th>
-                    <th>Games played</th>
-                </tr>
-                {{#each players}}
-                    <tr>
-                        <td>{{>player_link name=this.name id=this.id char=this.character_short vip_status=this.vip_status}}</td>
-                        <td>{{this.character}}</td>
-                        {{#if this.cheater_status}}
-                            <td><span class="cheater">Cheater</span></td>
-                        {{else}}
-                            <td>{{this.rating_value}} ±{{this.rating_deviation}}</td>
-                        {{/if}}
-                        <td>{{this.game_count}}</td>
-                    </tr
-                {{/each}}
-            </table>
-        </div>
+        {{> header stats}}
     </body>
 </html>
