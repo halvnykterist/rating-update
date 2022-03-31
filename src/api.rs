@@ -56,17 +56,19 @@ pub async fn stats_inner(conn: &RatingsDbConn) -> Stats {
     .await
 }
 
-pub async fn add_hit(conn: &RatingsDbConn, page: String) {
-    conn.run(move |conn| {
-        conn.execute("INSERT OR IGNORE INTO hits VALUES(?, 0)", params![&page])
-            .unwrap();
-        conn.execute(
-            "UPDATE hits SET hit_count = hit_count + 1 WHERE page = ?",
-            params![&page],
-        )
-        .unwrap();
-    })
-    .await;
+pub async fn add_hit(_conn: &RatingsDbConn, _page: String) {
+    //TODO figure out a way of implementing this that doesn't cause more DB pressure.
+
+    //conn.run(move |conn| {
+    //    conn.execute("INSERT OR IGNORE INTO hits VALUES(?, 0)", params![&page])
+    //        .unwrap();
+    //    conn.execute(
+    //        "UPDATE hits SET hit_count = hit_count + 1 WHERE page = ?",
+    //        params![&page],
+    //    )
+    //    .unwrap();
+    //})
+    //.await;
 }
 
 #[derive(Serialize)]
