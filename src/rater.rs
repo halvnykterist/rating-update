@@ -191,6 +191,7 @@ pub async fn update_ratings_continuous() {
     let mut last_rating_timestamp: i64 = conn
         .query_row("SELECT last_update FROM config", [], |r| r.get(0))
         .unwrap();
+    let mut last_statistics_update: i64 = last_rating_timestamp;
 
     if let Err(e) = calc_fraud_index(&mut conn) {
         error!("{}", e);
@@ -204,17 +205,21 @@ pub async fn update_ratings_continuous() {
             while Utc::now().timestamp() - last_rating_timestamp > RATING_PERIOD {
                 last_rating_timestamp = update_ratings(&mut conn);
             }
-            update_player_distribution(&mut conn);
-            if let Err(e) = calc_versus_matchups(&mut conn) {
-                error!("{}", e);
-            }
-            if let Err(e) = calc_fraud_index(&mut conn) {
-                error!("{}", e);
+            if last_rating_timestamp - last_statistics_update >= RATING_PERIOD * 24 {
+                info!("Doing a big update");
+                last_statistics_update = last_rating_timestamp;
+                update_player_distribution(&mut conn);
+                if let Err(e) = calc_versus_matchups(&mut conn) {
+                    error!("{}", e);
+                }
+                if let Err(e) = calc_fraud_index(&mut conn) {
+                    error!("{}", e);
+                }
+                if let Err(e) = calc_character_popularity(&mut conn, last_rating_timestamp) {
+                    error!("{}", e);
+                }
             }
             if let Err(e) = update_rankings(&mut conn) {
-                error!("{}", e);
-            }
-            if let Err(e) = calc_character_popularity(&mut conn, last_rating_timestamp) {
                 error!("{}", e);
             }
         }
