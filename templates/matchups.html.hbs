@@ -1,117 +1,111 @@
 <!DOCTYPE html> 
-<html>
+<html class="has-navbar-fixed-top">
     <meta charset = "UTF-8">
     <head>
-        <title>Matchups | RATING UPDATE</title>
-        <meta property="og:title" content="RATING UPDATE"/>
-        <meta property="og:type" content="website" />
-        <meta property="og:image" content="/android-chrome-192x192.png">
-        <meta property="og:description" content="Glicko2 ratings for Guilty Gear Strive" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-        <link rel="manifest" href="/site.webmanifest">
-        <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
-        <meta name="msapplication-TileColor" content="#da532c">
-        <meta name="theme-color" content="#ffffff">
-        <link href="/style.css" rel="stylesheet" type="text/css">
-        <!--Look, if you think you can make this website look better, DM a CSS file to @sov_gott_games or maybe open an issue. -->
+        {{> metadata title="Matchups"}}
     </head>
     <body>
-        {{> header}}
-
-        <br>
-        <div>
-            <h3> Global matchups </h3>
-        </div>
-        <table>
-            <tr>
-                <th>&nbsp;</th>
-                {{#each character_shortnames}}
-                    <th>{{this}}</th>
-                {{/each}}
-            </tr>
-            {{#each matchups_global}}
-                <tr>
-                    <th>{{this.name}}</th>
-                    {{#each this.matchups}}
-                        <td
-                            {{#if this.suspicious}}
-                                class="uncertain"
-                            {{else}}
-                                    class="{{this.evaluation}}"
-                            {{/if}}
-                            title="Raw: {{this.win_rate_real}}%. Based on {{this.game_count}} games"
-                        >
-                            <span {{#if this.suspicious}} class="uncertain" {{/if}}>
-                        {{this.win_rate_adjusted}}% </span>
-                        </td>
-                    {{/each}}
-                </tr>
-            {{/each}}
-        </table>
-        <br>
-
-        <div>
-            <h3>Versus calculated matchups (≥1800)</h3>
-        </div>
-        <p>These matchups are calculated based on the average of high rated players' records against each other. They should be less vulnerable to a single player playing a lot of games and skewing things.</p>
-        <table>
-            <tr>
-                <th>&nbsp;</th>
-                {{#each character_shortnames}}
-                    <th>{{this}}</th>
-                {{/each}}
-            </tr>
-            {{#each matchups_versus}}
-                <tr>
-                    <th>{{this.name}}</th>
-                    {{#each this.matchups}}
-                        <td
-                            {{#if this.suspicious}}
-                                class="uncertain"
-                            {{else}}
-                                    class="{{this.evaluation}}"
-                            {{/if}}
-                                    title="Based on {{this.game_count}} games between {{this.pair_count}} pairs"
-                        >
-                            <span {{#if this.suspicious}} class="uncertain" {{/if}}>
-                        {{this.win_rate}}% </span>
-                        </td>
-                    {{/each}}
-                </tr>
-            {{/each}}
-        </table>
-        <br>
-        <div>
-            <h3>High rated matchups (≥1800)</h3>
-        </div>
-        <p>Matchups with fewer than 250 games are shown in gray.</p>
-        <table>
-            <tr>
-                <th>&nbsp;</th>
-                {{#each character_shortnames}}
-                    <th>{{this}}</th>
-                {{/each}}
-            </tr>
-            {{#each matchups_high_rated}}
-                <tr>
-                    <th>{{this.name}}</th>
-                    {{#each this.matchups}}
-                        <td
-                            {{#if this.suspicious}}
-                                class="uncertain"
-                            {{else}}
-                                    class="{{this.evaluation}}"
-                            {{/if}}
-                            title="Raw: {{this.win_rate_real}}%. Based on {{this.game_count}} games"
-                        >
-                            <span {{#if this.suspicious}} class="uncertain" {{/if}}>
-                        {{this.win_rate_adjusted}}% </span>
-                        </td>
-                    {{/each}}
-                </tr>
-            {{/each}}
-        </table>
+        {{> navbar}}
+        <section class="hero is-primary">
+            <div class="hero-body has-text-centered">
+                <p class="title">Matchups</p>
+            </div>
+        </section>
+        <section class="section">
+            <div class="container">
+                <div class="content">
+                    <h3>Global matchups</h3>
+                    <div class="table-container">
+                    <table class="table is-bordered">
+                        <tr>
+                            <th>&nbsp;</th>
+                            {{#each character_shortnames}}
+                                <th>{{this}}</th>
+                            {{/each}}
+                        </tr>
+                        {{#each matchups_global}}
+                            <tr>
+                                <th>{{this.name}}</th>
+                                {{#each this.matchups}}
+                                    <td
+                                        {{#if this.suspicious}}
+                                            class="uncertain"
+                                        {{else}}
+                                                class="{{this.evaluation}}"
+                                        {{/if}}
+                                        title="Raw: {{this.win_rate_real}}%. Based on {{this.game_count}} games"
+                                    >
+                                        <span {{#if this.suspicious}} class="uncertain" {{/if}}>
+                                    {{this.win_rate_adjusted}}% </span>
+                                    </td>
+                                {{/each}}
+                            </tr>
+                        {{/each}}
+                    </table>
+                    </div>
+                    <h3>Versus calculated matchups (≥1800)</h3>
+                    <p>These matchups are calculated based on the average of high rated players' records against each other. They should be less vulnerable to a single player playing a lot of games and skewing things.</p>
+                    <div class="table-container">
+                    <table class="table is-bordered">
+                        <tr>
+                            <th>&nbsp;</th>
+                            {{#each character_shortnames}}
+                                <th>{{this}}</th>
+                            {{/each}}
+                        </tr>
+                        {{#each matchups_versus}}
+                            <tr>
+                                <th>{{this.name}}</th>
+                                {{#each this.matchups}}
+                                    <td
+                                        {{#if this.suspicious}}
+                                            class="uncertain"
+                                        {{else}}
+                                                class="{{this.evaluation}}"
+                                        {{/if}}
+                                                title="Based on {{this.game_count}} games between {{this.pair_count}} pairs"
+                                    >
+                                        <span {{#if this.suspicious}} class="uncertain" {{/if}}>
+                                    {{this.win_rate}}% </span>
+                                    </td>
+                                {{/each}}
+                            </tr>
+                        {{/each}}
+                    </table>
+                    </div>
+                    <h3>High rated matchups (≥1800)</h3>
+                    <p>Matchups with fewer than 250 games are shown in gray.</p>
+                    <div class="table-container">
+                    <table class="table is-bordered">
+                        <tr>
+                            <th>&nbsp;</th>
+                            {{#each character_shortnames}}
+                                <th>{{this}}</th>
+                            {{/each}}
+                        </tr>
+                        {{#each matchups_high_rated}}
+                            <tr>
+                                <th>{{this.name}}</th>
+                                {{#each this.matchups}}
+                                    <td
+                                        {{#if this.suspicious}}
+                                            class="uncertain"
+                                        {{else}}
+                                                class="{{this.evaluation}}"
+                                        {{/if}}
+                                        title="Raw: {{this.win_rate_real}}%. Based on {{this.game_count}} games"
+                                    >
+                                        <span {{#if this.suspicious}} class="uncertain" {{/if}}>
+                                    {{this.win_rate_adjusted}}% </span>
+                                    </td>
+                                {{/each}}
+                            </tr>
+                        {{/each}}
+                    </table>
+                    </div>
+                </div>
+            </div>
+        </section>
     </body>
+    {{> footer }}
 </html>

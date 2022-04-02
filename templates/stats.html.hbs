@@ -1,23 +1,27 @@
 <!DOCTYPE html> 
-<html>
+<html class="has-navbar-fixed-top">
     <meta charset = "UTF-8">
     <head>
-        <title>Stats | RATING UPDATE</title>
-        <meta property="og:title" content="RATING UPDATE"/>
-        <meta property="og:type" content="website" />
-        <meta property="og:image" content="/android-chrome-192x192.png">
-        <meta property="og:description" content="Glicko2 ratings for Guilty Gear Strive" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-        <link rel="manifest" href="/site.webmanifest">
-        <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
-        <meta name="msapplication-TileColor" content="#da532c">
-        <meta name="theme-color" content="#ffffff">
-        <link href="/style.css" rel="stylesheet" type="text/css">
-        <!--Look, if you think you can make this website look better, DM a CSS file to @sov_gott_games or maybe open an issue. -->
+        {{> metadata title="Stats"}}
     </head>
     <body>
-        {{> header stats}}
+        {{> navbar}}
+        <section class="hero is-primary">
+            <div class="hero-body has-text-centered">
+                <p class="title">Stats</p>
+            </div>
+        </section>
+        <section class="section">
+            <div class="container">
+                <div class="content">
+                    {{#if stats.game_count}}
+                    Data from {{stats.game_count}} games between {{stats.player_count}} players.<br>
+                    Leaderboards require a rating deviation ≤150.<br>
+                    Time until next update is {{stats.next_update_in}} (last update was at {{stats.last_update_string}}.)
+                    {{/if}}
+                </div>
+            </div>
+        </section>
     </body>
+    {{> footer }}
 </html>

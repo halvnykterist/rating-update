@@ -1,0 +1,92 @@
+@charset "utf-8";
+
+@import 'sass/sass/utilities/initial-variables.sass';
+
+$red: #C00000;
+$ggst-red: #811104;
+$ggst-black: #171717;
+$ggst-yellow: #F8B552;
+$ggst-orange: #EB7C2A;
+$primary: $red;
+$danger: $ggst-red;
+
+$scheme-main: $black;
+$scheme-main-bis: $black-bis;
+$scheme-main-ter: $black-ter;
+$scheme-invert: $white;
+$scheme-invert-bis: $white-bis;
+$scheme-invert-ter: $white-ter;
+$text: $white-ter;
+$text-light: $white-ter;
+$text-strong: $white-ter;
+$link: $ggst-yellow;
+$link-hover: $ggst-orange;
+$background: $grey-darker;
+$input-color: $white;
+$border: $grey-darker;
+
+$body-background-color: $ggst-black;
+$footer-background-color: $black;
+
+@import 'sass/sass/utilities/mixins.sass';
+.input::placeholder {
+	color: $white !important;
+}
+
+$table-cell-padding: 0.5em !important;
+
+.content table:not(.is-fullwidth) {
+	width: auto;
+}
+
+tr:nth-child(n) td.uncertain {
+    background-color: $background;
+}
+
+span.uncertain {
+    font-style: italic;
+}
+
+tr:nth-child(n) td.verybad {
+    background-color: #6C2B2B;
+}
+
+tr:nth-child(n) td.bad {
+    background-color: #6C4141;
+}
+
+tr:nth-child(n) td.slightlybad {
+    background-color: #6C5656;
+}
+
+tr:nth-child(n) td.ok {
+    background-color: $background;
+}
+
+tr:nth-child(n) td.slightlygood {
+    background-color: #566C5A;
+}
+
+tr:nth-child(n) td.good {
+    background-color: #416C48;
+}
+
+tr:nth-child(n) td.verygood {
+    background-color: #2B6C36;
+}
+
+.vip {
+    font-style: oblique;
+    color: $ggst-yellow !important;
+    font-variant-caps: petite-caps;
+}
+
+.cheater {
+    color: $danger;
+}
+
+table {
+    white-space: nowrap !important;
+}
+
+@import 'sass/bulma.sass';

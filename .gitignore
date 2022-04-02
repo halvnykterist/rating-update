@@ -1,4 +1,4 @@
 target/
-
+static/sass/
 ratings.sqlite
 output.log

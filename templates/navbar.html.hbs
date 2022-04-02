@@ -1,0 +1,81 @@
+<nav class="navbar is-fixed-top is-danger" role="navigation" aria-label="main navigation">
+  <div class="navbar-brand">
+    <a class="navbar-item" href="/">
+      <strong>RATING UPDATE</strong>
+    </a>
+
+    <a role="button" class="navbar-burger" data-target="navMenu" aria-label="menu" aria-expanded="false">
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+    </a>
+  </div>
+
+  <div class="navbar-menu" id="navMenu">
+    <div class="navbar-start">
+        <a class="navbar-item" href="/top/all">Top 100</a>   
+        <a class="navbar-item" href="/matchups">Matchups</a>  
+        <a class="navbar-item" href="/character_popularity">Popularity</a>  
+        <a class="navbar-item" href="/player_distribution">Distribution</a>  
+        <a class="navbar-item" href="/about">FAQ</a>
+        <a class="navbar-item" href="/stats">Stats</a>
+        <a class="navbar-item" href="/supporters">Supporters</a>  
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link">
+            Characters
+          </a>
+          <div class="navbar-dropdown">
+            {{#each all_characters}}
+            <a class="navbar-item" href="/top/{{this.[0]}}">{{this.[1]}}</a>
+            {{/each}}
+          </div>
+        </div>
+	</div>
+    <div class="navbar-end">
+        <div class="navbar-item">
+			    <form action="/" method="get">
+            <div class="field is-grouped">
+              <p class="control">
+                <input class="input" type="text" id="name" name="name" required autocomplete="on" placeholder="GG Player">
+              </p>
+              <p class="control">
+                <button class="button is-primary" type="submit"><span class="icon"><i class="fas fa-search"></i></span></button>
+              </p>
+            </div>
+			    </form>
+      	</div>
+        <a class="navbar-item" href="https://github.com/halvnykterist/rating-update/">
+          <span class="icon-text">
+            <span class="icon">
+              <i class="fab fa-github"></i>
+            </span>
+            <span></span>
+          </span>
+        </a>
+        <a class="navbar-item" href="https://twitter.com/sov_gott_games/">
+          <span class="icon-text">
+            <span class="icon">
+              <i class="fab fa-twitter"></i>
+            </span>
+            <span></span>
+          </span>
+        </a>
+        <a class="navbar-item" href="https://ko-fi.com/halvnykterist">
+          <span class="icon-text">
+            <span class="icon">
+              <i class="fas fa-coffee"></i>
+            </span>
+            <span></span>
+          </span>
+        </a>
+        <a class="navbar-item" href="https://www.patreon.com/halvnykterist">
+          <span class="icon-text">
+            <span class="icon">
+              <i class="fab fa-patreon"></i>
+            </span>
+            <span></span>
+          </span>
+        </a>
+    </div>
+  </div>
+</nav>

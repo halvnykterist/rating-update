@@ -1,95 +1,98 @@
 <!DOCTYPE html> 
-<html>
+<html class="has-navbar-fixed-top">
     <meta charset = "UTF-8">
     <head>
-        <title>About | RATING UPDATE</title>
-        <meta property="og:title" content="RATING UPDATE"/>
-        <meta property="og:type" content="website" />
-        <meta property="og:image" content="/android-chrome-192x192.png">
-        <meta property="og:description" content="Glicko2 ratings for Guilty Gear Strive" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-        <link rel="manifest" href="/site.webmanifest">
-        <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
-        <meta name="msapplication-TileColor" content="#da532c">
-        <meta name="theme-color" content="#ffffff">
-        <link href="/style.css" rel="stylesheet" type="text/css">
-        <!--Look, if you think you can make this website look better, DM a CSS file to @sov_gott_games or maybe open an issue. -->
+        {{> metadata title="About" }}
     </head>
     <body>
-        {{> header}}
+        {{> navbar}}
+        <section class="hero is-primary">
+            <div class="hero-body has-text-centered">
+                <p class="title">About</p>
+            </div>
+        </section>
+        <section class="section">
+            <div class="container">
+                <div class="content">
+                    <ul>
+                        <li><a href="#How_does_this_work">How does this work?</a></li>
+                        <li><a href="#Good_rating">What's a good rating?</a></li>
+                        <li><a href="#Plus_minus">What does the '±' part mean?</a></li>
+                        <li><a href="#Updates">How often does this page update?</a></li>
+                        <li><a href="#Expected_outcome">What's does 'expected wins' mean?</a></li>
+                        <li><a href="#Raw_vs_adjusted">What's the difference between 'Win rate (raw)' and 'Win rate (rating adjusted)'?</a></li>
+                        <li><a href="#Gaming">Can I gain more rating by farming lower skilled players?</a></li>
+                        <li><a href="#PC_only">Is this PC only?</a></li>
+                        <li><a href="#Missing_games">Some of my games are missing.</a></li>
+                        <li><a href="#Ugly">Why is this website so ugly?</a></li>
+                        <li><a href="#Questions">My question wasn't answered here.</a></li>
+                    </ul>
 
+                    <h2 id="How_does_this_work">How does this work?</h2>
+                    <p>This website uses information gathered from Strive's replays on PC to track players and assign them
+                    <a href="https://en.wikipedia.org/wiki/Glicko_rating_system">Glicko-2</a> ratings based on their performance. This system is widely used in competitive games and is especially suitable for 1v1 play. Matchups are as follows: </p>
+                    
+                    <table class="table is-narrow is-bordered">
+                        <thead>
+                            <tr>
+                                <th>Rating difference</th>
+                                <th>Win probability</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>0</td><td>50%</td></tr>
+                            <tr><td>100</td><td>63%</td></tr>
+                            <tr><td>200</td><td>75%</td></tr>
+                            <tr><td>300</td><td>85%</td></tr>
+                            <tr><td>400</td><td>91%</td></tr>
+                            <tr><td>500</td><td>95%</td></tr>
+                        </tbody>
+                    </table>
+                    
+                    <i>If you take on someone 300 points above you in a FT10, you can expect to take about 2 games off of them.</i>
 
-        <ul>
-            <li><a href="#How_does_this_work">How does this work?</a></li>
-            <li><a href="#Good_rating">What's a good rating?</a></li>
-            <li><a href="#Plus_minus">What does the '±' part mean?</a></li>
-            <li><a href="#Updates">How often does this page update?</a></li>
-            <li><a href="#Expected_outcome">What's does 'expected wins' mean?</a></li>
-            <li><a href="#Raw_vs_adjusted">What's the difference between 'Win rate (raw)' and 'Win rate (rating adjusted)'?</a></li>
-            <li><a href="#Gaming">Can I gain more rating by farming lower skilled players?</a></li>
-            <li><a href="#PC_only">Is this PC only?</a></li>
-            <li><a href="#Missing_games">Some of my games are missing.</a></li>
-            <li><a href="#Ugly">Why is this website so ugly?</a></li>
-            <li><a href="#Questions">My question wasn't answered here.</a></li>
-        </ul>
+                    <h2 id="Good_rating">What's a good rating?</h2>
+                    <p>Average rating is about 1500, if you want to compare yourself to others. I've got the "strong player" cutoff at 1800 since those are good enough to beat the average player 90% of the time or so, but above them there are plenty of 2100s that do the same to them.</p>
 
-        <h2 id="How_does_this_work">How does this work?</h2>
-        <p>This website uses information gathered from Strive's replays on PC to track players and assign them
-        <a href="https://en.wikipedia.org/wiki/Glicko_rating_system">Glicko-2</a> ratings based on their performance. This system is widely used in competitive games and is especially suitable for 1v1 play. Matchups are as follows: </p>
-        <table>
-            <tr>
-                <th>Rating difference</th>
-                <th>Win probability</th>
-            </tr>
-            <tr><td>0</td><td>50%</td></tr>
-            <tr><td>100</td><td>63%</td></tr>
-            <tr><td>200</td><td>75%</td></tr>
-            <tr><td>300</td><td>85%</td></tr>
-            <tr><td>400</td><td>91%</td></tr>
-            <tr><td>500</td><td>95%</td></tr>
-        </table>
-        <i>If you take on someone 300 points above you in a FT10, you can expect to take about 2 games off of them.</i>
+                    <h2 id="Plus_minus">What does the '±' part mean?</h2>
+                    <p>This represents how confident the system is in your rating. If you've got a rating of 1450 ±150, that means the system is 95% confident that your rating is between 1300 and 1600. New players/characters started out at 1500 ±700, which means the system thinks they could be anywhere between an 800-rated newbie or a 2200 rated pro. As you play more games, especailly against opponents close to you in skill, this number will naturally go down.</p>
 
-        <h2 id="Good_rating">What's a good rating?</h2>
-        <p>Average rating is about 1500, if you want to compare yourself to others. I've got the "strong player" cutoff at 1800 since those are good enough to beat the average player 90% of the time or so, but above them there are plenty of 2100s that do the same to them.</p>
+                    <h2 id="Updates">How often does this page update?</h2>
+                    <p>New data is scraped from Strive every minute, and ratings are recalculated every hour. This lets the system use multiple games each time it wants to update the ratings, resulting in a more stable system.</p>
+                    <p>If you're asking about the website itself getting new features, updates are sporadic. I still have a few core things I want to add, though. Feel free to ask me on <a href="https://github.com/halvnykterist/rating-update/">Github</a> or 
+                    <a href="https://twitter.com/sov_gott_games">Twitter</a>!. DMs etc. are open.</p>
 
-        <h2 id="Plus_minus">What does the '±' part mean?</h2>
-        <p>This represents how confident the system is in your rating. If you've got a rating of 1450 ±150, that means the system is 95% confident that your rating is between 1300 and 1600. New players/characters started out at 1500 ±700, which means the system thinks they could be anywhere between an 800-rated newbie or a 2200 rated pro. As you play more games, especailly against opponents close to you in skill, this number will naturally go down.</p>
+                    <h2 id="Expected_outcome">What's does 'expected wins' mean?</h2>
+                    <p>This is how often the system expects you be able to beat your opponent in a game, based on your relative ratings. It doesn't take your personal matchup history into account. </p>
+                    <p>This is also the number that you need to exceed on average if you want your rating to go up. If you can take down opponents the system thought was stronger than you, then clearly it was wrong!</p>
 
-        <h2 id="Updates">How often does this page update?</h2>
-        <p>New data is scraped from Strive every minute, and ratings are recalculated every hour. This lets the system use multiple games each time it wants to update the ratings, resulting in a more stable system.</p>
-        <p>If you're asking about the website itself getting new features, updates are sporadic. I still have a few core things I want to add, though. Feel free to ask me on <a href="https://github.com/halvnykterist/rating-update/">Github</a> or 
-        <a href="https://twitter.com/sov_gott_games">Twitter</a>!. DMs etc. are open.</p>
+                    <h2 id="Raw_vs_adjusted">What's the difference between 'Win rate (raw)' and 'Win rate (rating adjusted)'?</h2>
+                    <p>Raw win rate is what it sounds like - all of your wins vs that character divided by all your games against this character.</p>
+                    <p>Adjusted win rate takes into account your chance of winning based on diference in rating. Instead of simply adding together wins and losses, wins and losses are weighted by your expected win rate. If you beat someone that you had a 90% chance to win against, you only get .1 added to your "wins" total. If you lose to someone who you had a 70% chance to win against, you get the full .7 added to your loss bucket. Then at the end the adjusted win rate is your win bucket divided by your win bucket plus your loss bucket. Final estimation is (win_bucket) / (win_bucket + loss+bucket)</p>
 
-        <h2 id="Expected_outcome">What's does 'expected wins' mean?</h2>
-        <p>This is how often the system expects you be able to beat your opponent in a game, based on your relative ratings. It doesn't take your personal matchup history into account. </p>
-        <p>This is also the number that you need to exceed on average if you want your rating to go up. If you can take down opponents the system thought was stronger than you, then clearly it was wrong!</p>
+                    <h2 id="Gaming">Can I gain more rating by farming lower skilled players?</h2>
+                    <p>No, not unless you can beat them even more consistently than the game thought you should. If anything, going up against lower sklled players carries an element of risk, since losses to them causes you to lose a lot more rating than losing to a similarly rated opponent would.</p>
 
-        <h2 id="Raw_vs_adjusted">What's the difference between 'Win rate (raw)' and 'Win rate (rating adjusted)'?</h2>
-        <p>Raw win rate is what it sounds like - all of your wins vs that character divided by all your games against this character.</p>
-        <p>Adjusted win rate takes into account your chance of winning based on diference in rating. Instead of simply adding together wins and losses, wins and losses are weighted by your expected win rate. If you beat someone that you had a 90% chance to win against, you only get .1 added to your "wins" total. If you lose to someone who you had a 70% chance to win against, you get the full .7 added to your loss bucket. Then at the end the adjusted win rate is your win bucket divided by your win bucket plus your loss bucket. Final estimation is (win_bucket) / (win_bucket + loss+bucket)</p>
+                    <h2 id="PC_only">Is this PC only?</h2>
+                    <p>Yes, unfortunately. I don't have a way of grabbing the replays data for PSN games.</p>
 
-        <h2 id="Gaming">Can I gain more rating by farming lower skilled players?</h2>
-        <p>No, not unless you can beat them even more consistently than the game thought you should. If anything, going up against lower sklled players carries an element of risk, since losses to them causes you to lose a lot more rating than losing to a similarly rated opponent would.</p>
+                    <h2 id="Missing_games">Some of my games are missing.</h2>
+                    <p>The site only looks at replays from the tower, so if you've been playing in the park those games won't show up.</p>
+                    <p>I only started grabbing replays in December, and my scraping had a lot of downtime up until about January fifth. Games after that should all be present though.</p>
 
-        <h2 id="PC_only">Is this PC only?</h2>
-        <p>Yes, unfortunately. I don't have a way of grabbing the replays data for PSN games.</p>
+                    <h2 id="Ugly">Why is this website so ugly?</h2>
+                    <p>I'm not a webdev, I'm just someone who was curious about matchups and annoyed at how bad Strive's ranked system is. If you or someone you know knows CSS and wants to help pretty it up, feel free to open an issue on 
+                    <a href="https://github.com/halvnykterist/rating-update/">Github</a>.</p>
 
-        <h2 id="Missing_games">Some of my games are missing.</h2>
-        <p>The site only looks at replays from the tower, so if you've been playing in the park those games won't show up.</p>
-        <p>I only started grabbing replays in December, and my scraping had a lot of downtime up until about January fifth. Games after that should all be present though.</p>
-
-        <h2 id="Ugly">Why is this website so ugly?</h2>
-        <p>I'm not a webdev, I'm just someone who was curious about matchups and annoyed at how bad Strive's ranked system is. If you or someone you know knows CSS and wants to help pretty it up, feel free to open an issue on 
-        <a href="https://github.com/halvnykterist/rating-update/">Github</a>.</p>
-
-        <h2 id="Questions">My question wasn't answered here.</h2>
-        <p>Send me a message on 
-        <a href="https://twitter.com/sov_gott_games">Twitter</a>
-        or open an issue on
-        <a href="https://github.com/halvnykterist/rating-update/">Github</a>!
-        </p>
+                    <h2 id="Questions">My question wasn't answered here.</h2>
+                    <p>Send me a message on 
+                    <a href="https://twitter.com/sov_gott_games">Twitter</a>
+                    or open an issue on
+                    <a href="https://github.com/halvnykterist/rating-update/">Github</a>!
+                    </p>
+                </div>
+            </div>
+        </section>
     </body>
+    {{> footer }}
 </html>

@@ -1,53 +1,40 @@
 <!DOCTYPE html> 
-<html>
+<html class="has-navbar-fixed-top">
     <meta charset = "UTF-8">
     <head>
-        <title>{{character}} Top 100 | RATING UPDATE</title>
-        <meta property="og:title" content="RATING UPDATE"/>
-        <meta property="og:type" content="website" />
-        <meta property="og:image" content="/android-chrome-192x192.png">
-        <meta property="og:description" content="The 100 rated {{character}} players." />
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-        <link rel="manifest" href="/site.webmanifest">
-        <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
-        <meta name="msapplication-TileColor" content="#da532c">
-        <meta name="theme-color" content="#ffffff">
-        <link href="/style.css" rel="stylesheet" type="text/css">
-        <!--Look, if you think you can make this website look better, DM a CSS file to @sov_gott_games or maybe open an issue. -->
+        {{> metadata title=character}}
     </head>
     <body>
-        {{> header}}
-
-        <div>
-            |
-            {{#each all_characters}}
-            <a href="/top/{{this.[0]}}">{{this.[1]}}</a>
-            |
-            {{/each}}
-        </div>
-        <h2>
-            {{character}}
-        </h2>
-        <br>
-        <div>
-            <table>
-                <tr>
-                    <th>#</th>
-                    <th>Name</th>
-                    <th>Rating</th>
-                    <th>Games played</th>
-                </tr>
-                {{#each players}}
-                    <tr>
-                        <td>{{this.pos}}</td>
-                        <td>{{>player_link name=this.name id=this.id char=this.character_short vip_status=this.vip_status}}</td>
-                        <td>{{this.rating_value}} ±{{this.rating_deviation}}</td>
-                        <td>{{this.game_count}}</td>
-                    </tr>
-                {{/each}}
-            </table>
-        </div>
+        {{> navbar}}
+        <section class="hero is-primary">
+            <div class="hero-body has-text-centered">
+                <p class="title">Top 100: {{character}} Leaderboard</p>
+            </div>
+        </section>
+        <section class="section">
+            <div class="container">
+                <div class="content">
+                    <div class="table-container">
+                    <table>
+                        <tr>
+                            <th>#</th>
+                            <th>Name</th>
+                            <th>Rating</th>
+                            <th>Games played</th>
+                        </tr>
+                        {{#each players}}
+                            <tr>
+                                <td>{{this.pos}}</td>
+                                <td>{{>player_link name=this.name id=this.id char=this.character_short vip_status=this.vip_status}}</td>
+                                <td>{{this.rating_value}} ±{{this.rating_deviation}}</td>
+                                <td>{{this.game_count}}</td>
+                            </tr>
+                        {{/each}}
+                    </table>
+                    </div>
+                </div>
+            </div>
+        </section>
     </body>
+    {{> footer }}
 </html>
