@@ -88,7 +88,14 @@ async fn index() -> Redirect {
 #[get("/about")]
 async fn about(conn: RatingsDbConn) -> Cached<Template> {
     api::add_hit(&conn, format!("about")).await;
-    Cached::new(Template::render("about", &()), 999)
+
+    #[derive(Serialize)]
+    struct Context {
+        all_characters: &'static [(&'static str, &'static str)],
+    }
+    let context = Context { all_characters: CHAR_NAMES };
+
+    Cached::new(Template::render("about", &context), 999)
 }
 
 #[get("/stats")]
@@ -98,10 +105,11 @@ async fn stats(conn: RatingsDbConn) -> Cached<Template> {
     #[derive(Serialize)]
     struct Context {
         stats: api::Stats,
+        all_characters: &'static [(&'static str, &'static str)],
     }
-
     let context = Context {
         stats: api::stats_inner(&conn).await,
+        all_characters: CHAR_NAMES
     };
 
     Cached::new(Template::render("stats", &context), 999)
@@ -113,6 +121,7 @@ async fn supporters(conn: RatingsDbConn) -> Cached<Template> {
     #[derive(Serialize)]
     struct Context {
         players: Vec<api::VipPlayer>,
+        all_characters: &'static [(&'static str, &'static str)],
     }
 
     Cached::new(
@@ -120,6 +129,7 @@ async fn supporters(conn: RatingsDbConn) -> Cached<Template> {
             "supporters",
             &Context {
                 players: api::get_supporters(&conn).await,
+                all_characters: CHAR_NAMES
             },
         ),
         999,
@@ -133,10 +143,11 @@ async fn top_all(conn: RatingsDbConn) -> Cached<Template> {
     #[derive(Serialize)]
     struct Context {
         players: Vec<api::RankingPlayer>,
+        all_characters: &'static [(&'static str, &'static str)],
     }
 
     let players = api::top_all_inner(&conn).await;
-    let context = Context { players };
+    let context = Context { players, all_characters: CHAR_NAMES };
 
     Cached::new(Template::render("top_100", &context), 999)
 }
@@ -180,6 +191,7 @@ async fn matchups(conn: RatingsDbConn) -> Cached<Template> {
         matchups_global: Vec<api::CharacterMatchups>,
         matchups_high_rated: Vec<api::CharacterMatchups>,
         matchups_versus: Vec<api::VersusCharacterMatchups>,
+        all_characters: &'static [(&'static str, &'static str)],
     }
 
     let (matchups_global, matchups_high_rated, matchups_versus) = tokio::join!(
@@ -193,6 +205,7 @@ async fn matchups(conn: RatingsDbConn) -> Cached<Template> {
         matchups_global,
         matchups_high_rated,
         matchups_versus,
+        all_characters: CHAR_NAMES
     };
 
     Cached::new(Template::render("matchups", &context), 999)
@@ -210,6 +223,7 @@ async fn character_popularity(conn: RatingsDbConn) -> Cached<Template> {
         fraud_stats: Vec<api::FraudStats>,
         fraud_stats_higher_rated: Vec<api::FraudStats>,
         fraud_stats_highest_rated: Vec<api::FraudStats>,
+        all_characters: &'static [(&'static str, &'static str)],
     }
 
     let (
@@ -231,6 +245,7 @@ async fn character_popularity(conn: RatingsDbConn) -> Cached<Template> {
         fraud_stats,
         fraud_stats_higher_rated,
         fraud_stats_highest_rated,
+        all_characters: CHAR_NAMES
     };
 
     Cached::new(Template::render("character_popularity", &context), 999)
@@ -249,13 +264,14 @@ async fn player_distribution(conn: RatingsDbConn) -> Cached<Template> {
     struct Context {
         floors: Vec<api::FloorPlayers>,
         ratings: Vec<api::RatingPlayers>,
+        all_characters: &'static [(&'static str, &'static str)],
     }
 
     let (floors, ratings) = tokio::join!(
         api::player_floors_distribution(&conn),
         api::player_ratings_distribution(&conn),
     );
-    let context = Context { floors, ratings };
+    let context = Context { floors, ratings, all_characters: CHAR_NAMES };
 
     Cached::new(Template::render("player_distribution", &context), 999)
 }
@@ -298,12 +314,13 @@ async fn player_char(
     #[derive(Serialize)]
     struct Context {
         player: api::PlayerDataChar,
+        all_characters: &'static [(&'static str, &'static str)],
     }
 
     if let Some(player) =
         api::get_player_data_char(&conn, id, char_id, game_count, group_games).await
     {
-        let context = Context { player };
+        let context = Context { player, all_characters: CHAR_NAMES };
         Some(Cached::new(Template::render("player_char", &context), 999))
     } else {
         None
@@ -317,6 +334,7 @@ async fn search(conn: RatingsDbConn, name: String) -> Template {
     struct Context {
         search_string: String,
         players: Vec<api::SearchResultPlayer>,
+        all_characters: &'static [(&'static str, &'static str)],
     }
 
     let players = api::search_inner(&conn, name.clone(), false).await;
@@ -326,6 +344,7 @@ async fn search(conn: RatingsDbConn, name: String) -> Template {
         &Context {
             players,
             search_string: name,
+            all_characters: CHAR_NAMES
         },
     )
 }

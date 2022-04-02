@@ -1,105 +1,105 @@
 <!DOCTYPE html> 
-<html>
+<html class="has-navbar-fixed-top">
     <meta charset = "UTF-8">
     <head>
-        <title>Character popularity | RATING UPDATE</title>
-        <meta property="og:title" content="RATING UPDATE"/>
-        <meta property="og:type" content="website" />
-        <meta property="og:image" content="/android-chrome-192x192.png">
-        <meta property="og:description" content="Glicko2 ratings for Guilty Gear Strive" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-        <link rel="manifest" href="/site.webmanifest">
-        <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
-        <meta name="msapplication-TileColor" content="#da532c">
-        <meta name="theme-color" content="#ffffff">
-        <link href="/style.css" rel="stylesheet" type="text/css">
-        <!--Look, if you think you can make this website look better, DM a CSS file to @sov_gott_games or maybe open an issue. -->
+        {{> metadata title="Character popularity"}}
     </head>
     <body>
-        {{> header stats}}
+        {{> navbar}}
+        <section class="hero is-primary">
+            <div class="hero-body has-text-centered">
+                <p class="title">Character popularity</p>
+            </div>
+        </section>
+        <section class="section">
+            <div class="container">
+                <div class="content">
+                    <p>Each row shows popularity for that character within the rating range, with colors indicating how much more or less popular it is than the baseline global popularity. Data is from the last week of games.</p>
+                    <div class="table-container">
+                    <table class="table is-bordered">
+                        <tr>
+                            <th>&nbsp;</th>
+                            {{#each character_shortnames}}
+                                <th>{{this}}</th>
+                            {{/each}}
+                        </tr>
+                        <tr>
+                            <th>Overall</th>
+                            {{#each global_character_popularity}}
+                                <td>{{this}}%</td>
+                            {{/each}}
+                        </tr>
 
-        <br>
-        <h1>Character popularity</h1>
-        <p>Each row shows popularity for that character within the rating range, with colors indicating how much more or less popular it is than the baseline global popularity. Data is from the last week of games.</p>
-        <table>
-            <tr>
-                <th>&nbsp;</th>
-                {{#each character_shortnames}}
-                    <th>{{this}}</th>
-                {{/each}}
-            </tr>
-            <tr>
-                <th>Global character popularity</th>
-                {{#each global_character_popularity}}
-                    <td>{{this}}%</td>
-                {{/each}}
-            </tr>
-
-            {{#each rank_character_popularity}}
-                <tr>
-                    <th>{{this.rating_min}}–{{this.rating_max}}</th>
-                    {{#each characters}}
-                        <td class="{{this.evaluation}}" title="Delta: {{this.delta}}%">
-                            {{this.popularity}}%
-                        </td>
-                    {{/each}}
-                </tr>
-            {{/each}}
-        </table>
-
-        <h2> Fraud index</h2>
-        <p> For fun, I've calculated a "fraud index" estimating how much playing a character boosts your rating. This is done by looking at players who've got multiple characters with ≥100 games and ≤150 deviation, looking at their average rating, and then checking to see how far away their various characters are from the average. This isn't a perfect method, but I hope it yields interesting results. Middle table limits to people with an average rating over 1500, right is over 1800.</p>
-        <div>
-            <table style="display: inline-block">
-            <tr>
-                <th colspan="2">All</th>
-            </tr>
-            <tr>
-                <th>Character</th>
-                <th>Rating offset</th>
-            </tr>
-                {{#each fraud_stats}} 
-                    <tr>
-                        <td>{{this.character_name}}</td>
-                        <td title="{{this.player_count}} players">{{this.average_offset}}</td>
-                    </tr>
-                {{/each}}
-            </table>
-
-            <table style="display: inline-block">
-            <tr>
-                <th colspan="2">≥1500 Average Rating</th>
-            </tr>
-            <tr>
-                <th>Character</th>
-                <th>Rating offset</th>
-            </tr>
-                {{#each fraud_stats_higher_rated}} 
-                    <tr>
-                        <td>{{this.character_name}}</td>
-                        <td title="{{this.player_count}} players">{{this.average_offset}}</td>
-                    </tr>
-                {{/each}}
-            </table>
-
-            <table style="display: inline-block">
-            <tr>
-                <th colspan="2">≥1800 Average Rating</th>
-            </tr>
-            <tr>
-                <th>Character</th>
-                <th>Rating offset</th>
-            </tr>
-                {{#each fraud_stats_highest_rated}} 
-                    <tr>
-                        <td>{{this.character_name}}</td>
-                        <td title="{{this.player_count}} players">{{this.average_offset}}</td>
-                    </tr>
-                {{/each}}
-            </table>
-        </div>
-
+                        {{#each rank_character_popularity}}
+                            <tr>
+                                <th>{{this.rating_min}}–{{this.rating_max}}</th>
+                                {{#each characters}}
+                                    <td class="{{this.evaluation}}" title="Delta: {{this.delta}}%">
+                                        {{this.popularity}}%
+                                    </td>
+                                {{/each}}
+                            </tr>
+                        {{/each}}
+                    </table>
+                    </div>
+                    <h2> Fraud index</h2>
+                    <p>For fun, I've calculated a "fraud index" estimating how much playing a character boosts your rating. This is done by looking at players who've got multiple characters with ≥100 games and ≤150 deviation, looking at their average rating, and then checking to see how far away their various characters are from the average. This isn't a perfect method, but I hope it yields interesting results. Middle table limits to people with an average rating over 1500, right is over 1800.</p>
+                    <div class="columns">
+                        <div class="column">
+                            <table class="table is-bordered">
+                            <tr>
+                                <th colspan="2">All</th>
+                            </tr>
+                            <tr>
+                                <th>Character</th>
+                                <th>Rating offset</th>
+                            </tr>
+                                {{#each fraud_stats}} 
+                                    <tr>
+                                        <td>{{this.character_name}}</td>
+                                        <td title="{{this.player_count}} players">{{this.average_offset}}</td>
+                                    </tr>
+                                {{/each}}
+                            </table>
+                        </div>
+                        <div class="column">
+                            <table class="table is-bordered">
+                            <tr>
+                                <th colspan="2">≥1500 Average Rating</th>
+                            </tr>
+                            <tr>
+                                <th>Character</th>
+                                <th>Rating offset</th>
+                            </tr>
+                                {{#each fraud_stats_higher_rated}} 
+                                    <tr>
+                                        <td>{{this.character_name}}</td>
+                                        <td title="{{this.player_count}} players">{{this.average_offset}}</td>
+                                    </tr>
+                                {{/each}}
+                            </table>
+                        </div>
+                        <div class="column">
+                            <table class="table is-bordered">
+                            <tr>
+                                <th colspan="2">≥1800 Average Rating</th>
+                            </tr>
+                            <tr>
+                                <th>Character</th>
+                                <th>Rating offset</th>
+                            </tr>
+                                {{#each fraud_stats_highest_rated}} 
+                                    <tr>
+                                        <td>{{this.character_name}}</td>
+                                        <td title="{{this.player_count}} players">{{this.average_offset}}</td>
+                                    </tr>
+                                {{/each}}
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
     </body>
+    {{> footer }}
 </html>
