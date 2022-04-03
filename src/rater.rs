@@ -6,8 +6,9 @@ use lazy_static::lazy_static;
 use rocket::serde::json::serde_json;
 use rusqlite::{params, Connection, Row, Transaction};
 use serde::Deserialize;
-use std::{error::Error, fs::File, io::BufReader, sync::Mutex, time::Duration};
+use std::{fs::File, io::BufReader, sync::Mutex, time::Duration};
 use tokio::{time, try_join};
+use anyhow::Context;
 
 use crate::website;
 
@@ -30,7 +31,7 @@ lazy_static! {
 
 pub struct RuntimeData {}
 
-type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
+type Result<T> = std::result::Result<T, anyhow::Error>;
 
 pub fn init_database() -> Result<()> {
     info!("Intializing database");
@@ -167,12 +168,18 @@ pub fn load_json_data(path: &str) -> Result<()> {
     Ok(())
 }
 
-pub async fn run() {
+pub async fn run() -> Result<()> {
     try_join! {
-        tokio::spawn(pull_continuous()),
-        tokio::spawn(update_ratings_continuous()),
-    }
-    .unwrap();
+        async {
+            tokio::spawn(pull_continuous()).await?;
+            Ok(())
+        },
+        async {
+            tokio::spawn(async { update_ratings_continuous().await.context("Inside `update_rating_continuous`") }).await?
+        }
+    }?;
+
+    Ok(())
 }
 
 async fn pull_continuous() {

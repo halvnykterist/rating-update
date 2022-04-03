@@ -70,7 +70,10 @@ async fn main() {
             println!("Unrecognized argument: {}", x);
         }
         None => {
-            try_join!(tokio::spawn(website::run()), tokio::spawn(rater::run())).unwrap();
+            if let Err(err) = try_join!(async { tokio::spawn(website::run()).await?; Ok(()) }, rater::run()) {
+                eprintln!("{:?}", err);
+                std::process::exit(1);
+            }
         }
     }
 }
