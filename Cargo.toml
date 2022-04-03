@@ -25,6 +25,7 @@ num-format = "0.4"
 
 [dev-dependencies]
 criterion = { version = "0.3", features = ["async_tokio"] }
+futures = "0.3"
 reqwest = "0.11"
 
 [[bench]]

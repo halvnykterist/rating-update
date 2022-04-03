@@ -1575,6 +1575,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "criterion",
+ "futures",
  "fxhash",
  "ggst-api",
  "glicko2",

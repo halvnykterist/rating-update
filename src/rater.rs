@@ -15,7 +15,7 @@ use crate::website;
 const SYS_CONSTANT: f64 = 0.8;
 pub const MAX_DEVIATION: f64 = 75.0 / 173.7178;
 pub const HIGH_RATING: f64 = (1800.0 - 1500.0) / 173.7178;
-const DB_NAME: &str = "ratings.sqlite";
+pub const DB_NAME: &str = "ratings.sqlite";
 
 const CHAR_COUNT: usize = website::CHAR_NAMES.len();
 pub const POP_RATING_BRACKETS: usize = 11;
