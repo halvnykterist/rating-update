@@ -22,3 +22,15 @@ simplelog = "0.9"
 log = "0.4"
 fxhash = "0.2"
 num-format = "0.4"
+
+[dev-dependencies]
+criterion = { version = "0.3", features = ["async_tokio"] }
+reqwest = "0.11"
+
+[[bench]]
+name = "bench"
+harness = false
+
+
+[profile.bench]
+debug = 1
