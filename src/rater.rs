@@ -189,7 +189,7 @@ async fn pull_continuous() {
     loop {
         interval.tick().await;
         if let Err(e) = grab_games(&mut conn, 10).await {
-            error!("{}", e)
+            error!("grab_games failed: {}", e)
         }
     }
 }
@@ -202,7 +202,7 @@ pub async fn update_ratings_continuous() -> Result<()>  {
     let mut last_statistics_update: i64 = last_rating_timestamp;
 
     if let Err(e) = calc_fraud_index(&mut conn) {
-        error!("{}", e);
+        error!("calc_fraud_index failed: {}", e);
     }
 
     let mut interval = time::interval(Duration::from_secs(60));
@@ -218,17 +218,17 @@ pub async fn update_ratings_continuous() -> Result<()>  {
                 last_statistics_update = last_rating_timestamp;
                 update_player_distribution(&mut conn);
                 if let Err(e) = calc_versus_matchups(&mut conn) {
-                    error!("{}", e);
+                    error!("calc_versus_matchups failed: {}", e);
                 }
                 if let Err(e) = calc_fraud_index(&mut conn) {
-                    error!("{}", e);
+                    error!("calc_fraud_index failed: {}", e);
                 }
                 if let Err(e) = calc_character_popularity(&mut conn, last_rating_timestamp) {
-                    error!("{}", e);
+                    error!("calc_character_popularity failed: {}", e);
                 }
             }
             if let Err(e) = update_rankings(&mut conn) {
-                error!("{}", e);
+                error!("update_rankings failed: {}", e);
             }
         }
     }
@@ -242,16 +242,16 @@ pub async fn update_once() {
         .unwrap();
     update_player_distribution(&mut conn);
     if let Err(e) = calc_versus_matchups(&mut conn) {
-        error!("{}", e);
+        error!("calc_versus_matchups failed: {}", e);
     }
     if let Err(e) = calc_fraud_index(&mut conn) {
-        error!("{}", e);
+        error!("calc_fraud_index failed: {}", e);
     }
     if let Err(e) = update_rankings(&mut conn) {
-        error!("{}", e);
+        error!("update_rankings failed: {}", e);
     }
     if let Err(e) = calc_character_popularity(&mut conn, last_rating_timestamp) {
-        error!("{}", e);
+        error!("calc_character_popularity failed: {}", e);
     }
 }
 
@@ -874,10 +874,16 @@ pub fn calc_character_popularity(
     tx.execute("DELETE FROM character_popularity_global", [])?;
     tx.execute("DELETE FROM character_popularity_rating", [])?;
 
+
     let global_game_count: f64 =
         tx.query_row("SELECT COUNT(*) FROM  temp.recent_games", params![], |r| {
             r.get(0)
         })?;
+
+    if global_game_count == 0.0 {
+        info!("No new games have been recorded. Unable to calcualate character popularity");
+        return Ok(())
+    }
 
     for c in 0..CHAR_COUNT {
         let char_count: f64 = tx.query_row(
@@ -896,6 +902,7 @@ pub fn calc_character_popularity(
             params![c, char_count / global_game_count],
         )?;
     }
+
 
     for r in 0..POP_RATING_BRACKETS {
         let rating_min = if r > 0 {
