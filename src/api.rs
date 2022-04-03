@@ -516,7 +516,7 @@ pub async fn get_player_data_char(
 
 fn get_player_other_names(conn: &Connection, id: i64, name: &str) -> Option<Vec<String>> {
     let mut stmt = conn
-        .prepare("SELECT name FROM player_names WHERE id=?")
+        .prepare_cached("SELECT name FROM player_names WHERE id=?")
         .unwrap();
     let mut rows = stmt.query(params![id]).unwrap();
     let mut other_names = Vec::new();
@@ -536,7 +536,7 @@ fn get_player_other_names(conn: &Connection, id: i64, name: &str) -> Option<Vec<
 
 fn get_player_other_characters(conn: &Connection, id: i64) -> Vec<OtherPlayerCharacter> {
     let mut stmt = conn
-        .prepare(
+        .prepare_cached(
             "SELECT
             char_id, wins, losses, value, deviation
             FROM player_ratings
@@ -603,7 +603,7 @@ fn get_player_character_data(conn: &Connection, id: i64, char_id: i64, group_gam
 
         let history = {
             let mut stmt = conn
-                .prepare(
+                .prepare_cached(
                     "SELECT
                         timestamp,
                         value_a AS own_value,
@@ -695,7 +695,7 @@ fn get_player_character_data(conn: &Connection, id: i64, char_id: i64, group_gam
 
         let recent_games = {
             let mut stmt = conn
-                .prepare(
+                .prepare_cached(
                     "SELECT
                         games.timestamp AS timestamp,
                         game_floor,
@@ -799,7 +799,7 @@ fn get_player_character_data(conn: &Connection, id: i64, char_id: i64, group_gam
 
         let matchups = {
             let mut stmt = conn
-                .prepare(
+                .prepare_cached(
                     "SELECT
                         opp_char_id,
                         wins_real,
