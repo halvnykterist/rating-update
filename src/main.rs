@@ -1,16 +1,11 @@
 #![feature(proc_macro_hygiene, decl_macro)]
 
-#[macro_use]
-extern crate rocket;
-#[macro_use]
-extern crate log;
 use simplelog::*;
 use std::{fs::File, ops::Deref};
 use tokio::try_join;
 
-mod api;
-mod rater;
-mod website;
+
+use rating_update::{rater, website};
 
 fn init_logging() {
     if cfg!(debug_assertions) {
