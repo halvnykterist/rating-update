@@ -30,7 +30,9 @@ lazy_static! {
 
 pub struct RuntimeData {}
 
-pub fn init_database() -> Result<(), Box<dyn Error>> {
+type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
+
+pub fn init_database() -> Result<()> {
     info!("Intializing database");
 
     let conn = Connection::open(DB_NAME)?;
@@ -39,7 +41,7 @@ pub fn init_database() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn reset_database() -> Result<(), Box<dyn Error>> {
+pub fn reset_database() -> Result<()> {
     info!("Resettting database");
     let conn = Connection::open(DB_NAME)?;
     conn.execute_batch(include_str!("../reset.sql"))?;
@@ -47,7 +49,7 @@ pub fn reset_database() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn reset_names() -> Result<(), Box<dyn Error>> {
+pub fn reset_names() -> Result<()> {
     let mut conn = Connection::open(DB_NAME)?;
 
     let tx = conn.transaction()?;
@@ -75,7 +77,7 @@ pub fn reset_names() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn reset_distribution() -> Result<(), Box<dyn Error>> {
+pub fn reset_distribution() -> Result<()> {
     let mut conn = Connection::open(DB_NAME)?;
 
     update_player_distribution(&mut conn);
@@ -83,7 +85,7 @@ pub fn reset_distribution() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn load_json_data(path: &str) -> Result<(), Box<dyn Error>> {
+pub fn load_json_data(path: &str) -> Result<()> {
     let mut conn = Connection::open(DB_NAME)?;
 
     #[derive(Deserialize)]
@@ -185,12 +187,11 @@ async fn pull_continuous() {
     }
 }
 
-pub async fn update_ratings_continuous() {
-    let mut conn = Connection::open(DB_NAME).unwrap();
+pub async fn update_ratings_continuous() -> Result<()>  {
+    let mut conn = Connection::open(DB_NAME)?;
 
     let mut last_rating_timestamp: i64 = conn
-        .query_row("SELECT last_update FROM config", [], |r| r.get(0))
-        .unwrap();
+        .query_row("SELECT last_update FROM config", [], |r| r.get(0))?;
     let mut last_statistics_update: i64 = last_rating_timestamp;
 
     if let Err(e) = calc_fraud_index(&mut conn) {
@@ -224,6 +225,7 @@ pub async fn update_ratings_continuous() {
             }
         }
     }
+
 }
 
 pub async fn update_once() {
@@ -262,7 +264,7 @@ pub async fn pull() {
     grab_games(&mut conn, 100).await.unwrap();
 }
 
-async fn grab_games(conn: &mut Connection, pages: usize) -> Result<(), Box<dyn Error>> {
+async fn grab_games(conn: &mut Connection, pages: usize) -> Result<()> {
     let then = Utc::now();
     info!("Grabbing replays");
     let (replays, errors) = ggst_api::get_replays(
@@ -326,14 +328,14 @@ fn add_game(conn: &Transaction, game: ggst_api::Match) {
 
     conn.execute(
         "INSERT OR IGNORE INTO games (
-            timestamp, 
-            id_a, 
+            timestamp,
+            id_a,
             name_a,
             char_a,
             id_b,
             name_b,
             char_b,
-            winner, 
+            winner,
             game_floor
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         params![
@@ -398,7 +400,7 @@ fn update_player_distribution(conn: &mut Connection) {
         tx.execute(
             "INSERT INTO
             player_floor_distribution
-            (floor, player_count, game_count) 
+            (floor, player_count, game_count)
             VALUES (?, ?, ?)",
             params![f, player_count, game_count],
         )
@@ -411,8 +413,8 @@ fn update_player_distribution(conn: &mut Connection) {
 
         let player_count: i64 = tx
             .query_row(
-                "SELECT COUNT(*) 
-                FROM player_ratings 
+                "SELECT COUNT(*)
+                FROM player_ratings
                 WHERE value >= ? AND value < ? AND deviation < ?",
                 params![
                     glicko_to_glicko2(r_min as f64),
@@ -429,8 +431,8 @@ fn update_player_distribution(conn: &mut Connection) {
 
         let player_count_cum: i64 = tx
             .query_row(
-                "SELECT COUNT(*) 
-                FROM player_ratings 
+                "SELECT COUNT(*)
+                FROM player_ratings
                 WHERE value < ? AND deviation < ?",
                 params![glicko_to_glicko2(r_max as f64), MAX_DEVIATION],
                 |r| r.get(0),
@@ -475,7 +477,7 @@ fn update_ratings(conn: &mut Connection) -> i64 {
         let mut stmt = conn
             .prepare(
                 "SELECT
-                    games.timestamp, 
+                    games.timestamp,
                     games.id_a,
                     games.name_a,
                     games.char_a,
@@ -484,14 +486,14 @@ fn update_ratings(conn: &mut Connection) -> i64 {
                     games.char_b,
                     games.winner,
                     games.game_floor
-                FROM 
+                FROM
                     games LEFT JOIN game_ratings ON
-                    games.id_a == game_ratings.id_a 
+                    games.id_a == game_ratings.id_a
                     AND games.id_b == game_ratings.id_b
                     AND games.timestamp == game_ratings.timestamp
                 WHERE
-                    games.timestamp >= ? 
-                    AND games.timestamp < ? 
+                    games.timestamp >= ?
+                    AND games.timestamp < ?
                     AND game_ratings.id_a IS NULL",
             )
             .unwrap();
@@ -512,8 +514,8 @@ fn update_ratings(conn: &mut Connection) -> i64 {
 
         let mut stmt = conn
             .prepare(
-                "SELECT 
-                    id, char_id, wins, losses, value, deviation, volatility 
+                "SELECT
+                    id, char_id, wins, losses, value, deviation, volatility
                 FROM player_ratings",
             )
             .unwrap();
@@ -535,7 +537,7 @@ fn update_ratings(conn: &mut Connection) -> i64 {
 
         let mut stmt = conn
             .prepare(
-                "SELECT 
+                "SELECT
                     id
                 FROM cheater_status",
             )
@@ -630,14 +632,14 @@ fn update_ratings(conn: &mut Connection) -> i64 {
                     players.get_mut(&(g.id_b, g.char_b)).unwrap().0.loss_count += 1;
 
                     tx.execute(
-                        "UPDATE player_matchups 
+                        "UPDATE player_matchups
                     SET wins_real = wins_real + 1
                     WHERE id=? AND char_id=? AND opp_char_id=?",
                         params![g.id_a, g.char_a, g.char_b,],
                     )
                     .unwrap();
                     tx.execute(
-                        "UPDATE player_matchups 
+                        "UPDATE player_matchups
                     SET losses_real = losses_real + 1
                     WHERE id=? AND char_id=? AND opp_char_id=?",
                         params![g.id_b, g.char_b, g.char_a,],
@@ -647,28 +649,28 @@ fn update_ratings(conn: &mut Connection) -> i64 {
                     //TODO I know this is awful
                     if rating_a.deviation < MAX_DEVIATION && rating_b.deviation < MAX_DEVIATION {
                         tx.execute(
-                            "UPDATE player_matchups 
+                            "UPDATE player_matchups
                         SET wins_adjusted = wins_adjusted + ?
                         WHERE id=? AND char_id=? AND opp_char_id=?",
                             params![b_win_prob, g.id_a, g.char_a, g.char_b,],
                         )
                         .unwrap();
                         tx.execute(
-                            "UPDATE player_matchups 
+                            "UPDATE player_matchups
                         SET losses_adjusted = losses_adjusted + ?
                         WHERE id=? AND char_id=? AND opp_char_id=?",
                             params![b_win_prob, g.id_b, g.char_b, g.char_a,],
                         )
                         .unwrap();
                         tx.execute(
-                            "UPDATE global_matchups 
+                            "UPDATE global_matchups
                         SET wins_real = wins_real + 1, wins_adjusted = wins_adjusted + ?
                         WHERE char_id=? AND opp_char_id=?",
                             params![b_win_prob, g.char_a, g.char_b,],
                         )
                         .unwrap();
                         tx.execute(
-                            "UPDATE global_matchups 
+                            "UPDATE global_matchups
                         SET losses_real = losses_real + 1, losses_adjusted = losses_adjusted + ?
                         WHERE char_id=? AND opp_char_id=?",
                             params![b_win_prob, g.char_b, g.char_a,],
@@ -677,14 +679,14 @@ fn update_ratings(conn: &mut Connection) -> i64 {
 
                         if rating_a.value > HIGH_RATING && rating_b.value > HIGH_RATING {
                             tx.execute(
-                                "UPDATE high_rated_matchups 
+                                "UPDATE high_rated_matchups
                             SET wins_real = wins_real + 1, wins_adjusted = wins_adjusted + ?
                             WHERE char_id=? AND opp_char_id=?",
                                 params![b_win_prob, g.char_a, g.char_b,],
                             )
                             .unwrap();
                             tx.execute(
-                                "UPDATE high_rated_matchups 
+                                "UPDATE high_rated_matchups
                             SET losses_real = losses_real + 1, losses_adjusted = losses_adjusted + ?
                             WHERE char_id=? AND opp_char_id=?",
                                 params![b_win_prob, g.char_b, g.char_a,],
@@ -708,7 +710,7 @@ fn update_ratings(conn: &mut Connection) -> i64 {
                     players.get_mut(&(g.id_b, g.char_b)).unwrap().0.win_count += 1;
 
                     tx.execute(
-                        "UPDATE player_matchups 
+                        "UPDATE player_matchups
                     SET losses_real = losses_real + 1
                     WHERE id=? AND char_id=? AND opp_char_id=?",
                         params![g.id_a, g.char_a, g.char_b,],
@@ -716,7 +718,7 @@ fn update_ratings(conn: &mut Connection) -> i64 {
                     .unwrap();
 
                     tx.execute(
-                        "UPDATE player_matchups 
+                        "UPDATE player_matchups
                     SET wins_real = wins_real + 1
                     WHERE id=? AND char_id=? AND opp_char_id=?",
                         params![g.id_b, g.char_b, g.char_a,],
@@ -726,14 +728,14 @@ fn update_ratings(conn: &mut Connection) -> i64 {
                     //TODO make this less repetitive
                     if rating_a.deviation < MAX_DEVIATION && rating_b.deviation < MAX_DEVIATION {
                         tx.execute(
-                            "UPDATE player_matchups 
+                            "UPDATE player_matchups
                         SET losses_adjusted = losses_adjusted + ?
                         WHERE id=? AND char_id=? AND opp_char_id=?",
                             params![a_win_prob, g.id_a, g.char_a, g.char_b,],
                         )
                         .unwrap();
                         tx.execute(
-                            "UPDATE player_matchups 
+                            "UPDATE player_matchups
                         SET wins_adjusted = wins_adjusted + ?
                         WHERE id=? AND char_id=? AND opp_char_id=?",
                             params![a_win_prob, g.id_b, g.char_b, g.char_a,],
@@ -741,14 +743,14 @@ fn update_ratings(conn: &mut Connection) -> i64 {
                         .unwrap();
 
                         tx.execute(
-                            "UPDATE global_matchups 
+                            "UPDATE global_matchups
                         SET wins_real = wins_real + 1, wins_adjusted = wins_adjusted + ?
                         WHERE char_id=? AND opp_char_id=?",
                             params![a_win_prob, g.char_b, g.char_a,],
                         )
                         .unwrap();
                         tx.execute(
-                            "UPDATE global_matchups 
+                            "UPDATE global_matchups
                         SET losses_real = losses_real + 1, losses_adjusted = losses_adjusted + ?
                         WHERE char_id=? AND opp_char_id=?",
                             params![a_win_prob, g.char_a, g.char_b,],
@@ -757,14 +759,14 @@ fn update_ratings(conn: &mut Connection) -> i64 {
 
                         if rating_a.value > HIGH_RATING && rating_b.value > HIGH_RATING {
                             tx.execute(
-                                "UPDATE high_rated_matchups 
+                                "UPDATE high_rated_matchups
                             SET wins_real = wins_real + 1, wins_adjusted = wins_adjusted + ?
                             WHERE char_id=? AND opp_char_id=?",
                                 params![b_win_prob, g.char_b, g.char_a,],
                             )
                             .unwrap();
                             tx.execute(
-                                "UPDATE high_rated_matchups 
+                                "UPDATE high_rated_matchups
                             SET losses_real = losses_real + 1, losses_adjusted = losses_adjusted + ?
                             WHERE char_id=? AND opp_char_id=?",
                                 params![b_win_prob, g.char_a, g.char_b,],
@@ -832,7 +834,7 @@ fn update_ratings(conn: &mut Connection) -> i64 {
 pub fn calc_character_popularity(
     conn: &mut Connection,
     last_timestamp: i64,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
     let then = Utc::now();
     info!("Calculating character popularity stats..");
     let one_week_ago = last_timestamp - 60 * 60 * 24 * 7;
@@ -841,15 +843,15 @@ pub fn calc_character_popularity(
     info!("making temp table");
     tx.execute("DROP TABLE IF EXISTS temp.recent_games", [])?;
     tx.execute(
-        "CREATE TEMP TABLE temp.recent_games AS 
-        SELECT 
-            char_a, 
-            value_a, 
-            deviation_a, 
-            char_b, 
-            value_b, 
-            deviation_b 
-        FROM 
+        "CREATE TEMP TABLE temp.recent_games AS
+        SELECT
+            char_a,
+            value_a,
+            deviation_a,
+            char_b,
+            value_b,
+            deviation_b
+        FROM
             games NATURAL JOIN game_ratings
         WHERE timestamp > ? AND (deviation_a < ? OR deviation_b < ?)",
         params![one_week_ago, MAX_DEVIATION, MAX_DEVIATION],
@@ -876,7 +878,7 @@ pub fn calc_character_popularity(
                     (SELECT COUNT(*) FROM temp.recent_games
                     WHERE char_a = ?)
                     +
-                    (SELECT COUNT(*) FROM temp.recent_games 
+                    (SELECT COUNT(*) FROM temp.recent_games
                     WHERE char_b = ?)",
             params![c, c],
             |r| r.get(0),
@@ -901,12 +903,12 @@ pub fn calc_character_popularity(
         };
 
         let rating_game_count: f64 = tx.query_row(
-            "SELECT 
+            "SELECT
                 (SELECT COUNT(*) FROM temp.recent_games
-                WHERE value_a >= ? AND value_a < ? AND deviation_a < ?) 
-                + 
+                WHERE value_a >= ? AND value_a < ? AND deviation_a < ?)
+                +
                 (SELECT COUNT(*) FROM temp.recent_games
-                WHERE value_b >= ? AND value_b < ? AND deviation_b < ?) 
+                WHERE value_b >= ? AND value_b < ? AND deviation_b < ?)
                 ",
             params![
                 rating_min,
@@ -923,14 +925,14 @@ pub fn calc_character_popularity(
             let char_count: f64 = tx.query_row(
                 "SELECT
                     (SELECT COUNT(*) FROM temp.recent_games
-                        WHERE char_a =? 
+                        WHERE char_a =?
                             AND value_a >= ?
                             AND value_a < ?
-                            AND deviation_a < ?) 
+                            AND deviation_a < ?)
                     +
                     (SELECT COUNT(*) FROM temp.recent_games
-                        WHERE char_b =? 
-                            AND value_b >= ? 
+                        WHERE char_b =?
+                            AND value_b >= ?
                             AND value_b < ?
                             AND deviation_b < ?)",
                 params![
@@ -963,7 +965,7 @@ pub fn calc_character_popularity(
     Ok(())
 }
 
-pub fn update_rankings(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
+pub fn update_rankings(conn: &mut Connection) -> Result<()> {
     let then = Utc::now();
     let tx = conn.transaction()?;
     tx.execute("DELETE FROM ranking_global", [])?;
@@ -972,7 +974,7 @@ pub fn update_rankings(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
     tx.execute(
         "INSERT INTO ranking_global (global_rank, id, char_id)
          SELECT ROW_NUMBER() OVER (ORDER BY value - 2.0 * deviation DESC) as global_rank, id, char_id
-         FROM player_ratings 
+         FROM player_ratings
          WHERE deviation < ? AND (losses > 10 OR wins <= 200)
          ORDER BY value - 2.0 * deviation DESC
          LIMIT 1000",
@@ -983,7 +985,7 @@ pub fn update_rankings(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
         tx.execute(
             "INSERT INTO ranking_character (character_rank, id, char_id)
              SELECT ROW_NUMBER() OVER (ORDER BY value - 2.0 * deviation DESC) as character_rank, id, char_id
-             FROM player_ratings 
+             FROM player_ratings
              WHERE deviation < ? AND char_id = ? AND (losses > 10 OR wins <= 200)
              ORDER BY value - 2.0 * deviation DESC
              LIMIT 1000",
@@ -999,7 +1001,7 @@ pub fn update_rankings(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn calc_fraud_index(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
+pub fn calc_fraud_index(conn: &mut Connection) -> Result<()> {
     let then = Utc::now();
     info!("Calculating fraud index");
     let tx = conn.transaction()?;
@@ -1022,17 +1024,17 @@ pub fn calc_fraud_index(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
                     ) as averages
                     where char_count > 1
                 ) as filtered_averages
-                
+
                 join
-                
+
                 (
                     select id, char_id, value
                     from player_ratings
                     where deviation < ? and wins + losses >= 100
                 ) as char_ratings
-                
+
                 on filtered_averages.id = char_ratings.id
-                
+
             group by char_id;",
             )
             .unwrap();
@@ -1064,17 +1066,17 @@ pub fn calc_fraud_index(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
                     ) as averages
                     where char_count > 1 AND avg_value > 0.0
                 ) as filtered_averages
-                
+
                 join
-                
+
                 (
                     select id, char_id, value
                     from player_ratings
                     where deviation < ? and wins + losses >= 100
                 ) as char_ratings
-                
+
                 on filtered_averages.id = char_ratings.id
-                
+
             group by char_id;",
             )
             .unwrap();
@@ -1106,17 +1108,17 @@ pub fn calc_fraud_index(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
                     ) as averages
                     where char_count > 1 AND avg_value > 1.7
                 ) as filtered_averages
-                
+
                 join
-                
+
                 (
                     select id, char_id, value
                     from player_ratings
                     where deviation < ? and wins + losses >= 100
                 ) as char_ratings
-                
+
                 on filtered_averages.id = char_ratings.id
-                
+
             group by char_id;",
             )
             .unwrap();
@@ -1145,7 +1147,7 @@ pub fn calc_fraud_index(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn calc_versus_matchups(conn: &mut Connection) -> Result<(), Box<dyn Error>> {
+pub fn calc_versus_matchups(conn: &mut Connection) -> Result<()> {
     let then = Utc::now();
     let mut pairs = FxHashMap::<((i64, i64), (i64, i64)), (f64, f64, i64)>::default();
     info!("Calculating versus matchups");
@@ -1226,13 +1228,13 @@ pub fn calc_versus_matchups(conn: &mut Connection) -> Result<(), Box<dyn Error>>
             let probability = sum / pair_count as f64;
             if game_count > 0 {
                 tx.execute(
-                    "INSERT INTO 
+                    "INSERT INTO
                 versus_matchups(char_a, char_b, game_count, pair_count, win_rate)
                 VALUES(?, ?, ?, ?, ?)",
                     params![a, b, game_count, pair_count, probability],
                 )?;
                 tx.execute(
-                    "INSERT INTO 
+                    "INSERT INTO
                 versus_matchups(char_a, char_b, game_count, pair_count, win_rate)
                 VALUES(?, ?, ?, ?, ?)",
                     params![b, a, game_count, pair_count, 1.0 - probability],
