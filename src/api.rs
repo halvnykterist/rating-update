@@ -669,110 +669,25 @@ fn get_player_character_data(conn: &Connection, id: i64, char_id: i64, group_gam
                 let opponent_cheater: Option<String> =
                     row.get("cheater_status").unwrap();
 
-                let own_rating: GlickoRating = Glicko2Rating {
-                    value: own_value,
-                    deviation: own_deviation,
-                    volatility: 0.0,
-                }
-                .into();
-
-                let opponent_rating: GlickoRating = Glicko2Rating {
-                    value: opponent_value,
-                    deviation: opponent_deviation,
-                    volatility: 0.0,
-                }
-                .into();
-
-                let (
-                    expected_outcome_min,
-                    expected_outcome,
-                    expected_outcome_max,
-                    expected_outcome_evaluation,
-                ) = get_expected_outcomes(
-                    own_value,
-                    own_deviation,
-                    opponent_value,
-                    opponent_deviation,
-                );
-
-                if let Some(set) = history.last_mut().filter(|set| {
-                    set.opponent_id == format!("{:X}", opponent_id)
-                        && set.opponent_character
-                            == website::CHAR_NAMES[opponent_character as usize].1
-                        && group_games
-                }) {
-                    set.timestamp = format!(
-                        "{}",
-                        NaiveDateTime::from_timestamp(timestamp, 0)
-                            .format("%Y-%m-%d %H:%M")
-                    );
-                    set.own_rating_value = own_rating.value.round();
-                    set.own_rating_deviation = (own_rating.deviation * 2.0).round();
-                    set.opponent_rating_value = opponent_rating.value.round();
-                    set.opponent_rating_deviation =
-                        (opponent_rating.deviation * 2.0).round();
-
-                    set.expected_outcome = expected_outcome;
-                    set.expected_outcome_evaluation = expected_outcome_evaluation;
-                    set.expected_outcome_min = expected_outcome_min;
-                    set.expected_outcome_max = set.expected_outcome_max;
-
-                    match winner {
-                        1 | 4 => set.result_wins += 1,
-                        2 | 3 => set.result_losses += 1,
-                        _ => panic!("Bad winner"),
-                    }
-
-                    set.result_percent = ((set.result_wins as f64
-                        / (set.result_wins + set.result_losses) as f64)
-                        * 100.0)
-                        .round();
-                } else {
-                    history.push(PlayerSet {
-                        timestamp: format!(
-                            "{}",
-                            NaiveDateTime::from_timestamp(timestamp, 0)
-                                .format("%Y-%m-%d %H:%M")
-                        ),
-                        own_rating_value: own_rating.value.round(),
-                        own_rating_deviation: (own_rating.deviation * 2.0).round(),
-                        floor: match floor {
-                            99 => format!("Celestial"),
-                            n => format!("Floor {}", n),
-                        },
-                        opponent_name: opponent_name,
+                merge_set(
+                    &mut history,
+                    UnmergedPlayerSet {
+                        timestamp,
+                        floor,
+                        own_value,
+                        own_deviation,
+                        opponent_name,
+                        opponent_id,
+                        opponent_character,
+                        winner,
                         opponent_vip,
                         opponent_cheater,
-                        opponent_id: format!("{:X}", opponent_id),
-                        opponent_character: website::CHAR_NAMES
-                            [opponent_character as usize]
-                            .1
-                            .to_owned(),
-                        opponent_character_short: website::CHAR_NAMES
-                            [opponent_character as usize]
-                            .0
-                            .to_owned(),
-                        opponent_rating_value: opponent_rating.value.round(),
-                        opponent_rating_deviation: (opponent_rating.deviation * 2.0)
-                            .round(),
-                        expected_outcome,
-                        expected_outcome_evaluation,
-                        expected_outcome_min,
-                        expected_outcome_max,
-                        result_wins: match winner {
-                            1 | 4 => 1,
-                            _ => 0,
-                        },
-                        result_losses: match winner {
-                            2 | 3 => 1,
-                            _ => 0,
-                        },
-                        result_percent: match winner {
-                            1 | 4 => 100.0,
-                            _ => 0.0,
-                        },
-                    });
-                }
+                        opponent_value,
+                        opponent_deviation,
+                    },
+                    group_games,
+                );
+
             }
 
             history
@@ -840,13 +755,6 @@ fn get_player_character_data(conn: &Connection, id: i64, char_id: i64, group_gam
                 let opponent_cheater: Option<String> =
                     row.get("cheater_status").unwrap();
 
-                let own_rating: GlickoRating = Glicko2Rating {
-                    value: value,
-                    deviation: deviation,
-                    volatility: 0.0,
-                }
-                .into();
-
                 let (opponent_value, opponent_deviation) = conn
                     .query_row(
                         "SELECT value, deviation
@@ -864,103 +772,26 @@ fn get_player_character_data(conn: &Connection, id: i64, char_id: i64, group_gam
                     .unwrap()
                     .unwrap_or((0.0, 350.0 / 173.7178));
 
-                let opponent_rating: GlickoRating = Glicko2Rating {
-                    value: opponent_value,
-                    deviation: opponent_deviation,
-                    volatility: 0.0,
-                }
-                .into();
 
-                let (
-                    expected_outcome_min,
-                    expected_outcome,
-                    expected_outcome_max,
-                    expected_outcome_evaluation,
-                ) = get_expected_outcomes(
-                    value,
-                    deviation,
-                    opponent_value,
-                    opponent_deviation,
-                );
 
-                if let Some(set) = recent_games.last_mut().filter(|set| {
-                    set.opponent_id == format!("{:X}", opponent_id)
-                        && set.opponent_character
-                            == website::CHAR_NAMES[opponent_character as usize].1
-                        && group_games
-                }) {
-                    set.timestamp = format!(
-                        "{}",
-                        NaiveDateTime::from_timestamp(timestamp, 0)
-                            .format("%Y-%m-%d %H:%M")
-                    );
-                    set.own_rating_value = own_rating.value.round();
-                    set.own_rating_deviation = (own_rating.deviation * 2.0).round();
-                    set.opponent_rating_value = opponent_rating.value.round();
-                    set.opponent_rating_deviation =
-                        (opponent_rating.deviation * 2.0).round();
-
-                    set.expected_outcome = expected_outcome;
-                    set.expected_outcome_evaluation = expected_outcome_evaluation;
-                    set.expected_outcome_min = expected_outcome_min;
-                    set.expected_outcome_max = set.expected_outcome_max;
-
-                    match winner {
-                        1 | 4 => set.result_wins += 1,
-                        2 | 3 => set.result_losses += 1,
-                        _ => panic!("Bad winner"),
-                    }
-
-                    set.result_percent = ((set.result_wins as f64
-                        / (set.result_wins + set.result_losses) as f64)
-                        * 100.0)
-                        .round();
-                } else {
-                    recent_games.push(PlayerSet {
-                        timestamp: format!(
-                            "{}",
-                            NaiveDateTime::from_timestamp(timestamp, 0)
-                                .format("%Y-%m-%d %H:%M")
-                        ),
-                        own_rating_value: own_rating.value.round(),
-                        own_rating_deviation: (own_rating.deviation * 2.0).round(),
-                        floor: match floor {
-                            99 => format!("Celestial"),
-                            n => format!("Floor {}", n),
-                        },
-                        opponent_name: opponent_name,
+                merge_set(
+                    &mut recent_games,
+                    UnmergedPlayerSet {
+                        timestamp,
+                        floor,
+                        own_value: value,
+                        own_deviation: deviation,
+                        opponent_name,
+                        opponent_id,
+                        opponent_character,
+                        winner,
                         opponent_vip,
                         opponent_cheater,
-                        opponent_id: format!("{:X}", opponent_id),
-                        opponent_character: website::CHAR_NAMES
-                            [opponent_character as usize]
-                            .1
-                            .to_owned(),
-                        opponent_character_short: website::CHAR_NAMES
-                            [opponent_character as usize]
-                            .0
-                            .to_owned(),
-                        opponent_rating_value: opponent_rating.value.round(),
-                        opponent_rating_deviation: (opponent_rating.deviation * 2.0)
-                            .round(),
-                        expected_outcome,
-                        expected_outcome_evaluation,
-                        expected_outcome_min,
-                        expected_outcome_max,
-                        result_wins: match winner {
-                            1 | 4 => 1,
-                            _ => 0,
-                        },
-                        result_losses: match winner {
-                            2 | 3 => 1,
-                            _ => 0,
-                        },
-                        result_percent: match winner {
-                            1 | 4 => 100.0,
-                            _ => 0.0,
-                        },
-                    });
-                }
+                        opponent_value,
+                        opponent_deviation,
+                    },
+                    group_games,
+                );
             }
 
             recent_games
@@ -1019,6 +850,147 @@ fn get_player_character_data(conn: &Connection, id: i64, char_id: i64, group_gam
             character_rank,
             global_rank,
         }
+    }
+}
+
+struct UnmergedPlayerSet {
+    timestamp: i64,
+    floor: i64,
+    own_value: f64,
+    own_deviation: f64,
+    opponent_name: String,
+    opponent_id: i64,
+    opponent_character: i64,
+    opponent_value: f64,
+    opponent_deviation: f64,
+    winner: i64,
+    opponent_vip: Option<String>,
+    opponent_cheater: Option<String>,
+}
+
+
+fn merge_set(sets: &mut Vec<PlayerSet>, set: UnmergedPlayerSet, group_games: bool) {
+
+    let UnmergedPlayerSet {
+        timestamp,
+        floor,
+        own_value,
+        own_deviation,
+        opponent_name,
+        opponent_id,
+        opponent_character,
+        winner,
+        opponent_vip,
+        opponent_cheater,
+        opponent_value,
+        opponent_deviation,
+    } = set;
+
+    let own_rating: GlickoRating = Glicko2Rating {
+        value: own_value,
+        deviation: own_deviation,
+        volatility: 0.0,
+    }
+    .into();
+
+    let opponent_rating: GlickoRating = Glicko2Rating {
+        value: opponent_value,
+        deviation: opponent_deviation,
+        volatility: 0.0,
+    }
+    .into();
+
+    let (
+        expected_outcome_min,
+        expected_outcome,
+        expected_outcome_max,
+        expected_outcome_evaluation,
+    ) = get_expected_outcomes(
+        own_value,
+        own_deviation,
+        opponent_value,
+        opponent_deviation,
+    );
+
+
+
+    if let Some(set) = sets.last_mut().filter(|set| {
+        set.opponent_id == format!("{:X}", opponent_id)
+            && set.opponent_character
+                == website::CHAR_NAMES[opponent_character as usize].1
+            && group_games
+    }) {
+        set.timestamp = format!(
+            "{}",
+            NaiveDateTime::from_timestamp(timestamp, 0)
+                .format("%Y-%m-%d %H:%M")
+        );
+        set.own_rating_value = own_rating.value.round();
+        set.own_rating_deviation = (own_rating.deviation * 2.0).round();
+        set.opponent_rating_value = opponent_rating.value.round();
+        set.opponent_rating_deviation =
+            (opponent_rating.deviation * 2.0).round();
+
+        set.expected_outcome = expected_outcome;
+        set.expected_outcome_evaluation = expected_outcome_evaluation;
+        set.expected_outcome_min = expected_outcome_min;
+        set.expected_outcome_max = set.expected_outcome_max;
+
+        match winner {
+            1 | 4 => set.result_wins += 1,
+            2 | 3 => set.result_losses += 1,
+            _ => panic!("Bad winner"),
+        }
+
+        set.result_percent = ((set.result_wins as f64
+            / (set.result_wins + set.result_losses) as f64)
+            * 100.0)
+            .round();
+    } else {
+        sets.push(PlayerSet {
+            timestamp: format!(
+                "{}",
+                NaiveDateTime::from_timestamp(timestamp, 0)
+                    .format("%Y-%m-%d %H:%M")
+            ),
+            own_rating_value: own_rating.value.round(),
+            own_rating_deviation: (own_rating.deviation * 2.0).round(),
+            floor: match floor {
+                99 => format!("Celestial"),
+                n => format!("Floor {}", n),
+            },
+            opponent_name: opponent_name,
+            opponent_vip,
+            opponent_cheater,
+            opponent_id: format!("{:X}", opponent_id),
+            opponent_character: website::CHAR_NAMES
+                [opponent_character as usize]
+                .1
+                .to_owned(),
+            opponent_character_short: website::CHAR_NAMES
+                [opponent_character as usize]
+                .0
+                .to_owned(),
+            opponent_rating_value: opponent_rating.value.round(),
+            opponent_rating_deviation: (opponent_rating.deviation * 2.0)
+                .round(),
+            expected_outcome,
+            expected_outcome_evaluation,
+            expected_outcome_min,
+            expected_outcome_max,
+            result_wins: match winner {
+                1 | 4 => 1,
+                _ => 0,
+            },
+            result_losses: match winner {
+                2 | 3 => 1,
+                _ => 0,
+            },
+            result_percent: match winner {
+                1 | 4 => 100.0,
+                _ => 0.0,
+            },
+        });
     }
 }
 
