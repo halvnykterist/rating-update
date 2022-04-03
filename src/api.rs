@@ -9,6 +9,8 @@ use crate::{
     website::{self, RatingsDbConn},
 };
 
+type Result<T> = std::result::Result<T, anyhow::Error>;
+
 #[derive(Serialize)]
 pub struct Stats {
     game_count: i64,
@@ -496,7 +498,7 @@ pub async fn get_player_data_char(
 
             let other_characters = get_player_other_characters(conn, id);
 
-            let character_data = get_player_character_data(conn, id, char_id, group_games, game_count);
+            let character_data = get_player_character_data(conn, id, char_id, group_games, game_count).unwrap()?;
 
             Some(PlayerDataChar {
                 id: format!("{:X}", id),
@@ -573,8 +575,8 @@ fn get_player_other_characters(conn: &Connection, id: i64) -> Vec<OtherPlayerCha
     other_characters
 }
 
-fn get_player_character_data(conn: &Connection, id: i64, char_id: i64, group_games: bool, game_count: i64) -> PlayerCharacterData {
-    let (wins, losses, value, deviation, global_rank, character_rank) = conn
+fn get_player_character_data(conn: &Connection, id: i64, char_id: i64, group_games: bool, game_count: i64) -> Result<Option<PlayerCharacterData>> {
+    let (wins, losses, value, deviation, global_rank, character_rank) = match conn
         .query_row(
             "SELECT wins, losses, value, deviation, global_rank, character_rank
             FROM player_ratings
@@ -596,8 +598,13 @@ fn get_player_character_data(conn: &Connection, id: i64, char_id: i64, group_gam
                     row.get::<_, Option<i32>>(5).unwrap(),
                 ))
             },
-        )
-        .unwrap();
+        ) {
+        Ok(x) => x,
+        Err(rusqlite::Error::QueryReturnedNoRows) => return Ok(None),
+        Err(err) => {
+            return Err(err.into())
+        }
+    };
     {
         let character_name = website::CHAR_NAMES[char_id as usize].1.to_owned();
 
@@ -838,7 +845,7 @@ fn get_player_character_data(conn: &Connection, id: i64, char_id: i64, group_gam
             matchups
         };
 
-        PlayerCharacterData {
+        Ok(Some(PlayerCharacterData {
             character_name,
             game_count: wins + losses,
             win_rate: wins as f64 / (wins + losses) as f64,
@@ -849,7 +856,7 @@ fn get_player_character_data(conn: &Connection, id: i64, char_id: i64, group_gam
             matchups,
             character_rank,
             global_rank,
-        }
+        }))
     }
 }
 
