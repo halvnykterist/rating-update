@@ -21,7 +21,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
   </head>
 
-  <body>
+  
+  <body onload="(() => {
+        let req = new XMLHttpRequest();
+        req.onreadystatechange = function() {
+            if (this.readyState = 4 && this.status == 200) {
+                console.log('got history');
+                document.getElementById('history').innerHTML = this.responseText;
+            }
+        };
+        console.log('requesting history');
+        req.open('GET', '{{char_id}}/history', true);
+        req.send();
+    })()" >
     {{> navbar}}
     <section class="hero is-primary">
       <div class="hero-body has-text-centered">
@@ -63,125 +75,8 @@
                   <span class="tag is-warning is-medium">#{{player.data.global_rank}} Overall</span>
                 {{/if}}
               </h2>
-              {{#if player.data.recent_games}}
-                <h2>Recent Results</h2>
-                <div class="table-container">
-                  <table>
-                    <tr>
-                      <th>Date</th>
-                      <th>Rating</th>
-                      <th>Floor</th>
-                      <th>Opponent</th>
-                      <th>Opp. Character</th>
-                      <th>Opp. rating</th>
-                      <th>Expected wins</th>
-                      <th>Result</th>
-                    </tr>
-                    {{#each player.data.recent_games}}
-                      <tr>
-                        <td>{{this.timestamp}}</td>
-                        {{#if ../player.cheater_status}}
-                          <td><span class="cheater">Cheater</span></td>
-                        {{else}}
-                          <td>{{this.own_rating_value}} ±{{this.own_rating_deviation}}</td>
-                        {{/if}}
-                        <td>{{this.floor}}</td>
-                        <td>{{>player_link
-                                    name=this.opponent_name 
-                                    id=this.opponent_id char=this.opponent_character_short
-                                    vip_status=this.opponent_vip
-                                    cheater_status=this.opponent_cheater
-                                    }}
-                        </td>
-                        <td>{{this.opponent_character}}</td>
-                        <td>
-                          {{#if this.opponent_cheater}}
-                            <span class="cheater">Cheater</span>
-                          {{else}}
-                            {{this.opponent_rating_value}} ±{{this.opponent_rating_deviation}}
-                        </td>
-              {{/if}}
-              <td>
-                {{#if this.opponent_cheater}}
-                  <span class="cheater">Cheater</span>
-                {{else}}
-                  {{#if ../player.cheater_status}}
-                    <span class="cheater">Cheater</span>
-                  {{else}}
-                    <span title="{{this.expected_outcome_min}}–{{this.expected_outcome_max}}%">
-                    {{#if this.expected_outcome}}
-                      {{this.expected_outcome}}%
-                    {{/if}}
-                    {{this.expected_outcome_evaluation}}
-                    </span>
-                  {{/if}}
-                {{/if}}
-              </td>
-              <td><span title="{{this.result_percent}}%">{{this.result_wins}} - {{this.result_losses}}</span></td>
-              </tr>
-              {{/each}}
-              </table>
-            </div>
-            {{/if}}
-            {{#if player.data.history}}
-              <h2>Match History</h2>
-              <div class="table-container">
-                <table>
-                  <tr>
-                    <th>Date</th>
-                    <th>Rating</th>
-                    <th>Floor</th>
-                    <th>Opponent</th>
-                    <th>Opp. Character</th>
-                    <th>Opp. rating</th>
-                    <th>Expected wins</th>
-                    <th>Result</th>
-                  </tr>
-                  {{#each player.data.history}}
-                    <tr>
-                      <td>{{this.timestamp}}</td>
-                      {{#if ../player.cheater_status}}
-                        <td><span class="cheater">Cheater</span></td>
-                      {{else}}
-                        <td>{{this.own_rating_value}} ±{{this.own_rating_deviation}}</td>
-                      {{/if}}
-                      <td>{{this.floor}}</td>
-                      <td>{{>player_link
-                                    name=this.opponent_name 
-                                    id=this.opponent_id char=this.opponent_character_short
-                                    vip_status=this.opponent_vip
-                                    }}
-                      </td>
-                      <td>{{this.opponent_character}}</td>
-                      <td>
-                        {{#if this.opponent_cheater}}
-                          <span class="cheater">Cheater</span>
-                        {{else}}
-                          {{this.opponent_rating_value}} ±{{this.opponent_rating_deviation}}
-                      </td>
-            {{/if}}
-            <td>
-              {{#if this.opponent_cheater}}
-                <span class="cheater">Cheater</span>
-              {{else}}
-                {{#if ../player.cheater_status}}
-                  <span class="cheater">Cheater</span>
-                {{else}}
-                  <span title="{{this.expected_outcome_min}}–{{this.expected_outcome_max}}%">
-                  {{#if this.expected_outcome}}
-                    {{this.expected_outcome}}%
-                  {{/if}}
-                  {{this.expected_outcome_evaluation}}
-                  </span>
-                {{/if}}
-              {{/if}}
-            </td>
-            <td><span title="{{this.result_percent}}%">{{this.result_wins}} - {{this.result_losses}}</span></td>
-            </tr>
-            {{/each}}
-            </table>
-          </div>
-          {{/if}}
+
+              <div id="history"></div>
           {{#if player.data.matchups}}
             <h2>Matchups</h2>
             <div class="table-container">

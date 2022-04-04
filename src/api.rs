@@ -334,18 +334,18 @@ pub async fn top_char_inner(conn: &RatingsDbConn, char_id: i64) -> Vec<RankingPl
 pub struct PlayerData {
     name: String,
     other_names: Option<Vec<String>>,
-    characters: Vec<PlayerCharacterData>,
+    characters: Vec<PlayerCharData>,
 }
 
 #[derive(Serialize)]
-pub struct PlayerDataChar {
+pub struct PlayerAndCharData {
     id: String,
     name: String,
     vip_status: Option<String>,
     cheater_status: Option<String>,
     other_names: Option<Vec<String>>,
     other_characters: Vec<OtherPlayerCharacter>,
-    data: PlayerCharacterData,
+    data: PlayerCharData,
 }
 
 #[derive(Serialize)]
@@ -358,7 +358,7 @@ struct OtherPlayerCharacter {
 }
 
 #[derive(Serialize)]
-struct PlayerCharacterData {
+struct PlayerCharData {
     character_name: String,
     rating_value: f64,
     rating_deviation: f64,
@@ -366,9 +366,14 @@ struct PlayerCharacterData {
     character_rank: Option<i32>,
     win_rate: f64,
     game_count: i32,
+    matchups: Vec<PlayerMatchup>,
+}
+
+#[derive(Serialize)]
+pub struct PlayerCharHistory {
+    cheater_status: Option<String>,
     history: Vec<PlayerSet>,
     recent_games: Vec<PlayerSet>,
-    matchups: Vec<PlayerMatchup>,
 }
 
 const MATCHUP_MIN_GAMES: f64 = 250.0;
@@ -460,14 +465,13 @@ pub async fn get_player_highest_rated_character(conn: &RatingsDbConn, id: i64) -
     .await
 }
 
-pub async fn get_player_data_char(
+pub async fn get_player_history_char(
     conn: &RatingsDbConn,
     id: i64,
     char_id: i64,
     game_count: i64,
     group_games: bool,
-    skip_games: bool,
-) -> Option<PlayerDataChar> {
+) -> Option<PlayerCharHistory> {
     conn.run(move |conn| {
         if conn
             .query_row(
@@ -489,66 +493,11 @@ pub async fn get_player_data_char(
                 )
                 .unwrap();
             info!(
-                "Loading data for {} ({})",
+                "Loading history for {} ({})",
                 name,
                 website::CHAR_NAMES[char_id as usize].0
             );
-            let other_names = {
-                let mut stmt = conn
-                    .prepare("SELECT name FROM player_names WHERE id=?")
-                    .unwrap();
-                let mut rows = stmt.query(params![id]).unwrap();
-                let mut other_names = Vec::new();
-                while let Some(row) = rows.next().unwrap() {
-                    let other_name: String = row.get(0).unwrap();
-                    if other_name != name && !other_names.contains(&other_name) {
-                        other_names.push(other_name);
-                    }
-                }
-
-                other_names
-            };
-
-            let other_characters = {
-                let mut stmt = conn
-                    .prepare(
-                        "SELECT
-                        char_id, wins, losses, value, deviation
-                        FROM player_ratings
-                        WHERE id=?",
-                    )
-                    .unwrap();
-
-                let mut other_characters = Vec::new();
-
-                let mut rows = stmt.query(params![id]).unwrap();
-
-                while let Some(row) = rows.next().unwrap() {
-                    let char_id: usize = row.get(0).unwrap();
-                    let game_count: i32 =
-                        row.get::<_, i32>(1).unwrap() + row.get::<_, i32>(2).unwrap();
-                    let rating: GlickoRating = Glicko2Rating {
-                        value: row.get(3).unwrap(),
-                        deviation: row.get(4).unwrap(),
-                        volatility: 0.0,
-                    }
-                    .into();
-
-                    let character_name = website::CHAR_NAMES[char_id].1.to_owned();
-                    let character_shortname = website::CHAR_NAMES[char_id].0.to_owned();
-                    other_characters.push(OtherPlayerCharacter {
-                        character_name,
-                        character_shortname,
-                        game_count,
-                        rating_value: rating.value.round(),
-                        rating_deviation: (rating.deviation * 2.0).round(),
-                    });
-                }
-
-                other_characters
-            };
-
-            let character_data = {
+            let player_char_history = {
                 let (wins, losses, value, deviation, global_rank, character_rank) = conn
                     .query_row(
                         "SELECT wins, losses, value, deviation, global_rank, character_rank
@@ -576,7 +525,7 @@ pub async fn get_player_data_char(
                 {
                     let character_name = website::CHAR_NAMES[char_id as usize].1.to_owned();
 
-                    let history = if !skip_games {
+                    let history = {
                         let mut stmt = conn
                             .prepare(
                                 "SELECT
@@ -751,11 +700,9 @@ pub async fn get_player_data_char(
                         }
 
                         history
-                    } else {
-                        Vec::new()
                     };
 
-                    let recent_games = if !skip_games {
+                    let recent_games = {
                         let mut stmt = conn
                             .prepare(
                                 "SELECT
@@ -941,8 +888,6 @@ pub async fn get_player_data_char(
                         }
 
                         recent_games
-                    } else {
-                        Vec::new()
                     };
 
                     let matchups = {
@@ -986,14 +931,182 @@ pub async fn get_player_data_char(
                         matchups
                     };
 
-                    PlayerCharacterData {
+                    PlayerCharHistory {
+                        cheater_status,
+                        history,
+                        recent_games,
+                    }
+                }
+            };
+
+            Some(player_char_history)
+        } else {
+            None
+        }
+    })
+    .await
+}
+
+pub async fn get_player_data_char(
+    conn: &RatingsDbConn,
+    id: i64,
+    char_id: i64,
+) -> Option<PlayerAndCharData> {
+    conn.run(move |conn| {
+        if conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM players WHERE id=?)",
+                params![id],
+                |r| r.get(0),
+            )
+            .unwrap()
+        {
+            let (name, vip_status, cheater_status): (String, Option<String>, Option<String>) = conn
+                .query_row(
+                    "SELECT name, vip_status, cheater_status FROM players 
+                        LEFT JOIN vip_status ON vip_status.id = players.id
+                        LEFT JOIN cheater_status ON cheater_status.id = players.id
+                           WHERE players.id=?
+                           ",
+                    params![id],
+                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+                )
+                .unwrap();
+            info!(
+                "Loading data for {} ({})",
+                name,
+                website::CHAR_NAMES[char_id as usize].0
+            );
+            let other_names = {
+                let mut stmt = conn
+                    .prepare("SELECT name FROM player_names WHERE id=?")
+                    .unwrap();
+                let mut rows = stmt.query(params![id]).unwrap();
+                let mut other_names = Vec::new();
+                while let Some(row) = rows.next().unwrap() {
+                    let other_name: String = row.get(0).unwrap();
+                    if other_name != name && !other_names.contains(&other_name) {
+                        other_names.push(other_name);
+                    }
+                }
+
+                other_names
+            };
+
+            let other_characters = {
+                let mut stmt = conn
+                    .prepare(
+                        "SELECT
+                        char_id, wins, losses, value, deviation
+                        FROM player_ratings
+                        WHERE id=?",
+                    )
+                    .unwrap();
+
+                let mut other_characters = Vec::new();
+
+                let mut rows = stmt.query(params![id]).unwrap();
+
+                while let Some(row) = rows.next().unwrap() {
+                    let char_id: usize = row.get(0).unwrap();
+                    let game_count: i32 =
+                        row.get::<_, i32>(1).unwrap() + row.get::<_, i32>(2).unwrap();
+                    let rating: GlickoRating = Glicko2Rating {
+                        value: row.get(3).unwrap(),
+                        deviation: row.get(4).unwrap(),
+                        volatility: 0.0,
+                    }
+                    .into();
+
+                    let character_name = website::CHAR_NAMES[char_id].1.to_owned();
+                    let character_shortname = website::CHAR_NAMES[char_id].0.to_owned();
+                    other_characters.push(OtherPlayerCharacter {
+                        character_name,
+                        character_shortname,
+                        game_count,
+                        rating_value: rating.value.round(),
+                        rating_deviation: (rating.deviation * 2.0).round(),
+                    });
+                }
+
+                other_characters
+            };
+
+            let character_data = {
+                let (wins, losses, value, deviation, global_rank, character_rank) = conn
+                    .query_row(
+                        "SELECT wins, losses, value, deviation, global_rank, character_rank
+                        FROM player_ratings
+                        LEFT JOIN ranking_global ON
+                            ranking_global.id = player_ratings.id AND
+                            ranking_global.char_id = player_ratings.char_id
+                        LEFT JOIN ranking_character ON
+                            ranking_character.id = player_ratings.id AND
+                            ranking_character.char_id = player_ratings.char_id
+                        WHERE player_ratings.id=? AND player_ratings.char_id=?",
+                        params![id, char_id],
+                        |row| {
+                            Ok((
+                                row.get::<_, i32>(0).unwrap(),
+                                row.get::<_, i32>(1).unwrap(),
+                                row.get::<_, f64>(2).unwrap(),
+                                row.get::<_, f64>(3).unwrap(),
+                                row.get::<_, Option<i32>>(4).unwrap(),
+                                row.get::<_, Option<i32>>(5).unwrap(),
+                            ))
+                        },
+                    )
+                    .unwrap();
+                {
+                    let character_name = website::CHAR_NAMES[char_id as usize].1.to_owned();
+
+                    let matchups = {
+                        let mut stmt = conn
+                            .prepare(
+                                "SELECT
+                                    opp_char_id,
+                                    wins_real,
+                                    wins_adjusted,
+                                    losses_real,
+                                    losses_adjusted
+                                FROM player_matchups
+                                WHERE id = ?
+                                    AND char_id = ?
+                                ORDER BY wins_real DESC",
+                            )
+                            .unwrap();
+
+                        let mut rows = stmt.query(params![id, char_id]).unwrap();
+                        let mut matchups = Vec::<PlayerMatchup>::new();
+                        while let Some(row) = rows.next().unwrap() {
+                            let opp_char_id: usize = row.get(0).unwrap();
+                            let wins_real: f64 = row.get(1).unwrap();
+                            let wins_adjusted: f64 = row.get(2).unwrap();
+                            let losses_real: f64 = row.get(3).unwrap();
+                            let losses_adjusted: f64 = row.get(4).unwrap();
+                            matchups.push(PlayerMatchup {
+                                character: website::CHAR_NAMES[opp_char_id].1.to_owned(),
+                                game_count: (wins_real + losses_real) as i32,
+                                win_rate_real: (wins_real / (wins_real + losses_real) * 100.0)
+                                    .round(),
+                                win_rate_adjusted: (wins_adjusted
+                                    / (wins_adjusted + losses_adjusted)
+                                    * 100.0)
+                                    .round(),
+                            });
+                        }
+
+                        matchups.sort_by_key(|m| -(m.win_rate_adjusted as i32));
+
+                        matchups
+                    };
+
+                    PlayerCharData {
                         character_name,
                         game_count: wins + losses,
                         win_rate: wins as f64 / (wins + losses) as f64,
                         rating_value: (value * 173.7178 + 1500.0).round(),
                         rating_deviation: (deviation * 173.7178 * 2.0).round(),
-                        history,
-                        recent_games,
                         matchups,
                         character_rank,
                         global_rank,
@@ -1001,7 +1114,7 @@ pub async fn get_player_data_char(
                 }
             };
 
-            Some(PlayerDataChar {
+            Some(PlayerAndCharData {
                 id: format!("{:X}", id),
                 name,
                 vip_status,

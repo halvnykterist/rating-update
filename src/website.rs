@@ -1,5 +1,4 @@
-use crate::{api, rater};
-use chrono::Utc;
+use crate::api;
 use rocket::{
     fs::NamedFile,
     http::{hyper::header::CACHE_CONTROL, Header},
@@ -52,6 +51,7 @@ pub async fn run() {
                 player_distribution,
                 player,
                 player_char,
+                player_char_history,
                 search,
                 about,
                 stats,
@@ -93,7 +93,9 @@ async fn about(conn: RatingsDbConn) -> Cached<Template> {
     struct Context {
         all_characters: &'static [(&'static str, &'static str)],
     }
-    let context = Context { all_characters: CHAR_NAMES };
+    let context = Context {
+        all_characters: CHAR_NAMES,
+    };
 
     Cached::new(Template::render("about", &context), 999)
 }
@@ -109,7 +111,7 @@ async fn stats(conn: RatingsDbConn) -> Cached<Template> {
     }
     let context = Context {
         stats: api::stats_inner(&conn).await,
-        all_characters: CHAR_NAMES
+        all_characters: CHAR_NAMES,
     };
 
     Cached::new(Template::render("stats", &context), 999)
@@ -129,7 +131,7 @@ async fn supporters(conn: RatingsDbConn) -> Cached<Template> {
             "supporters",
             &Context {
                 players: api::get_supporters(&conn).await,
-                all_characters: CHAR_NAMES
+                all_characters: CHAR_NAMES,
             },
         ),
         999,
@@ -147,7 +149,10 @@ async fn top_all(conn: RatingsDbConn) -> Cached<Template> {
     }
 
     let players = api::top_all_inner(&conn).await;
-    let context = Context { players, all_characters: CHAR_NAMES };
+    let context = Context {
+        players,
+        all_characters: CHAR_NAMES,
+    };
 
     Cached::new(Template::render("top_100", &context), 999)
 }
@@ -205,7 +210,7 @@ async fn matchups(conn: RatingsDbConn) -> Cached<Template> {
         matchups_global,
         matchups_high_rated,
         matchups_versus,
-        all_characters: CHAR_NAMES
+        all_characters: CHAR_NAMES,
     };
 
     Cached::new(Template::render("matchups", &context), 999)
@@ -245,7 +250,7 @@ async fn character_popularity(conn: RatingsDbConn) -> Cached<Template> {
         fraud_stats,
         fraud_stats_higher_rated,
         fraud_stats_highest_rated,
-        all_characters: CHAR_NAMES
+        all_characters: CHAR_NAMES,
     };
 
     Cached::new(Template::render("character_popularity", &context), 999)
@@ -271,7 +276,11 @@ async fn player_distribution(conn: RatingsDbConn) -> Cached<Template> {
         api::player_floors_distribution(&conn),
         api::player_ratings_distribution(&conn),
     );
-    let context = Context { floors, ratings, all_characters: CHAR_NAMES };
+    let context = Context {
+        floors,
+        ratings,
+        all_characters: CHAR_NAMES,
+    };
 
     Cached::new(Template::render("player_distribution", &context), 999)
 }
@@ -287,43 +296,65 @@ async fn player(conn: RatingsDbConn, player_id: &str) -> Option<Redirect> {
         Some(Redirect::to(uri!(player_char(
             player_id = player_id,
             char_id = char_short,
-            history = Option::<i64>::None,
-            group_games = Option::<bool>::None,
-            skip_games = Option::<bool>::None,
         ))))
     } else {
         None
     }
 }
+#[get("/player/<player_id>/<char_id>/history?<game_count>&<group_games>")]
+async fn player_char_history(
+    conn: RatingsDbConn,
+    player_id: &str,
+    char_id: &str,
+    game_count: Option<i64>,
+    group_games: Option<bool>,
+) -> Option<Cached<Template>> {
+    api::add_hit(&conn, format!("player/{}/{}/history", player_id, char_id)).await;
 
-#[get("/player/<player_id>/<char_id>?<history>&<group_games>&<skip_games>")]
+    let id = i64::from_str_radix(player_id, 16).unwrap();
+    let char_id = CHAR_NAMES.iter().position(|(c, _)| *c == char_id)? as i64;
+    let game_count = game_count.unwrap_or(200);
+    let group_games = group_games.unwrap_or(true);
+
+    if let Some(history) =
+        api::get_player_history_char(&conn, id, char_id, game_count, group_games).await
+    {
+        Some(Cached::new(
+            Template::render("player_char_history", &history),
+            999,
+        ))
+    } else {
+        None
+    }
+}
+
+#[get("/player/<player_id>/<char_id>")]
 async fn player_char(
     conn: RatingsDbConn,
     player_id: &str,
     char_id: &str,
-    history: Option<i64>,
-    group_games: Option<bool>,
-    skip_games: Option<bool>,
 ) -> Option<Cached<Template>> {
     api::add_hit(&conn, format!("player/{}/{}", player_id, char_id)).await;
 
     let id = i64::from_str_radix(player_id, 16).unwrap();
-    let game_count = history.unwrap_or(200);
-    let group_games = group_games.unwrap_or(true);
-    let skip_games = skip_games.unwrap_or(false);
 
-    let char_id = CHAR_NAMES.iter().position(|(c, _)| *c == char_id)? as i64;
+    let char_id_i64 = CHAR_NAMES.iter().position(|(c, _)| *c == char_id)? as i64;
 
     #[derive(Serialize)]
     struct Context {
-        player: api::PlayerDataChar,
+        player_id: String,
+        char_id: String,
+        player: api::PlayerAndCharData,
         all_characters: &'static [(&'static str, &'static str)],
     }
 
-    if let Some(player) =
-        api::get_player_data_char(&conn, id, char_id, game_count, group_games, skip_games).await
-    {
-        let context = Context { player, all_characters: CHAR_NAMES };
+    if let Some(player) = api::get_player_data_char(&conn, id, char_id_i64).await {
+        let context = Context {
+            player_id: player_id.to_owned(),
+            char_id: char_id.to_owned(),
+            player,
+            all_characters: CHAR_NAMES,
+        };
         Some(Cached::new(Template::render("player_char", &context), 999))
     } else {
         None
@@ -347,7 +378,7 @@ async fn search(conn: RatingsDbConn, name: String) -> Template {
         &Context {
             players,
             search_string: name,
-            all_characters: CHAR_NAMES
+            all_characters: CHAR_NAMES,
         },
     )
 }
