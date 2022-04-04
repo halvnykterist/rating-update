@@ -15,8 +15,10 @@ document.addEventListener('DOMContentLoaded', () => {
   var currentPage = window.location || window.document.location;
   if ($charTabs.length > 0) {
     $charTabs.forEach ( el => {
+      console.log(el.children[0].href)
+      console.log(currentPage.href)
       if ( currentPage.href == el.children[0].href ) {
-        el.classList.toggle('is-active');
+        el.children[0].classList.toggle('is-active');
       }
     });
   }
