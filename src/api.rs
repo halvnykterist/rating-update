@@ -481,8 +481,8 @@ pub async fn get_player_history_char(
             )
             .unwrap()
         {
-            let (name, vip_status, cheater_status): (String, Option<String>, Option<String>) = conn
-                .query_row(
+            let (name, _vip_status, cheater_status): (String, Option<String>, Option<String>) =
+                conn.query_row(
                     "SELECT name, vip_status, cheater_status FROM players 
                         LEFT JOIN vip_status ON vip_status.id = players.id
                         LEFT JOIN cheater_status ON cheater_status.id = players.id
@@ -498,33 +498,16 @@ pub async fn get_player_history_char(
                 website::CHAR_NAMES[char_id as usize].0
             );
             let player_char_history = {
-                let (wins, losses, value, deviation, global_rank, character_rank) = conn
+                let (value, deviation) = conn
                     .query_row(
-                        "SELECT wins, losses, value, deviation, global_rank, character_rank
+                        "SELECT value, deviation
                         FROM player_ratings
-                        LEFT JOIN ranking_global ON
-                            ranking_global.id = player_ratings.id AND
-                            ranking_global.char_id = player_ratings.char_id
-                        LEFT JOIN ranking_character ON
-                            ranking_character.id = player_ratings.id AND
-                            ranking_character.char_id = player_ratings.char_id
                         WHERE player_ratings.id=? AND player_ratings.char_id=?",
                         params![id, char_id],
-                        |row| {
-                            Ok((
-                                row.get::<_, i32>(0).unwrap(),
-                                row.get::<_, i32>(1).unwrap(),
-                                row.get::<_, f64>(2).unwrap(),
-                                row.get::<_, f64>(3).unwrap(),
-                                row.get::<_, Option<i32>>(4).unwrap(),
-                                row.get::<_, Option<i32>>(5).unwrap(),
-                            ))
-                        },
+                        |row| Ok((row.get::<_, f64>(0).unwrap(), row.get::<_, f64>(1).unwrap())),
                     )
                     .unwrap();
                 {
-                    let character_name = website::CHAR_NAMES[char_id as usize].1.to_owned();
-
                     let history = {
                         let mut stmt = conn
                             .prepare(
@@ -888,47 +871,6 @@ pub async fn get_player_history_char(
                         }
 
                         recent_games
-                    };
-
-                    let matchups = {
-                        let mut stmt = conn
-                            .prepare(
-                                "SELECT
-                                    opp_char_id,
-                                    wins_real,
-                                    wins_adjusted,
-                                    losses_real,
-                                    losses_adjusted
-                                FROM player_matchups
-                                WHERE id = ?
-                                    AND char_id = ?
-                                ORDER BY wins_real DESC",
-                            )
-                            .unwrap();
-
-                        let mut rows = stmt.query(params![id, char_id]).unwrap();
-                        let mut matchups = Vec::<PlayerMatchup>::new();
-                        while let Some(row) = rows.next().unwrap() {
-                            let opp_char_id: usize = row.get(0).unwrap();
-                            let wins_real: f64 = row.get(1).unwrap();
-                            let wins_adjusted: f64 = row.get(2).unwrap();
-                            let losses_real: f64 = row.get(3).unwrap();
-                            let losses_adjusted: f64 = row.get(4).unwrap();
-                            matchups.push(PlayerMatchup {
-                                character: website::CHAR_NAMES[opp_char_id].1.to_owned(),
-                                game_count: (wins_real + losses_real) as i32,
-                                win_rate_real: (wins_real / (wins_real + losses_real) * 100.0)
-                                    .round(),
-                                win_rate_adjusted: (wins_adjusted
-                                    / (wins_adjusted + losses_adjusted)
-                                    * 100.0)
-                                    .round(),
-                            });
-                        }
-
-                        matchups.sort_by_key(|m| -(m.win_rate_adjusted as i32));
-
-                        matchups
                     };
 
                     PlayerCharHistory {
