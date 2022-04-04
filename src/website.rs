@@ -321,7 +321,7 @@ async fn player_char_history(
     {
         Some(Cached::new(
             Template::render("player_char_history", &history),
-            999,
+            60,
         ))
     } else {
         None
