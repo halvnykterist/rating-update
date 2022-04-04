@@ -466,6 +466,7 @@ pub async fn get_player_data_char(
     char_id: i64,
     game_count: i64,
     group_games: bool,
+    skip_games: bool,
 ) -> Option<PlayerDataChar> {
     conn.run(move |conn| {
         if conn
@@ -575,7 +576,7 @@ pub async fn get_player_data_char(
                 {
                     let character_name = website::CHAR_NAMES[char_id as usize].1.to_owned();
 
-                    let history = {
+                    let history = if !skip_games {
                         let mut stmt = conn
                             .prepare(
                                 "SELECT
@@ -750,9 +751,11 @@ pub async fn get_player_data_char(
                         }
 
                         history
+                    } else {
+                        Vec::new()
                     };
 
-                    let recent_games = {
+                    let recent_games = if !skip_games {
                         let mut stmt = conn
                             .prepare(
                                 "SELECT
@@ -938,6 +941,8 @@ pub async fn get_player_data_char(
                         }
 
                         recent_games
+                    } else {
+                        Vec::new()
                     };
 
                     let matchups = {
