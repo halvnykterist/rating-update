@@ -14,6 +14,16 @@ CREATE TABLE games (
 CREATE INDEX games_char_a ON games(char_a);
 CREATE INDEX games_char_b ON games(char_b);
 
+-- Indices for speeding up player character match history lookup
+CREATE INDEX games_id_char_a ON games (
+	id_a,
+	char_a
+);
+CREATE INDEX games_id_char_b ON games (
+	id_b,
+	char_b
+);
+
 CREATE TABLE game_ratings (
     timestamp INTEGER NOT NULL,
     id_a INTEGER NOT NULL,

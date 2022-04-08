@@ -317,7 +317,7 @@ async fn player_char_history(
     let group_games = group_games.unwrap_or(true);
 
     if let Some(history) =
-        api::get_player_history_char(&conn, id, char_id, game_count, group_games).await
+        api::get_player_char_history(&conn, id, char_id, game_count, group_games).await
     {
         Some(Cached::new(
             Template::render("player_char_history", &history),
@@ -344,7 +344,7 @@ async fn player_char(
     struct Context {
         player_id: String,
         char_id: String,
-        player: api::PlayerAndCharData,
+        player: api::PlayerDataChar,
         all_characters: &'static [(&'static str, &'static str)],
     }
 

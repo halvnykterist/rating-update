@@ -1,16 +1,11 @@
 #![feature(proc_macro_hygiene, decl_macro)]
 
-#[macro_use]
-extern crate rocket;
-#[macro_use]
-extern crate log;
 use simplelog::*;
 use std::{fs::File, ops::Deref};
 use tokio::try_join;
 
-mod api;
-mod rater;
-mod website;
+
+use rating_update::{rater, website};
 
 fn init_logging() {
     if cfg!(debug_assertions) {
@@ -70,7 +65,10 @@ async fn main() {
             println!("Unrecognized argument: {}", x);
         }
         None => {
-            try_join!(tokio::spawn(website::run()), tokio::spawn(rater::run())).unwrap();
+            if let Err(err) = try_join!(async { tokio::spawn(website::run()).await?; Ok(()) }, rater::run()) {
+                eprintln!("{:?}", err);
+                std::process::exit(1);
+            }
         }
     }
 }

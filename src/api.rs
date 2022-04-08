@@ -2,12 +2,14 @@ use chrono::{Duration, NaiveDateTime, Utc};
 use fxhash::FxHashMap;
 use glicko2::{Glicko2Rating, GlickoRating};
 use rocket::serde::{json::Json, Serialize};
-use rusqlite::{named_params, params, OptionalExtension};
+use rusqlite::{named_params, params, Connection, OptionalExtension};
 
 use crate::{
     rater::{self, RatedPlayer},
     website::{self, RatingsDbConn},
 };
+
+type Result<T> = std::result::Result<T, anyhow::Error>;
 
 #[derive(Serialize)]
 pub struct Stats {
@@ -172,7 +174,7 @@ pub async fn top_all_inner(conn: &RatingsDbConn) -> Vec<RankingPlayer> {
         let mut stmt = c
             .prepare(
                 "SELECT player_ratings.id as id, char_id, wins, losses, value, deviation, volatility, name, vip_status, cheater_status
-                 FROM ranking_global 
+                 FROM ranking_global
                  NATURAL JOIN player_ratings
                  NATURAL JOIN players
                  LEFT JOIN vip_status ON vip_status.id = player_ratings.id
@@ -238,7 +240,7 @@ pub async fn search_inner(
         let mut stmt = c
             .prepare(
                 "SELECT * FROM
-                    player_names 
+                    player_names
                     NATURAL JOIN player_ratings
                     LEFT JOIN vip_status ON vip_status.id = player_names.id
                     LEFT JOIN cheater_status ON cheater_status.id = player_names.id
@@ -297,7 +299,7 @@ pub async fn top_char_inner(conn: &RatingsDbConn, char_id: i64) -> Vec<RankingPl
         let mut stmt = c
             .prepare(
                 "SELECT player_ratings.id as id, char_id, wins, losses, value, deviation, volatility, name, vip_status, cheater_status
-                 FROM ranking_character 
+                 FROM ranking_character
                  NATURAL JOIN player_ratings
                  NATURAL JOIN players
                  LEFT JOIN vip_status ON vip_status.id = player_ratings.id
@@ -334,18 +336,18 @@ pub async fn top_char_inner(conn: &RatingsDbConn, char_id: i64) -> Vec<RankingPl
 pub struct PlayerData {
     name: String,
     other_names: Option<Vec<String>>,
-    characters: Vec<PlayerCharData>,
+    characters: Vec<PlayerCharacterData>,
 }
 
 #[derive(Serialize)]
-pub struct PlayerAndCharData {
+pub struct PlayerDataChar {
     id: String,
     name: String,
     vip_status: Option<String>,
     cheater_status: Option<String>,
     other_names: Option<Vec<String>>,
     other_characters: Vec<OtherPlayerCharacter>,
-    data: PlayerCharData,
+    data: PlayerCharacterData,
 }
 
 #[derive(Serialize)]
@@ -358,7 +360,7 @@ struct OtherPlayerCharacter {
 }
 
 #[derive(Serialize)]
-struct PlayerCharData {
+struct PlayerCharacterData {
     character_name: String,
     rating_value: f64,
     rating_deviation: f64,
@@ -370,8 +372,7 @@ struct PlayerCharData {
 }
 
 #[derive(Serialize)]
-pub struct PlayerCharHistory {
-    cheater_status: Option<String>,
+pub struct PlayerCharacterHistory {
     history: Vec<PlayerSet>,
     recent_games: Vec<PlayerSet>,
 }
@@ -452,8 +453,8 @@ pub async fn get_player_highest_rated_character(conn: &RatingsDbConn, id: i64) -
     conn.run(move |conn| {
         conn.query_row(
             "SELECT char_id
-        FROM player_ratings 
-        WHERE id=? 
+        FROM player_ratings
+        WHERE id=?
         ORDER BY value - 3.0  * deviation DESC
         LIMIT 1",
             params![id],
@@ -465,230 +466,133 @@ pub async fn get_player_highest_rated_character(conn: &RatingsDbConn, id: i64) -
     .await
 }
 
-pub async fn get_player_history_char(
+pub async fn get_player_char_history(
     conn: &RatingsDbConn,
     id: i64,
     char_id: i64,
     game_count: i64,
     group_games: bool,
-) -> Option<PlayerCharHistory> {
+) -> Option<PlayerCharacterHistory> {
     conn.run(move |conn| {
-        if conn
+        let (_wins, _losses, value, deviation, _global_rank, _character_rank) = conn
             .query_row(
-                "SELECT EXISTS(SELECT 1 FROM players WHERE id=?)",
-                params![id],
-                |r| r.get(0),
+                "SELECT wins, losses, value, deviation, global_rank, character_rank
+                FROM player_ratings
+                LEFT JOIN ranking_global ON
+                    ranking_global.id = player_ratings.id AND
+                    ranking_global.char_id = player_ratings.char_id
+                LEFT JOIN ranking_character ON
+                    ranking_character.id = player_ratings.id AND
+                    ranking_character.char_id = player_ratings.char_id
+                WHERE player_ratings.id=? AND player_ratings.char_id=?",
+                params![id, char_id],
+                |row| {
+                    Ok((
+                        row.get::<_, i32>(0).unwrap(),
+                        row.get::<_, i32>(1).unwrap(),
+                        row.get::<_, f64>(2).unwrap(),
+                        row.get::<_, f64>(3).unwrap(),
+                        row.get::<_, Option<i32>>(4).unwrap(),
+                        row.get::<_, Option<i32>>(5).unwrap(),
+                    ))
+                },
             )
-            .unwrap()
-        {
-            let (name, _vip_status, cheater_status): (String, Option<String>, Option<String>) =
-                conn.query_row(
-                    "SELECT name, vip_status, cheater_status FROM players 
-                        LEFT JOIN vip_status ON vip_status.id = players.id
-                        LEFT JOIN cheater_status ON cheater_status.id = players.id
-                           WHERE players.id=?
-                           ",
-                    params![id],
-                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            .unwrap();
+
+        let history = {
+            let mut stmt = conn
+                .prepare_cached(
+                    "SELECT
+                            timestamp,
+                            value_a AS own_value,
+                            deviation_a AS own_deviation,
+                            game_floor,
+                            name_b AS opponent_name,
+                            id_b AS opponent_id,
+                            char_b AS opponent_character,
+                            value_b AS opponent_value,
+                            deviation_b AS opponent_deviation,
+                            winner,
+                            vip_status,
+                            cheater_status
+                        FROM games NATURAL JOIN game_ratings
+                        LEFT JOIN vip_status ON vip_status.id = games.id_b
+                        LEFT JOIN cheater_status ON cheater_status.id = games.id_b
+                        WHERE games.id_a= :id AND games.char_a = :char_id
+
+                        UNION
+
+                        SELECT
+                            timestamp,
+                            value_b AS own_value,
+                            deviation_b AS own_deviation,
+                            game_floor,
+                            name_a AS opponent_name,
+                            id_a AS opponent_id,
+                            char_a AS opponent_character,
+                            value_a AS opponent_value,
+                            deviation_a AS opponent_deviation,
+                            winner + 2  as winner,
+                            vip_status,
+                            cheater_status
+                        FROM games NATURAL JOIN game_ratings
+                        LEFT JOIN vip_status ON vip_status.id = games.id_a
+                        LEFT JOIN cheater_status ON cheater_status.id = games.id_a
+                        WHERE games.id_b = :id AND games.char_b = :char_id
+
+                        ORDER BY timestamp DESC LIMIT :game_count",
                 )
                 .unwrap();
-            info!(
-                "Loading history for {} ({})",
-                name,
-                website::CHAR_NAMES[char_id as usize].0
-            );
-            let player_char_history = {
-                let (value, deviation) = conn
-                    .query_row(
-                        "SELECT value, deviation
-                        FROM player_ratings
-                        WHERE player_ratings.id=? AND player_ratings.char_id=?",
-                        params![id, char_id],
-                        |row| Ok((row.get::<_, f64>(0).unwrap(), row.get::<_, f64>(1).unwrap())),
-                    )
-                    .unwrap();
-                {
-                    let history = {
-                        let mut stmt = conn
-                            .prepare(
-                                "SELECT
-                                    timestamp,
-                                    value_a AS own_value,
-                                    deviation_a AS own_deviation,
-                                    game_floor,
-                                    name_b AS opponent_name,
-                                    id_b AS opponent_id,
-                                    char_b AS opponent_character,
-                                    value_b AS opponent_value,
-                                    deviation_b AS opponent_deviation,
-                                    winner,
-                                    vip_status,
-                                    cheater_status
-                                FROM games NATURAL JOIN game_ratings
-                                LEFT JOIN vip_status ON vip_status.id = games.id_b
-                                LEFT JOIN cheater_status ON cheater_status.id = games.id_b
-                                WHERE games.id_a= :id AND games.char_a = :char_id
-                            
-                                UNION
 
-                                SELECT
-                                    timestamp,
-                                    value_b AS own_value,
-                                    deviation_b AS own_deviation,
-                                    game_floor,
-                                    name_a AS opponent_name,
-                                    id_a AS opponent_id,
-                                    char_a AS opponent_character,
-                                    value_a AS opponent_value,
-                                    deviation_a AS opponent_deviation,
-                                    winner + 2  as winner,
-                                    vip_status,
-                                    cheater_status
-                                FROM games NATURAL JOIN game_ratings
-                                LEFT JOIN vip_status ON vip_status.id = games.id_a
-                                LEFT JOIN cheater_status ON cheater_status.id = games.id_a
-                                WHERE games.id_b = :id AND games.char_b = :char_id
+            let mut rows = stmt
+                .query(named_params! {
+                    ":id" : id,
+                    ":char_id": char_id,
+                    ":game_count":game_count,
+                })
+                .unwrap();
+            let mut history = Vec::<PlayerSet>::new();
+            while let Some(row) = rows.next().unwrap() {
+                let timestamp: i64 = row.get("timestamp").unwrap();
+                let own_value: f64 = row.get("own_value").unwrap();
+                let own_deviation: f64 = row.get("own_deviation").unwrap();
+                let floor: i64 = row.get("game_floor").unwrap();
+                let opponent_name: String = row.get("opponent_name").unwrap();
+                let opponent_id: i64 = row.get("opponent_id").unwrap();
+                let opponent_character: i64 = row.get("opponent_character").unwrap();
+                let opponent_value: f64 = row.get("opponent_value").unwrap();
+                let opponent_deviation: f64 = row.get("opponent_deviation").unwrap();
+                let winner: i64 = row.get("winner").unwrap();
+                let opponent_vip: Option<String> = row.get("vip_status").unwrap();
+                let opponent_cheater: Option<String> = row.get("cheater_status").unwrap();
 
-                                ORDER BY timestamp DESC LIMIT :game_count",
-                            )
-                            .unwrap();
+                merge_set(
+                    &mut history,
+                    UnmergedPlayerSet {
+                        timestamp,
+                        floor,
+                        own_value,
+                        own_deviation,
+                        opponent_name,
+                        opponent_id,
+                        opponent_character,
+                        winner,
+                        opponent_vip,
+                        opponent_cheater,
+                        opponent_value,
+                        opponent_deviation,
+                    },
+                    group_games,
+                );
+            }
 
-                        let mut rows = stmt
-                            .query(named_params! {
-                                ":id" : id,
-                                ":char_id": char_id,
-                                ":game_count":game_count,
-                            })
-                            .unwrap();
-                        let mut history = Vec::<PlayerSet>::new();
-                        while let Some(row) = rows.next().unwrap() {
-                            let timestamp: i64 = row.get("timestamp").unwrap();
-                            let own_value: f64 = row.get("own_value").unwrap();
-                            let own_deviation: f64 = row.get("own_deviation").unwrap();
-                            let floor: i64 = row.get("game_floor").unwrap();
-                            let opponent_name: String = row.get("opponent_name").unwrap();
-                            let opponent_id: i64 = row.get("opponent_id").unwrap();
-                            let opponent_character: i64 = row.get("opponent_character").unwrap();
-                            let opponent_value: f64 = row.get("opponent_value").unwrap();
-                            let opponent_deviation: f64 = row.get("opponent_deviation").unwrap();
-                            let winner: i64 = row.get("winner").unwrap();
-                            let opponent_vip: Option<String> = row.get("vip_status").unwrap();
-                            let opponent_cheater: Option<String> =
-                                row.get("cheater_status").unwrap();
+            history
+        };
 
-                            let own_rating: GlickoRating = Glicko2Rating {
-                                value: own_value,
-                                deviation: own_deviation,
-                                volatility: 0.0,
-                            }
-                            .into();
-
-                            let opponent_rating: GlickoRating = Glicko2Rating {
-                                value: opponent_value,
-                                deviation: opponent_deviation,
-                                volatility: 0.0,
-                            }
-                            .into();
-
-                            let (
-                                expected_outcome_min,
-                                expected_outcome,
-                                expected_outcome_max,
-                                expected_outcome_evaluation,
-                            ) = get_expected_outcomes(
-                                own_value,
-                                own_deviation,
-                                opponent_value,
-                                opponent_deviation,
-                            );
-
-                            if let Some(set) = history.last_mut().filter(|set| {
-                                set.opponent_id == format!("{:X}", opponent_id)
-                                    && set.opponent_character
-                                        == website::CHAR_NAMES[opponent_character as usize].1
-                                    && group_games
-                            }) {
-                                set.timestamp = format!(
-                                    "{}",
-                                    NaiveDateTime::from_timestamp(timestamp, 0)
-                                        .format("%Y-%m-%d %H:%M")
-                                );
-                                set.own_rating_value = own_rating.value.round();
-                                set.own_rating_deviation = (own_rating.deviation * 2.0).round();
-                                set.opponent_rating_value = opponent_rating.value.round();
-                                set.opponent_rating_deviation =
-                                    (opponent_rating.deviation * 2.0).round();
-
-                                set.expected_outcome = expected_outcome;
-                                set.expected_outcome_evaluation = expected_outcome_evaluation;
-                                set.expected_outcome_min = expected_outcome_min;
-                                set.expected_outcome_max = set.expected_outcome_max;
-
-                                match winner {
-                                    1 | 4 => set.result_wins += 1,
-                                    2 | 3 => set.result_losses += 1,
-                                    _ => panic!("Bad winner"),
-                                }
-
-                                set.result_percent = ((set.result_wins as f64
-                                    / (set.result_wins + set.result_losses) as f64)
-                                    * 100.0)
-                                    .round();
-                            } else {
-                                history.push(PlayerSet {
-                                    timestamp: format!(
-                                        "{}",
-                                        NaiveDateTime::from_timestamp(timestamp, 0)
-                                            .format("%Y-%m-%d %H:%M")
-                                    ),
-                                    own_rating_value: own_rating.value.round(),
-                                    own_rating_deviation: (own_rating.deviation * 2.0).round(),
-                                    floor: match floor {
-                                        99 => format!("Celestial"),
-                                        n => format!("Floor {}", n),
-                                    },
-                                    opponent_name: opponent_name,
-                                    opponent_vip,
-                                    opponent_cheater,
-                                    opponent_id: format!("{:X}", opponent_id),
-                                    opponent_character: website::CHAR_NAMES
-                                        [opponent_character as usize]
-                                        .1
-                                        .to_owned(),
-                                    opponent_character_short: website::CHAR_NAMES
-                                        [opponent_character as usize]
-                                        .0
-                                        .to_owned(),
-                                    opponent_rating_value: opponent_rating.value.round(),
-                                    opponent_rating_deviation: (opponent_rating.deviation * 2.0)
-                                        .round(),
-                                    expected_outcome,
-                                    expected_outcome_evaluation,
-                                    expected_outcome_min,
-                                    expected_outcome_max,
-                                    result_wins: match winner {
-                                        1 | 4 => 1,
-                                        _ => 0,
-                                    },
-                                    result_losses: match winner {
-                                        2 | 3 => 1,
-                                        _ => 0,
-                                    },
-                                    result_percent: match winner {
-                                        1 | 4 => 100.0,
-                                        _ => 0.0,
-                                    },
-                                });
-                            }
-                        }
-
-                        history
-                    };
-
-                    let recent_games = {
-                        let mut stmt = conn
-                            .prepare(
-                                "SELECT
+        let recent_games = {
+            let mut stmt = conn
+                .prepare_cached(
+                    "SELECT
                             games.timestamp AS timestamp,
                             game_floor,
                             name_b AS opponent_name,
@@ -697,16 +601,16 @@ pub async fn get_player_history_char(
                             winner,
                             vip_status,
                             cheater_status
-                        FROM games LEFT JOIN game_ratings 
-                        ON games.id_a = game_ratings.id_a 
-                            AND games.id_b = game_ratings.id_b 
+                        FROM games LEFT JOIN game_ratings
+                        ON games.id_a = game_ratings.id_a
+                            AND games.id_b = game_ratings.id_b
                             AND games.timestamp = game_ratings.timestamp
                         LEFT JOIN vip_status ON vip_status.id = games.id_b
                         LEFT JOIN cheater_status ON cheater_status.id = games.id_b
-                        WHERE games.id_a= :id 
-                            AND games.char_a = :char_id 
+                        WHERE games.id_a= :id
+                            AND games.char_a = :char_id
                             AND game_ratings.id_a IS NULL
-                    
+
                         UNION
 
                         SELECT
@@ -718,173 +622,73 @@ pub async fn get_player_history_char(
                             winner + 2  as winner,
                             vip_status,
                             cheater_status
-                        FROM games LEFT JOIN game_ratings 
-                        ON games.id_a = game_ratings.id_a 
-                            AND games.id_b = game_ratings.id_b 
+                        FROM games LEFT JOIN game_ratings
+                        ON games.id_a = game_ratings.id_a
+                            AND games.id_b = game_ratings.id_b
                             AND games.timestamp = game_ratings.timestamp
                         LEFT JOIN vip_status ON vip_status.id = games.id_a
                         LEFT JOIN cheater_status ON cheater_status.id = games.id_a
-                        WHERE games.id_b= :id 
-                            AND games.char_b = :char_id 
+                        WHERE games.id_b= :id
+                            AND games.char_b = :char_id
                             AND game_ratings.id_a IS NULL
 
                         ORDER BY games.timestamp DESC",
-                            )
-                            .unwrap();
+                )
+                .unwrap();
 
-                        let mut rows = stmt
-                            .query(named_params! {":id" : id, ":char_id": char_id})
-                            .unwrap();
-                        let mut recent_games = Vec::<PlayerSet>::new();
-                        while let Some(row) = rows.next().unwrap() {
-                            let timestamp: i64 = row.get("timestamp").unwrap();
-                            let floor: i64 = row.get("game_floor").unwrap();
-                            let opponent_name: String = row.get("opponent_name").unwrap();
-                            let opponent_id: i64 = row.get("opponent_id").unwrap();
-                            let opponent_character: i64 = row.get("opponent_character").unwrap();
-                            let winner: i64 = row.get("winner").unwrap();
-                            let opponent_vip: Option<String> = row.get("vip_status").unwrap();
-                            let opponent_cheater: Option<String> =
-                                row.get("cheater_status").unwrap();
+            let mut rows = stmt
+                .query(named_params! {":id" : id, ":char_id": char_id})
+                .unwrap();
+            let mut recent_games = Vec::<PlayerSet>::new();
+            while let Some(row) = rows.next().unwrap() {
+                let timestamp: i64 = row.get("timestamp").unwrap();
+                let floor: i64 = row.get("game_floor").unwrap();
+                let opponent_name: String = row.get("opponent_name").unwrap();
+                let opponent_id: i64 = row.get("opponent_id").unwrap();
+                let opponent_character: i64 = row.get("opponent_character").unwrap();
+                let winner: i64 = row.get("winner").unwrap();
+                let opponent_vip: Option<String> = row.get("vip_status").unwrap();
+                let opponent_cheater: Option<String> = row.get("cheater_status").unwrap();
 
-                            let own_rating: GlickoRating = Glicko2Rating {
-                                value: value,
-                                deviation: deviation,
-                                volatility: 0.0,
-                            }
-                            .into();
+                let (opponent_value, opponent_deviation) = conn
+                    .query_row(
+                        "SELECT value, deviation
+                        FROM player_ratings
+                        WHERE id=? AND char_id=?",
+                        params![opponent_id, opponent_character],
+                        |row| Ok((row.get::<_, f64>(0).unwrap(), row.get::<_, f64>(1).unwrap())),
+                    )
+                    .optional()
+                    .unwrap()
+                    .unwrap_or((0.0, 350.0 / 173.7178));
 
-                            let (opponent_value, opponent_deviation) = conn
-                                .query_row(
-                                    "SELECT value, deviation
-                                FROM player_ratings
-                                WHERE id=? AND char_id=?",
-                                    params![opponent_id, opponent_character],
-                                    |row| {
-                                        Ok((
-                                            row.get::<_, f64>(0).unwrap(),
-                                            row.get::<_, f64>(1).unwrap(),
-                                        ))
-                                    },
-                                )
-                                .optional()
-                                .unwrap()
-                                .unwrap_or((0.0, 350.0 / 173.7178));
+                merge_set(
+                    &mut recent_games,
+                    UnmergedPlayerSet {
+                        timestamp,
+                        floor,
+                        own_value: value,
+                        own_deviation: deviation,
+                        opponent_name,
+                        opponent_id,
+                        opponent_character,
+                        winner,
+                        opponent_vip,
+                        opponent_cheater,
+                        opponent_value,
+                        opponent_deviation,
+                    },
+                    group_games,
+                );
+            }
 
-                            let opponent_rating: GlickoRating = Glicko2Rating {
-                                value: opponent_value,
-                                deviation: opponent_deviation,
-                                volatility: 0.0,
-                            }
-                            .into();
+            recent_games
+        };
 
-                            let (
-                                expected_outcome_min,
-                                expected_outcome,
-                                expected_outcome_max,
-                                expected_outcome_evaluation,
-                            ) = get_expected_outcomes(
-                                value,
-                                deviation,
-                                opponent_value,
-                                opponent_deviation,
-                            );
-
-                            if let Some(set) = recent_games.last_mut().filter(|set| {
-                                set.opponent_id == format!("{:X}", opponent_id)
-                                    && set.opponent_character
-                                        == website::CHAR_NAMES[opponent_character as usize].1
-                                    && group_games
-                            }) {
-                                set.timestamp = format!(
-                                    "{}",
-                                    NaiveDateTime::from_timestamp(timestamp, 0)
-                                        .format("%Y-%m-%d %H:%M")
-                                );
-                                set.own_rating_value = own_rating.value.round();
-                                set.own_rating_deviation = (own_rating.deviation * 2.0).round();
-                                set.opponent_rating_value = opponent_rating.value.round();
-                                set.opponent_rating_deviation =
-                                    (opponent_rating.deviation * 2.0).round();
-
-                                set.expected_outcome = expected_outcome;
-                                set.expected_outcome_evaluation = expected_outcome_evaluation;
-                                set.expected_outcome_min = expected_outcome_min;
-                                set.expected_outcome_max = set.expected_outcome_max;
-
-                                match winner {
-                                    1 | 4 => set.result_wins += 1,
-                                    2 | 3 => set.result_losses += 1,
-                                    _ => panic!("Bad winner"),
-                                }
-
-                                set.result_percent = ((set.result_wins as f64
-                                    / (set.result_wins + set.result_losses) as f64)
-                                    * 100.0)
-                                    .round();
-                            } else {
-                                recent_games.push(PlayerSet {
-                                    timestamp: format!(
-                                        "{}",
-                                        NaiveDateTime::from_timestamp(timestamp, 0)
-                                            .format("%Y-%m-%d %H:%M")
-                                    ),
-                                    own_rating_value: own_rating.value.round(),
-                                    own_rating_deviation: (own_rating.deviation * 2.0).round(),
-                                    floor: match floor {
-                                        99 => format!("Celestial"),
-                                        n => format!("Floor {}", n),
-                                    },
-                                    opponent_name: opponent_name,
-                                    opponent_vip,
-                                    opponent_cheater,
-                                    opponent_id: format!("{:X}", opponent_id),
-                                    opponent_character: website::CHAR_NAMES
-                                        [opponent_character as usize]
-                                        .1
-                                        .to_owned(),
-                                    opponent_character_short: website::CHAR_NAMES
-                                        [opponent_character as usize]
-                                        .0
-                                        .to_owned(),
-                                    opponent_rating_value: opponent_rating.value.round(),
-                                    opponent_rating_deviation: (opponent_rating.deviation * 2.0)
-                                        .round(),
-                                    expected_outcome,
-                                    expected_outcome_evaluation,
-                                    expected_outcome_min,
-                                    expected_outcome_max,
-                                    result_wins: match winner {
-                                        1 | 4 => 1,
-                                        _ => 0,
-                                    },
-                                    result_losses: match winner {
-                                        2 | 3 => 1,
-                                        _ => 0,
-                                    },
-                                    result_percent: match winner {
-                                        1 | 4 => 100.0,
-                                        _ => 0.0,
-                                    },
-                                });
-                            }
-                        }
-
-                        recent_games
-                    };
-
-                    PlayerCharHistory {
-                        cheater_status,
-                        history,
-                        recent_games,
-                    }
-                }
-            };
-
-            Some(player_char_history)
-        } else {
-            None
-        }
+        Some(PlayerCharacterHistory {
+            history,
+            recent_games,
+        })
     })
     .await
 }
@@ -893,7 +697,7 @@ pub async fn get_player_data_char(
     conn: &RatingsDbConn,
     id: i64,
     char_id: i64,
-) -> Option<PlayerAndCharData> {
+) -> Option<PlayerDataChar> {
     conn.run(move |conn| {
         if conn
             .query_row(
@@ -905,7 +709,7 @@ pub async fn get_player_data_char(
         {
             let (name, vip_status, cheater_status): (String, Option<String>, Option<String>) = conn
                 .query_row(
-                    "SELECT name, vip_status, cheater_status FROM players 
+                    "SELECT name, vip_status, cheater_status FROM players
                         LEFT JOIN vip_status ON vip_status.id = players.id
                         LEFT JOIN cheater_status ON cheater_status.id = players.id
                            WHERE players.id=?
@@ -919,154 +723,19 @@ pub async fn get_player_data_char(
                 name,
                 website::CHAR_NAMES[char_id as usize].0
             );
-            let other_names = {
-                let mut stmt = conn
-                    .prepare("SELECT name FROM player_names WHERE id=?")
-                    .unwrap();
-                let mut rows = stmt.query(params![id]).unwrap();
-                let mut other_names = Vec::new();
-                while let Some(row) = rows.next().unwrap() {
-                    let other_name: String = row.get(0).unwrap();
-                    if other_name != name && !other_names.contains(&other_name) {
-                        other_names.push(other_name);
-                    }
-                }
+            let other_names = get_player_other_names(conn, id, &name);
 
-                other_names
-            };
+            let other_characters = get_player_other_characters(conn, id);
 
-            let other_characters = {
-                let mut stmt = conn
-                    .prepare(
-                        "SELECT
-                        char_id, wins, losses, value, deviation
-                        FROM player_ratings
-                        WHERE id=?",
-                    )
-                    .unwrap();
+            let character_data = get_player_character_data(conn, id, char_id).unwrap()?;
 
-                let mut other_characters = Vec::new();
-
-                let mut rows = stmt.query(params![id]).unwrap();
-
-                while let Some(row) = rows.next().unwrap() {
-                    let char_id: usize = row.get(0).unwrap();
-                    let game_count: i32 =
-                        row.get::<_, i32>(1).unwrap() + row.get::<_, i32>(2).unwrap();
-                    let rating: GlickoRating = Glicko2Rating {
-                        value: row.get(3).unwrap(),
-                        deviation: row.get(4).unwrap(),
-                        volatility: 0.0,
-                    }
-                    .into();
-
-                    let character_name = website::CHAR_NAMES[char_id].1.to_owned();
-                    let character_shortname = website::CHAR_NAMES[char_id].0.to_owned();
-                    other_characters.push(OtherPlayerCharacter {
-                        character_name,
-                        character_shortname,
-                        game_count,
-                        rating_value: rating.value.round(),
-                        rating_deviation: (rating.deviation * 2.0).round(),
-                    });
-                }
-
-                other_characters
-            };
-
-            let character_data = {
-                let (wins, losses, value, deviation, global_rank, character_rank) = conn
-                    .query_row(
-                        "SELECT wins, losses, value, deviation, global_rank, character_rank
-                        FROM player_ratings
-                        LEFT JOIN ranking_global ON
-                            ranking_global.id = player_ratings.id AND
-                            ranking_global.char_id = player_ratings.char_id
-                        LEFT JOIN ranking_character ON
-                            ranking_character.id = player_ratings.id AND
-                            ranking_character.char_id = player_ratings.char_id
-                        WHERE player_ratings.id=? AND player_ratings.char_id=?",
-                        params![id, char_id],
-                        |row| {
-                            Ok((
-                                row.get::<_, i32>(0).unwrap(),
-                                row.get::<_, i32>(1).unwrap(),
-                                row.get::<_, f64>(2).unwrap(),
-                                row.get::<_, f64>(3).unwrap(),
-                                row.get::<_, Option<i32>>(4).unwrap(),
-                                row.get::<_, Option<i32>>(5).unwrap(),
-                            ))
-                        },
-                    )
-                    .unwrap();
-                {
-                    let character_name = website::CHAR_NAMES[char_id as usize].1.to_owned();
-
-                    let matchups = {
-                        let mut stmt = conn
-                            .prepare(
-                                "SELECT
-                                    opp_char_id,
-                                    wins_real,
-                                    wins_adjusted,
-                                    losses_real,
-                                    losses_adjusted
-                                FROM player_matchups
-                                WHERE id = ?
-                                    AND char_id = ?
-                                ORDER BY wins_real DESC",
-                            )
-                            .unwrap();
-
-                        let mut rows = stmt.query(params![id, char_id]).unwrap();
-                        let mut matchups = Vec::<PlayerMatchup>::new();
-                        while let Some(row) = rows.next().unwrap() {
-                            let opp_char_id: usize = row.get(0).unwrap();
-                            let wins_real: f64 = row.get(1).unwrap();
-                            let wins_adjusted: f64 = row.get(2).unwrap();
-                            let losses_real: f64 = row.get(3).unwrap();
-                            let losses_adjusted: f64 = row.get(4).unwrap();
-                            matchups.push(PlayerMatchup {
-                                character: website::CHAR_NAMES[opp_char_id].1.to_owned(),
-                                game_count: (wins_real + losses_real) as i32,
-                                win_rate_real: (wins_real / (wins_real + losses_real) * 100.0)
-                                    .round(),
-                                win_rate_adjusted: (wins_adjusted
-                                    / (wins_adjusted + losses_adjusted)
-                                    * 100.0)
-                                    .round(),
-                            });
-                        }
-
-                        matchups.sort_by_key(|m| -(m.win_rate_adjusted as i32));
-
-                        matchups
-                    };
-
-                    PlayerCharData {
-                        character_name,
-                        game_count: wins + losses,
-                        win_rate: wins as f64 / (wins + losses) as f64,
-                        rating_value: (value * 173.7178 + 1500.0).round(),
-                        rating_deviation: (deviation * 173.7178 * 2.0).round(),
-                        matchups,
-                        character_rank,
-                        global_rank,
-                    }
-                }
-            };
-
-            Some(PlayerAndCharData {
+            Some(PlayerDataChar {
                 id: format!("{:X}", id),
                 name,
                 vip_status,
                 cheater_status,
                 other_characters,
-                other_names: if other_names.is_empty() {
-                    None
-                } else {
-                    Some(other_names)
-                },
+                other_names,
                 data: character_data,
             })
         } else {
@@ -1074,6 +743,269 @@ pub async fn get_player_data_char(
         }
     })
     .await
+}
+
+fn get_player_other_names(conn: &Connection, id: i64, name: &str) -> Option<Vec<String>> {
+    let mut stmt = conn
+        .prepare_cached("SELECT name FROM player_names WHERE id=?")
+        .unwrap();
+    let mut rows = stmt.query(params![id]).unwrap();
+    let mut other_names = Vec::new();
+    while let Some(row) = rows.next().unwrap() {
+        let other_name: String = row.get(0).unwrap();
+        if other_name != name && !other_names.contains(&other_name) {
+            other_names.push(other_name);
+        }
+    }
+
+    if other_names.is_empty() {
+        None
+    } else {
+        Some(other_names)
+    }
+}
+
+fn get_player_other_characters(conn: &Connection, id: i64) -> Vec<OtherPlayerCharacter> {
+    let mut stmt = conn
+        .prepare_cached(
+            "SELECT
+            char_id, wins, losses, value, deviation
+            FROM player_ratings
+            WHERE id=?",
+        )
+        .unwrap();
+
+    let mut other_characters = Vec::new();
+
+    let mut rows = stmt.query(params![id]).unwrap();
+
+    while let Some(row) = rows.next().unwrap() {
+        let char_id: usize = row.get(0).unwrap();
+        let game_count: i32 = row.get::<_, i32>(1).unwrap() + row.get::<_, i32>(2).unwrap();
+        let rating: GlickoRating = Glicko2Rating {
+            value: row.get(3).unwrap(),
+            deviation: row.get(4).unwrap(),
+            volatility: 0.0,
+        }
+        .into();
+
+        let character_name = website::CHAR_NAMES[char_id].1.to_owned();
+        let character_shortname = website::CHAR_NAMES[char_id].0.to_owned();
+        other_characters.push(OtherPlayerCharacter {
+            character_name,
+            character_shortname,
+            game_count,
+            rating_value: rating.value.round(),
+            rating_deviation: (rating.deviation * 2.0).round(),
+        });
+    }
+
+    other_characters
+}
+
+fn get_player_character_data(
+    conn: &Connection,
+    id: i64,
+    char_id: i64,
+) -> Result<Option<PlayerCharacterData>> {
+    let (wins, losses, value, deviation, global_rank, character_rank) = match conn.query_row(
+        "SELECT wins, losses, value, deviation, global_rank, character_rank
+            FROM player_ratings
+            LEFT JOIN ranking_global ON
+                ranking_global.id = player_ratings.id AND
+                ranking_global.char_id = player_ratings.char_id
+            LEFT JOIN ranking_character ON
+                ranking_character.id = player_ratings.id AND
+                ranking_character.char_id = player_ratings.char_id
+            WHERE player_ratings.id=? AND player_ratings.char_id=?",
+        params![id, char_id],
+        |row| {
+            Ok((
+                row.get::<_, i32>(0).unwrap(),
+                row.get::<_, i32>(1).unwrap(),
+                row.get::<_, f64>(2).unwrap(),
+                row.get::<_, f64>(3).unwrap(),
+                row.get::<_, Option<i32>>(4).unwrap(),
+                row.get::<_, Option<i32>>(5).unwrap(),
+            ))
+        },
+    ) {
+        Ok(x) => x,
+        Err(rusqlite::Error::QueryReturnedNoRows) => return Ok(None),
+        Err(err) => return Err(err.into()),
+    };
+    {
+        let character_name = website::CHAR_NAMES[char_id as usize].1.to_owned();
+
+        let matchups = {
+            let mut stmt = conn
+                .prepare_cached(
+                    "SELECT
+                        opp_char_id,
+                        wins_real,
+                        wins_adjusted,
+                        losses_real,
+                        losses_adjusted
+                    FROM player_matchups
+                    WHERE id = ?
+                        AND char_id = ?
+                    ORDER BY wins_real DESC",
+                )
+                .unwrap();
+
+            let mut rows = stmt.query(params![id, char_id]).unwrap();
+            let mut matchups = Vec::<PlayerMatchup>::new();
+            while let Some(row) = rows.next().unwrap() {
+                let opp_char_id: usize = row.get(0).unwrap();
+                let wins_real: f64 = row.get(1).unwrap();
+                let wins_adjusted: f64 = row.get(2).unwrap();
+                let losses_real: f64 = row.get(3).unwrap();
+                let losses_adjusted: f64 = row.get(4).unwrap();
+                matchups.push(PlayerMatchup {
+                    character: website::CHAR_NAMES[opp_char_id].1.to_owned(),
+                    game_count: (wins_real + losses_real) as i32,
+                    win_rate_real: (wins_real / (wins_real + losses_real) * 100.0).round(),
+                    win_rate_adjusted: (wins_adjusted / (wins_adjusted + losses_adjusted) * 100.0)
+                        .round(),
+                });
+            }
+
+            matchups.sort_by_key(|m| -(m.win_rate_adjusted as i32));
+
+            matchups
+        };
+
+        Ok(Some(PlayerCharacterData {
+            character_name,
+            game_count: wins + losses,
+            win_rate: wins as f64 / (wins + losses) as f64,
+            rating_value: (value * 173.7178 + 1500.0).round(),
+            rating_deviation: (deviation * 173.7178 * 2.0).round(),
+            matchups,
+            character_rank,
+            global_rank,
+        }))
+    }
+}
+
+struct UnmergedPlayerSet {
+    timestamp: i64,
+    floor: i64,
+    own_value: f64,
+    own_deviation: f64,
+    opponent_name: String,
+    opponent_id: i64,
+    opponent_character: i64,
+    opponent_value: f64,
+    opponent_deviation: f64,
+    winner: i64,
+    opponent_vip: Option<String>,
+    opponent_cheater: Option<String>,
+}
+
+fn merge_set(sets: &mut Vec<PlayerSet>, set: UnmergedPlayerSet, group_games: bool) {
+    let UnmergedPlayerSet {
+        timestamp,
+        floor,
+        own_value,
+        own_deviation,
+        opponent_name,
+        opponent_id,
+        opponent_character,
+        winner,
+        opponent_vip,
+        opponent_cheater,
+        opponent_value,
+        opponent_deviation,
+    } = set;
+
+    let own_rating: GlickoRating = Glicko2Rating {
+        value: own_value,
+        deviation: own_deviation,
+        volatility: 0.0,
+    }
+    .into();
+
+    let opponent_rating: GlickoRating = Glicko2Rating {
+        value: opponent_value,
+        deviation: opponent_deviation,
+        volatility: 0.0,
+    }
+    .into();
+
+    let (expected_outcome_min, expected_outcome, expected_outcome_max, expected_outcome_evaluation) =
+        get_expected_outcomes(own_value, own_deviation, opponent_value, opponent_deviation);
+
+    if let Some(set) = sets.last_mut().filter(|set| {
+        set.opponent_id == format!("{:X}", opponent_id)
+            && set.opponent_character == website::CHAR_NAMES[opponent_character as usize].1
+            && group_games
+    }) {
+        set.timestamp = format!(
+            "{}",
+            NaiveDateTime::from_timestamp(timestamp, 0).format("%Y-%m-%d %H:%M")
+        );
+        set.own_rating_value = own_rating.value.round();
+        set.own_rating_deviation = (own_rating.deviation * 2.0).round();
+        set.opponent_rating_value = opponent_rating.value.round();
+        set.opponent_rating_deviation = (opponent_rating.deviation * 2.0).round();
+
+        set.expected_outcome = expected_outcome;
+        set.expected_outcome_evaluation = expected_outcome_evaluation;
+        set.expected_outcome_min = expected_outcome_min;
+        set.expected_outcome_max = set.expected_outcome_max;
+
+        match winner {
+            1 | 4 => set.result_wins += 1,
+            2 | 3 => set.result_losses += 1,
+            _ => panic!("Bad winner"),
+        }
+
+        set.result_percent =
+            ((set.result_wins as f64 / (set.result_wins + set.result_losses) as f64) * 100.0)
+                .round();
+    } else {
+        sets.push(PlayerSet {
+            timestamp: format!(
+                "{}",
+                NaiveDateTime::from_timestamp(timestamp, 0).format("%Y-%m-%d %H:%M")
+            ),
+            own_rating_value: own_rating.value.round(),
+            own_rating_deviation: (own_rating.deviation * 2.0).round(),
+            floor: match floor {
+                99 => format!("Celestial"),
+                n => format!("Floor {}", n),
+            },
+            opponent_name: opponent_name,
+            opponent_vip,
+            opponent_cheater,
+            opponent_id: format!("{:X}", opponent_id),
+            opponent_character: website::CHAR_NAMES[opponent_character as usize]
+                .1
+                .to_owned(),
+            opponent_character_short: website::CHAR_NAMES[opponent_character as usize]
+                .0
+                .to_owned(),
+            opponent_rating_value: opponent_rating.value.round(),
+            opponent_rating_deviation: (opponent_rating.deviation * 2.0).round(),
+            expected_outcome,
+            expected_outcome_evaluation,
+            expected_outcome_min,
+            expected_outcome_max,
+            result_wins: match winner {
+                1 | 4 => 1,
+                _ => 0,
+            },
+            result_losses: match winner {
+                2 | 3 => 1,
+                _ => 0,
+            },
+            result_percent: match winner {
+                1 | 4 => 100.0,
+                _ => 0.0,
+            },
+        });
+    }
 }
 
 #[derive(Serialize)]
@@ -1791,8 +1723,8 @@ pub async fn rating_experience(
                 .prepare(
                     "SELECT value_a, value_b
                     FROM game_ratings
-                    WHERE deviation_a < ? AND deviation_b < ? AND 
-                        ((value_a > ? AND value_a < ?) 
+                    WHERE deviation_a < ? AND deviation_b < ? AND
+                        ((value_a > ? AND value_a < ?)
                         OR
                         (value_b > ? AND value_b < ?))",
                 )
