@@ -18,7 +18,7 @@ pub const HIGH_RATING: f64 = (1800.0 - 1500.0) / 173.7178;
 pub const DB_NAME: &str = "ratings.sqlite";
 
 const CHAR_COUNT: usize = website::CHAR_NAMES.len();
-pub const POP_RATING_BRACKETS: usize = 11;
+pub const POP_RATING_BRACKETS: usize = 13;
 
 pub const RATING_PERIOD: i64 = 1 * 60 * 60;
 pub fn glicko_to_glicko2(r: f64) -> f64 {
