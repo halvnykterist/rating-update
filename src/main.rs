@@ -6,6 +6,7 @@ use tokio::try_join;
 
 use rating_update::{rater, website};
 
+
 fn init_logging() {
     if cfg!(debug_assertions) {
         CombinedLogger::init(vec![

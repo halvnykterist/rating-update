@@ -34,6 +34,8 @@ pub const CHAR_NAMES: &[(&str, &str)] = &[
     ("TE", "Testament"),
 ];
 
+pub const PLATFORM: &str = &"PC";
+
 pub async fn run() {
     rocket::build()
         .attach(RatingsDbConn::fairing())
@@ -91,9 +93,13 @@ async fn about(conn: RatingsDbConn) -> Cached<Template> {
 
     #[derive(Serialize)]
     struct Context {
+        platform: &'static str,
+        is_pc: bool,
         all_characters: &'static [(&'static str, &'static str)],
     }
     let context = Context {
+        platform: PLATFORM,
+        is_pc: PLATFORM == "PC",
         all_characters: CHAR_NAMES,
     };
 
@@ -106,10 +112,14 @@ async fn stats(conn: RatingsDbConn) -> Cached<Template> {
 
     #[derive(Serialize)]
     struct Context {
+        platform: &'static str,
+        is_pc: bool,
         stats: api::Stats,
         all_characters: &'static [(&'static str, &'static str)],
     }
     let context = Context {
+        platform: PLATFORM,
+        is_pc: PLATFORM == "PC",
         stats: api::stats_inner(&conn).await,
         all_characters: CHAR_NAMES,
     };
@@ -122,6 +132,8 @@ async fn supporters(conn: RatingsDbConn) -> Cached<Template> {
     api::add_hit(&conn, format!("supporters")).await;
     #[derive(Serialize)]
     struct Context {
+        platform: &'static str,
+        is_pc: bool,
         players: Vec<api::VipPlayer>,
         all_characters: &'static [(&'static str, &'static str)],
     }
@@ -130,6 +142,8 @@ async fn supporters(conn: RatingsDbConn) -> Cached<Template> {
         Template::render(
             "supporters",
             &Context {
+                platform: PLATFORM,
+                is_pc: PLATFORM == "PC",
                 players: api::get_supporters(&conn).await,
                 all_characters: CHAR_NAMES,
             },
@@ -144,12 +158,16 @@ async fn top_all(conn: RatingsDbConn) -> Cached<Template> {
 
     #[derive(Serialize)]
     struct Context {
+        platform: &'static str,
+        is_pc: bool,
         players: Vec<api::RankingPlayer>,
         all_characters: &'static [(&'static str, &'static str)],
     }
 
     let players = api::top_all_inner(&conn).await;
     let context = Context {
+        platform: PLATFORM,
+        is_pc: PLATFORM == "PC",
         players,
         all_characters: CHAR_NAMES,
     };
@@ -163,6 +181,8 @@ async fn top_char(conn: RatingsDbConn, character_short: &str) -> Option<Cached<T
 
     #[derive(Serialize)]
     struct Context {
+        platform: &'static str,
+        is_pc: bool,
         players: Vec<api::RankingPlayer>,
         character: &'static str,
         character_short: &'static str,
@@ -174,6 +194,8 @@ async fn top_char(conn: RatingsDbConn, character_short: &str) -> Option<Cached<T
 
         let players = api::top_char_inner(&conn, char_code as i64).await;
         let context = Context {
+            platform: PLATFORM,
+            is_pc: PLATFORM == "PC",
             players,
             character,
             character_short,
@@ -192,6 +214,8 @@ async fn matchups(conn: RatingsDbConn) -> Cached<Template> {
 
     #[derive(Serialize)]
     struct Context {
+        platform: &'static str,
+        is_pc: bool,
         character_shortnames: Vec<&'static str>,
         matchups_global: Vec<api::CharacterMatchups>,
         matchups_high_rated: Vec<api::CharacterMatchups>,
@@ -206,6 +230,8 @@ async fn matchups(conn: RatingsDbConn) -> Cached<Template> {
     );
 
     let context = Context {
+        platform: PLATFORM,
+        is_pc: PLATFORM == "PC",
         character_shortnames: CHAR_NAMES.iter().map(|c| c.0).collect(),
         matchups_global,
         matchups_high_rated,
@@ -222,6 +248,8 @@ async fn character_popularity(conn: RatingsDbConn) -> Cached<Template> {
 
     #[derive(Serialize)]
     struct Context {
+        platform: &'static str,
+        is_pc: bool,
         character_shortnames: Vec<&'static str>,
         global_character_popularity: Vec<f64>,
         rank_character_popularity: Vec<api::RankCharacterPopularities>,
@@ -244,6 +272,8 @@ async fn character_popularity(conn: RatingsDbConn) -> Cached<Template> {
     );
 
     let context = Context {
+        platform: PLATFORM,
+        is_pc: PLATFORM == "PC",
         character_shortnames: CHAR_NAMES.iter().map(|c| c.0).collect(),
         global_character_popularity,
         rank_character_popularity,
@@ -267,6 +297,8 @@ async fn player_distribution(conn: RatingsDbConn) -> Cached<Template> {
 
     #[derive(Serialize)]
     struct Context {
+        platform: &'static str,
+        is_pc: bool,
         floors: Vec<api::FloorPlayers>,
         ratings: Vec<api::RatingPlayers>,
         all_characters: &'static [(&'static str, &'static str)],
@@ -277,6 +309,8 @@ async fn player_distribution(conn: RatingsDbConn) -> Cached<Template> {
         api::player_ratings_distribution(&conn),
     );
     let context = Context {
+        platform: PLATFORM,
+        is_pc: PLATFORM == "PC",
         floors,
         ratings,
         all_characters: CHAR_NAMES,
@@ -342,6 +376,8 @@ async fn player_char(
 
     #[derive(Serialize)]
     struct Context {
+        platform: &'static str,
+        is_pc: bool,
         player_id: String,
         char_id: String,
         player: api::PlayerDataChar,
@@ -350,6 +386,8 @@ async fn player_char(
 
     if let Some(player) = api::get_player_data_char(&conn, id, char_id_i64).await {
         let context = Context {
+            platform: PLATFORM,
+            is_pc: PLATFORM == "PC",
             player_id: player_id.to_owned(),
             char_id: char_id.to_owned(),
             player,
@@ -366,6 +404,8 @@ async fn search(conn: RatingsDbConn, name: String) -> Template {
     api::add_hit(&conn, format!("search/{}", name)).await;
     #[derive(Serialize)]
     struct Context {
+        platform: &'static str,
+        is_pc: bool,
         search_string: String,
         players: Vec<api::SearchResultPlayer>,
         all_characters: &'static [(&'static str, &'static str)],
@@ -376,6 +416,8 @@ async fn search(conn: RatingsDbConn, name: String) -> Template {
     Template::render(
         "search_results",
         &Context {
+            platform: PLATFORM,
+            is_pc: PLATFORM == "PC",
             players,
             search_string: name,
             all_characters: CHAR_NAMES,
