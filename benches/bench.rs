@@ -5,10 +5,11 @@ fn load_player(c: &mut Criterion) {
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let http_client = reqwest::Client::new();
 
-    runtime.block_on(async { tokio::spawn(rating_update::website::run()); });
+    runtime.block_on(async {
+        tokio::spawn(rating_update::website::run());
+    });
 
     c.bench_function("load_player", |b| {
-
         // Find a number of players to run the benchmark on
         let players = {
             let db_connection = rusqlite::Connection::open(rating_update::rater::DB_NAME).unwrap();
@@ -27,17 +28,25 @@ fn load_player(c: &mut Criterion) {
         };
 
         b.to_async(&runtime).iter(|| async {
-
             let http_client = &http_client;
             futures::stream::iter(&players)
                 .map(|&(id, char_id)| async move {
-                    let response = http_client.get(format!("http://localhost/player/{:X}/{}", id, rating_update::website::CHAR_NAMES[char_id].0)).send().await.unwrap();
+                    let response = http_client
+                        .get(format!(
+                            "http://localhost/player/{:X}/{}",
+                            id,
+                            rating_update::website::CHAR_NAMES[char_id].0
+                        ))
+                        .send()
+                        .await
+                        .unwrap();
 
                     assert_eq!(response.status(), reqwest::StatusCode::OK);
                     response.bytes().await.unwrap();
                 })
                 .buffer_unordered(10)
-                .for_each(|()| async {}).await;
+                .for_each(|()| async {})
+                .await;
         });
     });
 }

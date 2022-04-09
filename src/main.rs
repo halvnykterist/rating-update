@@ -4,7 +4,6 @@ use simplelog::*;
 use std::{fs::File, ops::Deref};
 use tokio::try_join;
 
-
 use rating_update::{rater, website};
 
 fn init_logging() {
@@ -65,7 +64,13 @@ async fn main() {
             println!("Unrecognized argument: {}", x);
         }
         None => {
-            if let Err(err) = try_join!(async { tokio::spawn(website::run()).await?; Ok(()) }, rater::run()) {
+            if let Err(err) = try_join!(
+                async {
+                    tokio::spawn(website::run()).await?;
+                    Ok(())
+                },
+                rater::run()
+            ) {
                 eprintln!("{:?}", err);
                 std::process::exit(1);
             }

@@ -175,8 +175,12 @@ pub async fn run() -> Result<()> {
             Ok(())
         },
         async {
-            tokio::spawn(async { update_ratings_continuous().await.context("Inside `update_rating_continuous`") }).await?
-        }
+            tokio::spawn(
+                async {
+                    update_ratings_continuous()
+                    .await.context("Inside `update_rating_continuous`")
+                }).await?
+        },
     }?;
 
     Ok(())
@@ -982,7 +986,8 @@ pub fn update_rankings(conn: &mut Connection) -> Result<()> {
 
     tx.execute(
         "INSERT INTO ranking_global (global_rank, id, char_id)
-         SELECT ROW_NUMBER() OVER (ORDER BY value - 2.0 * deviation DESC) as global_rank, id, char_id
+         SELECT ROW_NUMBER()
+         OVER (ORDER BY value - 2.0 * deviation DESC) as global_rank, id, char_id
          FROM player_ratings
          WHERE deviation < ? AND (losses > 10 OR wins <= 200)
          ORDER BY value - 2.0 * deviation DESC
@@ -993,7 +998,8 @@ pub fn update_rankings(conn: &mut Connection) -> Result<()> {
     for c in 0..CHAR_COUNT {
         tx.execute(
             "INSERT INTO ranking_character (character_rank, id, char_id)
-             SELECT ROW_NUMBER() OVER (ORDER BY value - 2.0 * deviation DESC) as character_rank, id, char_id
+             SELECT ROW_NUMBER() 
+             OVER (ORDER BY value - 2.0 * deviation DESC) as character_rank, id, char_id
              FROM player_ratings
              WHERE deviation < ? AND char_id = ? AND (losses > 10 OR wins <= 200)
              ORDER BY value - 2.0 * deviation DESC
@@ -1021,12 +1027,18 @@ pub fn calc_fraud_index(conn: &mut Connection) -> Result<()> {
     {
         let mut stmt = tx
             .prepare(
-                "select char_id, count(*), avg(char_ratings.value - filtered_averages.avg_value)
+                "select 
+                    char_id, 
+                    count(*), 
+                    avg(char_ratings.value - filtered_averages.avg_value)
             from
                 (
                     select * from
                     (
-                        select id, avg(value) as avg_value, count(char_id) as char_count
+                        select 
+                            id, 
+                            avg(value) as avg_value, 
+                            count(char_id) as char_count
                         from player_ratings
                         where deviation < ? and wins + losses >= 100
                         group by id
@@ -1063,12 +1075,18 @@ pub fn calc_fraud_index(conn: &mut Connection) -> Result<()> {
 
         let mut stmt = tx
             .prepare(
-                "select char_id, count(*), avg(char_ratings.value - filtered_averages.avg_value)
+                "select 
+                    char_id, 
+                    count(*), 
+                    avg(char_ratings.value - filtered_averages.avg_value)
             from
                 (
                     select * from
                     (
-                        select id, avg(value) as avg_value, count(char_id) as char_count
+                        select 
+                            id, 
+                            avg(value) as avg_value, 
+                            count(char_id) as char_count
                         from player_ratings
                         where deviation < ? and wins + losses >= 100
                         group by id
@@ -1105,12 +1123,18 @@ pub fn calc_fraud_index(conn: &mut Connection) -> Result<()> {
 
         let mut stmt = tx
             .prepare(
-                "select char_id, count(*), avg(char_ratings.value - filtered_averages.avg_value)
+                "select 
+                    char_id, 
+                    count(*), 
+                    avg(char_ratings.value - filtered_averages.avg_value)
             from
                 (
                     select * from
                     (
-                        select id, avg(value) as avg_value, count(char_id) as char_count
+                        select
+                            id,
+                            avg(value) as avg_value, 
+                            count(char_id) as char_count
                         from player_ratings
                         where deviation < ? and wins + losses >= 100
                         group by id
@@ -1166,7 +1190,8 @@ pub fn calc_versus_matchups(conn: &mut Connection) -> Result<()> {
             "SELECT
             id_a, char_a, value_a, id_b, char_b, value_b, winner
             FROM games NATURAL JOIN game_ratings
-            WHERE value_a > ? AND deviation_a < ? AND value_b > ? AND deviation_b < ?;",
+            WHERE value_a > ? AND deviation_a < ? 
+            AND value_b > ? AND deviation_b < ?;",
         )?;
 
         let mut rows = stmt.query(params![
