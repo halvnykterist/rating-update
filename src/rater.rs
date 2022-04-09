@@ -1,3 +1,4 @@
+use anyhow::Context;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use fxhash::{FxHashMap, FxHashSet};
 use glicko2::{GameResult, Glicko2Rating};
@@ -8,7 +9,6 @@ use rusqlite::{params, Connection, Row, Transaction};
 use serde::Deserialize;
 use std::{fs::File, io::BufReader, sync::Mutex, time::Duration};
 use tokio::{time, try_join};
-use anyhow::Context;
 
 use crate::website;
 
@@ -194,11 +194,11 @@ async fn pull_continuous() {
     }
 }
 
-pub async fn update_ratings_continuous() -> Result<()>  {
+pub async fn update_ratings_continuous() -> Result<()> {
     let mut conn = Connection::open(DB_NAME)?;
 
-    let mut last_rating_timestamp: i64 = conn
-        .query_row("SELECT last_update FROM config", [], |r| r.get(0))?;
+    let mut last_rating_timestamp: i64 =
+        conn.query_row("SELECT last_update FROM config", [], |r| r.get(0))?;
     let mut last_statistics_update: i64 = last_rating_timestamp;
 
     if let Err(e) = calc_fraud_index(&mut conn) {
@@ -232,7 +232,6 @@ pub async fn update_ratings_continuous() -> Result<()>  {
             }
         }
     }
-
 }
 
 pub async fn update_once() {
@@ -276,6 +275,7 @@ async fn grab_games(conn: &mut Connection, pages: usize) -> Result<()> {
     info!("Grabbing replays");
     let (replays, errors) = ggst_api::get_replays(
         &ggst_api::Context::default(),
+        ggst_api::Platform::PC,
         pages,
         127,
         ggst_api::QueryParameters::default(),
@@ -838,10 +838,7 @@ fn update_ratings(conn: &mut Connection) -> i64 {
     next_timestamp
 }
 
-pub fn calc_character_popularity(
-    conn: &mut Connection,
-    last_timestamp: i64,
-) -> Result<()> {
+pub fn calc_character_popularity(conn: &mut Connection, last_timestamp: i64) -> Result<()> {
     let then = Utc::now();
     info!("Calculating character popularity stats..");
     let one_week_ago = last_timestamp - 60 * 60 * 24 * 7;
@@ -874,7 +871,6 @@ pub fn calc_character_popularity(
     tx.execute("DELETE FROM character_popularity_global", [])?;
     tx.execute("DELETE FROM character_popularity_rating", [])?;
 
-
     let global_game_count: f64 =
         tx.query_row("SELECT COUNT(*) FROM  temp.recent_games", params![], |r| {
             r.get(0)
@@ -882,7 +878,7 @@ pub fn calc_character_popularity(
 
     if global_game_count == 0.0 {
         info!("No new games have been recorded. Unable to calcualate character popularity");
-        return Ok(())
+        return Ok(());
     }
 
     for c in 0..CHAR_COUNT {
@@ -902,7 +898,6 @@ pub fn calc_character_popularity(
             params![c, char_count / global_game_count],
         )?;
     }
-
 
     for r in 0..POP_RATING_BRACKETS {
         let rating_min = if r > 0 {
