@@ -964,7 +964,7 @@ pub fn calc_character_popularity(conn: &mut Connection, last_timestamp: i64) -> 
 
             tx.execute(
                 "INSERT INTO character_popularity_rating VALUES(?, ?, ?)",
-                params![c, r, 2.0 * char_count / rating_game_count],
+                params![c, r, 2.0 * char_count / rating_game_count.max(1.0)],
             )?;
         }
     }
