@@ -178,7 +178,8 @@ pub async fn run() -> Result<()> {
             tokio::spawn(
                 async {
                     update_ratings_continuous()
-                    .await.context("Inside `update_rating_continuous`")
+                    .await
+                    .context("Inside `update_rating_continuous`")
                 }).await?
         },
     }?;
