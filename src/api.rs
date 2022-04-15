@@ -1245,11 +1245,11 @@ pub struct FloorPlayers {
 pub async fn player_floors_distribution(conn: &RatingsDbConn) -> Vec<FloorPlayers> {
     conn.run(move |conn| {
         let total_players: i64 = conn
-            .query_row("SELECT COUNT(*) FROM players", [], |r| r.get(0))
+            .query_row("SELECT SUM(player_count) FROM player_floor_distribution", [], |r| r.get(0))
             .unwrap();
 
         let total_games: i64 = conn
-            .query_row("SELECT COUNT(*) FROM games", [], |r| r.get(0))
+            .query_row("SELECT SUM(game_count) FROM player_floor_distribution", [], |r| r.get(0))
             .unwrap();
 
         let mut stmt = conn
