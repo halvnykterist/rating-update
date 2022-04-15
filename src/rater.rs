@@ -388,6 +388,8 @@ fn update_player_distribution(conn: &mut Connection) {
     let then = Utc::now();
     let tx = conn.transaction().unwrap();
 
+    let two_weeks_ago = then.timestamp() - RATING_PERIOD * 24 * 14;
+
     tx.execute("DELETE FROM player_floor_distribution", [])
         .unwrap();
     tx.execute("DELETE FROM player_rating_distribution", [])
@@ -403,8 +405,8 @@ fn update_player_distribution(conn: &mut Connection) {
             .unwrap();
         let game_count: i64 = tx
             .query_row(
-                "SELECT COUNT(*) FROM games WHERE game_floor = ?",
-                params![f],
+                "SELECT COUNT(*) FROM games WHERE game_floor = ? AND timestamp > ?",
+                params![f, two_weeks_ago],
                 |r| r.get(0),
             )
             .unwrap();
