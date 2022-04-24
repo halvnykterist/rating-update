@@ -549,7 +549,6 @@ dependencies = [
 [[package]]
 name = "ggst-api"
 version = "0.2.0"
-source = "git+https://github.com/halvnykterist/ggst-api-rs#08a59eee9ab83368003ccfcf7589ca891eced731"
 dependencies = [
  "bytes",
  "chrono",

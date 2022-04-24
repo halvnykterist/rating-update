@@ -167,6 +167,85 @@ pub async fn player_rating(
     }
 }
 
+#[get("/api/accuracy/<player>/<character_short>")]
+pub async fn player_rating_accuracy(
+    conn: RatingsDbConn,
+    player: &str,
+    character_short: &str,
+) -> Option<Json<Vec<f64>>> {
+    let id = i64::from_str_radix(&player, 16).unwrap();
+    if let Some(char_id) = website::CHAR_NAMES
+        .iter()
+        .position(|(c, _)| *c == character_short)
+    {
+        conn.run(move |conn| {
+            let mut buckets = vec![(0.0, 0.0); 21];
+
+            let mut stmt = conn
+                .prepare(
+                    "
+                SELECT
+                    value_a as own_value,
+                    value_b as opp_value,
+                    winner
+                FROM games NATURAL JOIN game_ratings
+                WHERE 
+                    games.id_a = :id 
+                    AND games.char_a = :char_id 
+                    AND game_ratings.deviation_a < 0.5
+                    AND game_ratings.deviation_b < 0.5
+
+                UNION
+
+                SELECT
+                    value_b as own_value,
+                    value_a as opp_value,
+                    winner + 2 as winner
+                FROM games NATURAL JOIN game_ratings
+                WHERE 
+                    games.id_b = :id 
+                    AND games.char_b = :char_id 
+                    AND game_ratings.deviation_a < 0.5 
+                    AND game_ratings.deviation_b < 0.5",
+                )
+                .unwrap();
+
+            let mut rows = stmt
+                .query(named_params! {
+                    ":id" : id,
+                    ":char_id": char_id,
+                })
+                .unwrap();
+
+            while let Some(row) = rows.next().unwrap() {
+                let own_value: f64 = row.get(0).unwrap();
+                let opp_value: f64 = row.get(1).unwrap();
+                let winner: i64 = row.get(2).unwrap();
+
+                let expected = own_value.exp() / (own_value.exp() + opp_value.exp());
+
+                let bucket = (expected.min(1.0).max(0.0) * 20.0).round() as usize;
+
+                match winner {
+                    1 | 4 => buckets[bucket].0 += 1.0,
+                    2 | 3 => buckets[bucket].1 += 1.0,
+                    _ => panic!("Bad winner"),
+                }
+            }
+
+            Some(Json(
+                buckets
+                    .iter()
+                    .map(|(wins, losses)| wins / (wins + losses))
+                    .collect(),
+            ))
+        })
+        .await
+    } else {
+        None
+    }
+}
+
 pub async fn top_all_inner(conn: &RatingsDbConn) -> Vec<RankingPlayer> {
     conn.run(|c| {
         let mut stmt = c
@@ -2001,7 +2080,7 @@ pub async fn outcomes(conn: RatingsDbConn) -> Json<Vec<f64>> {
                     "SELECT
                 value_a, value_b, winner
                 FROM games NATURAL JOIN game_ratings
-                WHERE deviation_a < ? AND deviation_b < ?;",
+                WHERE deviation_a < ? AND deviation_b < ?",
                 )
                 .unwrap();
 
