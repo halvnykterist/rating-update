@@ -19,7 +19,7 @@
         <a class="navbar-item" href="/player_distribution">Distribution</a>  
         <a class="navbar-item" href="/about">FAQ</a>
         <a class="navbar-item" href="/stats">Stats</a>
-        <a class="navbar-item" href="/supporters">Supporters</a>  
+        <a class="navbar-item" href="http://ratingupdate.info/supporters">Supporters</a>  
         <div class="navbar-item has-dropdown is-hoverable">
           <a class="navbar-link">
             Characters
@@ -76,6 +76,15 @@
             <span></span>
           </span>
         </a>
+        {{#if is_pc}}
+            <span class="navbar-item">
+            PC | <a href="http://console.ratingupdate.info">Console</a>
+            </span>
+        {{else}}
+            <span class="navbar-item">
+            <a href="http://pc.ratingupdate.info">PC</a> | Console
+            </span>
+        {{/if}}
     </div>
   </div>
 </nav>
