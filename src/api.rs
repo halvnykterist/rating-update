@@ -446,6 +446,7 @@ struct PlayerCharacterData {
     global_rank: Option<i32>,
     character_rank: Option<i32>,
     win_rate: f64,
+    adjusted_win_rate: f64,
     game_count: i32,
     matchups: Vec<PlayerMatchup>,
 }
@@ -916,6 +917,9 @@ fn get_player_character_data(
     {
         let character_name = website::CHAR_NAMES[char_id as usize].1.to_owned();
 
+        let mut total_wins_adjusted = 0.0;
+        let mut total_losses_adjusted = 0.0;
+
         let matchups = {
             let mut stmt = conn
                 .prepare_cached(
@@ -947,6 +951,9 @@ fn get_player_character_data(
                     win_rate_adjusted: (wins_adjusted / (wins_adjusted + losses_adjusted) * 100.0)
                         .round(),
                 });
+
+                total_wins_adjusted += wins_adjusted;
+                total_losses_adjusted += losses_adjusted;
             }
 
             matchups.sort_by_key(|m| -(m.win_rate_adjusted as i32));
@@ -957,7 +964,10 @@ fn get_player_character_data(
         Ok(Some(PlayerCharacterData {
             character_name,
             game_count: wins + losses,
-            win_rate: wins as f64 / (wins + losses) as f64,
+            win_rate: (100.0 * wins as f64 / (wins + losses) as f64).round(),
+            adjusted_win_rate: (100.0 * total_wins_adjusted
+                / (total_wins_adjusted + total_losses_adjusted))
+                .round(),
             rating_value: (value * 173.7178 + 1500.0).round(),
             rating_deviation: (deviation * 173.7178 * 2.0).round(),
             matchups,
@@ -1324,11 +1334,19 @@ pub struct FloorPlayers {
 pub async fn player_floors_distribution(conn: &RatingsDbConn) -> Vec<FloorPlayers> {
     conn.run(move |conn| {
         let total_players: i64 = conn
-            .query_row("SELECT SUM(player_count) FROM player_floor_distribution", [], |r| r.get(0))
+            .query_row(
+                "SELECT SUM(player_count) FROM player_floor_distribution",
+                [],
+                |r| r.get(0),
+            )
             .unwrap();
 
         let total_games: i64 = conn
-            .query_row("SELECT SUM(game_count) FROM player_floor_distribution", [], |r| r.get(0))
+            .query_row(
+                "SELECT SUM(game_count) FROM player_floor_distribution",
+                [],
+                |r| r.get(0),
+            )
             .unwrap();
 
         let mut stmt = conn

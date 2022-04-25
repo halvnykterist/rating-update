@@ -101,6 +101,16 @@
                     {{/if}}
                   </tr>
                 {{/each}}
+                  <tr>
+                      <td><b>Overall</b></td>
+                    <td><b>{{player.data.game_count}}</b></td>
+                    <td><b>{{player.data.win_rate}}%</b></td>
+                    {{#if player.data.adjusted_win_rate}}
+                        <td><b>{{player.data.adjusted_win_rate}}%</b></td>
+                    {{else}}
+                      <td>N/A</td>
+                    {{/if}}
+                  </tr>
               </table>
             </div>
           {{/if}}
