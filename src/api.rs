@@ -286,6 +286,81 @@ pub async fn top_all_inner(conn: &RatingsDbConn) -> Vec<RankingPlayer> {
 }
 
 #[derive(Serialize)]
+pub struct PlayerLookupPlayer {
+    id: String,
+    name: String,
+    characters: Vec<PlayerLookupCharacter>,
+}
+
+#[derive(Serialize)]
+pub struct PlayerLookupCharacter {
+    shortname: &'static str,
+    rating: i64,
+    deviation: i64,
+    game_count: i64,
+}
+
+#[get("/api/player_lookup?<name>")]
+pub async fn player_lookup(conn: RatingsDbConn, name: String) -> Json<Vec<PlayerLookupPlayer>> {
+    Json(
+        conn.run(move |conn| {
+            let players = {
+                let mut stmt = conn
+                    .prepare(
+                        "SELECT id, name 
+                    FROM player_names
+                    WHERE name LIKE ?
+                    ",
+                    )
+                    .unwrap();
+                let mut rows = stmt.query(params!(name)).unwrap();
+
+                let mut players = Vec::new();
+                while let Some(row) = rows.next().unwrap() {
+                    players.push((
+                        row.get::<_, i64>(0).unwrap(),
+                        row.get::<_, String>(1).unwrap(),
+                    ));
+                }
+
+                players
+            };
+
+            let mut r = Vec::new();
+            let mut stmt = conn
+                .prepare(
+                    "SELECT char_id, value, deviation, wins + losses as game_count
+                        FROM player_ratings
+                        WHERE id = ? ",
+                )
+                .unwrap();
+            for (id, name) in players {
+                let mut rows = stmt.query(params![id]).unwrap();
+
+                let mut characters = Vec::new();
+                while let Some(row) = rows.next().unwrap() {
+                    characters.push(PlayerLookupCharacter {
+                        shortname: website::CHAR_NAMES[row.get::<_, usize>(0).unwrap()].0,
+                        rating: (row.get::<_, f64>(1).unwrap() * 173.7178 + 1500.0).round() as i64,
+                        deviation: (row.get::<_, f64>(2).unwrap() * 173.7178).round() as i64,
+                        game_count: row.get(3).unwrap(),
+                    });
+                }
+
+                r.push(PlayerLookupPlayer {
+                    id: format!("{:X}", id),
+                    name,
+                    characters,
+                });
+            }
+
+            r
+        })
+        .await,
+    )
+}
+
+#[derive(Serialize)]
 pub struct SearchResultPlayer {
     name: String,
     vip_status: Option<String>,
