@@ -285,6 +285,36 @@ pub async fn top_all_inner(conn: &RatingsDbConn) -> Vec<RankingPlayer> {
     .await
 }
 
+#[get("/api/active_players")]
+pub async fn active_players(conn: RatingsDbConn) -> Json<Vec<i64>> {
+    Json(
+        conn.run(|conn| {
+            let now = Utc::now().timestamp();
+
+            let mut res = Vec::new();
+            for i in 0..14 {
+                let before = now - i * 24 * 60 * 60;
+                let after = now - (i + 1) * 24 * 60 * 60;
+
+                res.push(
+                    conn.query_row(
+                        "SELECT COUNT(id) FROM
+                        (SELECT id_a AS id FROM games WHERE timestamp > ? AND timestamp < ?
+                        UNION
+                        SELECT id_b AS id FROM games WHERE timestamp > ? AND timestamp < ?)",
+                        params![after, before, after, before],
+                        |r| r.get(0),
+                    )
+                    .unwrap(),
+                );
+            }
+
+            res
+        })
+        .await,
+    )
+}
+
 #[derive(Serialize)]
 pub struct PlayerLookupPlayer {
     id: String,
