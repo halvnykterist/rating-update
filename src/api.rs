@@ -372,7 +372,7 @@ pub async fn player_lookup(conn: RatingsDbConn, name: String) -> Json<Vec<Player
                     characters.push(PlayerLookupCharacter {
                         shortname: website::CHAR_NAMES[row.get::<_, usize>(0).unwrap()].0,
                         rating: (row.get::<_, f64>(1).unwrap() * 173.7178 + 1500.0).round() as i64,
-                        deviation: (row.get::<_, f64>(2).unwrap() * 173.7178).round() as i64,
+                        deviation: (row.get::<_, f64>(2).unwrap() * 173.7178 * 2.0).round() as i64,
                         game_count: row.get(3).unwrap(),
                     });
                 }
