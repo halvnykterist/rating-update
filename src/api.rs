@@ -1504,10 +1504,10 @@ pub async fn player_ratings_distribution(conn: &RatingsDbConn) -> Vec<RatingPlay
         let total_players: i64 = conn
             .query_row(
                 "
-        SELECT COUNT(*)
-        FROM player_ratings
-        WHERE deviation < ?",
-                params![rater::MAX_DEVIATION],
+        SELECT player_count_cum 
+        FROM player_rating_distribution
+        ORDER BY player_count_cum DESC",
+                [],
                 |r| r.get(0),
             )
             .unwrap();
