@@ -12,4 +12,4 @@ DELETE FROM player_rating_distribution;
 DELETE FROM player_floor_distribution;
 
 DELETE FROM config;
-INSERT INTO config VALUES(1635717600);
+INSERT INTO config VALUES(1635717600, 0);

@@ -14,6 +14,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "all_asserts"
+version = "2.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca77caf0ca1057c274cda103cda1363d892b7cad5f2e646afde4df0697bea100"
+
+[[package]]
 name = "ansi_term"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -703,12 +709,6 @@ dependencies = [
  "serde_json",
  "tokio",
 ]
-
-[[package]]
-name = "glicko2"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47c7363f4d5d9534d6049b1b4882e32d084bae29662c05527d809968738a04c1"
 
 [[package]]
 name = "glob"
@@ -1587,13 +1587,13 @@ dependencies = [
 name = "rating-update"
 version = "0.1.0"
 dependencies = [
+ "all_asserts",
  "anyhow",
  "chrono",
  "criterion",
  "futures",
  "fxhash",
  "ggst-api",
- "glicko2",
  "glob",
  "lazy_static",
  "log",

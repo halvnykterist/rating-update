@@ -1,89 +1,25 @@
-15 minutes: grab new replays
-    just push the games directly to the big list
-    also push to game_ratings? might need to create new players during this
-4 hours: rating period?
-    grab the games filtered by time period
-    update player ratings
-    update distributions, matchup charts
+daily rating history
+    change since 1 week ago?
 
-games
-    timestamp
-    player_a
-    player_b
-    player_a_name
-    player_b_name
-    character_a
-    character_b
-    outcome
+match history
+    sum rating change
+    full rating change set on hover?
 
-game_ratings
-    timestamp
-    player_a
-    player_b
-    player_a_rating
-    player_b_rating
-
-players
-    player_id
-    name
-
-player_rating
-    player_id
-    character_id
-    rating
-    
-names
-    player_id
-    name
-
-what to show:
-    top 100/character
-        this needs to be sourced from a table?
-        or we can just keep it in-memory, update when ratings update
-    player search
-        need to have a GET that returns a list of player IDs along with other info
-    player page
-        grab player info from players/names/player_rating
-        grab history from games/game_ratings
-    player distribution
-        floor distribution in memory?
-        rating distribution in memory?
-    character popularity
-        in-memory?
-    matchups
-        could be in-memory too
-    about
-    twitter
-
-pages
-    index
+top rating (at low deviation)
+    also date
+top rated / low dev opponent defeated
+    opp name
+    opp id
+    opp character
+    opp rating
+    opp dev
+    floor
+    date
 
 
 
-rated games (in groups of 4 hours or whatever)
-unrated games?
-    but we don' even get opponent rating for these
-    fuck
-
-
-immediately insert new games into rated games? no
-
-play history:
-    grab all games
-    match on rated_games
-    use options
-    heck
-    do I just turn them into sets on the JS side?
-
-
-
-
-recalc flag
-    truncate all tables other than games
-    set config last update to be the last of november
-
-fix names table on server to be virtual
-fix name of player matchups table on server
-add global and high rated matchups on server
-
-make player distribution tables
+stats:
+    total games
+    total players
+    games in the last day
+    different players in the last day

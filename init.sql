@@ -59,8 +59,30 @@ CREATE TABLE player_ratings (
     losses INTEGER NOT NULL,
     value REAL NOT NULL,
     deviation REAL NOT NULL,
-    volatility REAL NOT NULL,
+    last_decay INTEGER NOT NULL,
+
+    top_rating_value REAL,
+    top_rating_deviation REAL,
+    top_rating_timestamp INTEGER,
+
+    top_defeated_id INTEGER,
+    top_defeated_char_id INTEGER,
+    top_defeated_name TEXT,
+    top_defeated_value REAL,
+    top_defeated_deviation REAL,
+    top_defeated_floor INTEGER,
+    top_defeated_timestamp REAL,
+
     PRIMARY KEY(id, char_id)
+);
+
+CREATE TABLE daily_ratings (
+    id INTEGER NOT NULL,
+    char_id INTEGER NOT NULL,
+    timestamp INTEGER NOT NULL,
+    value REAL NOT NULL,
+    deviation REAL NOT NULL,
+    PRIMARY KEY(id, char_id, timestamp)
 );
 
 CREATE INDEX player_value ON player_ratings(value);
@@ -194,4 +216,4 @@ CREATE TABLE hits (
     PRIMARY KEY(page)
 );
 
-INSERT INTO config VALUES(1635717600);
+INSERT INTO config VALUES(1635717600, 0);

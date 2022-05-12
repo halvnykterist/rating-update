@@ -1,29 +1,29 @@
+use all_asserts::*;
 use anyhow::Context;
-use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use fxhash::{FxHashMap, FxHashSet};
-use glicko2::{GameResult, Glicko2Rating};
 use glob::glob;
 use lazy_static::lazy_static;
 use rocket::serde::json::serde_json;
-use rusqlite::{params, Connection, Row, Transaction};
+use rusqlite::{params, Connection, OptionalExtension, Row, Transaction};
 use serde::Deserialize;
 use std::{fs::File, io::BufReader, sync::Mutex, time::Duration};
 use tokio::{time, try_join};
 
-use crate::website;
+use crate::{glicko::Rating, website};
 
-const SYS_CONSTANT: f64 = 0.8;
-pub const MAX_DEVIATION: f64 = 75.0 / 173.7178;
-pub const HIGH_RATING: f64 = (1800.0 - 1500.0) / 173.7178;
+const DECAY_CONSTANT: f64 = 0.4;
+
+pub const LOW_DEVIATION: f64 = 75.0;
+pub const HIGH_RATING: f64 = 1800.0;
 pub const DB_NAME: &str = "ratings.sqlite";
 
 const CHAR_COUNT: usize = website::CHAR_NAMES.len();
 pub const POP_RATING_BRACKETS: usize = 13;
 
-pub const RATING_PERIOD: i64 = 1 * 60 * 60;
-pub fn glicko_to_glicko2(r: f64) -> f64 {
-    (r - 1500.0) / 173.7178
-}
+pub const RATING_PERIOD: i64 = 60;
+pub const RANKING_PERIOD: i64 = 1 * 60 * 60;
+pub const STATISTICS_PERIOD: i64 = 24 * 60 * 60;
 
 lazy_static! {
     pub static ref RUNTIME_DATA: Mutex<RuntimeData> = Mutex::new(RuntimeData {});
@@ -156,7 +156,7 @@ pub fn load_json_data(path: &str) -> Result<()> {
                                     },
                                 ),
                             },
-                        )
+                        );
                     }
                 }
             }
@@ -177,7 +177,7 @@ pub async fn run() -> Result<()> {
         async {
             tokio::spawn(
                 async {
-                    update_ratings_continuous()
+                    update_statistics_continuous()
                     .await
                     .context("Inside `update_rating_continuous`")
                 }).await?
@@ -199,28 +199,23 @@ async fn pull_continuous() {
     }
 }
 
-pub async fn update_ratings_continuous() -> Result<()> {
+pub async fn update_statistics_continuous() -> Result<()> {
     let mut conn = Connection::open(DB_NAME)?;
 
-    let mut last_rating_timestamp: i64 =
+    let mut last_ranking_update: i64 =
         conn.query_row("SELECT last_update FROM config", [], |r| r.get(0))?;
-    let mut last_statistics_update: i64 = last_rating_timestamp;
-
-    if let Err(e) = calc_fraud_index(&mut conn) {
-        error!("calc_fraud_index failed: {}", e);
-    }
+    let mut last_statistics_update = last_ranking_update;
 
     let mut interval = time::interval(Duration::from_secs(60));
 
     loop {
         interval.tick().await;
-        if Utc::now().timestamp() - last_rating_timestamp > RATING_PERIOD {
-            while Utc::now().timestamp() - last_rating_timestamp > RATING_PERIOD {
-                last_rating_timestamp = update_ratings(&mut conn);
-            }
-            if last_rating_timestamp - last_statistics_update >= RATING_PERIOD * 24 {
-                info!("Doing a big update");
-                last_statistics_update = last_rating_timestamp;
+        if Utc::now().timestamp() - last_ranking_update > RANKING_PERIOD {
+            info!("New ranking period, updating decay and rankings");
+
+            if last_ranking_update - last_statistics_update >= STATISTICS_PERIOD {
+                info!("New statistics period, updating statistics.");
+                last_statistics_update = last_ranking_update;
                 update_player_distribution(&mut conn);
                 if let Err(e) = calc_versus_matchups(&mut conn) {
                     error!("calc_versus_matchups failed: {}", e);
@@ -228,35 +223,49 @@ pub async fn update_ratings_continuous() -> Result<()> {
                 if let Err(e) = calc_fraud_index(&mut conn) {
                     error!("calc_fraud_index failed: {}", e);
                 }
-                if let Err(e) = calc_character_popularity(&mut conn, last_rating_timestamp) {
+                if let Err(e) = calc_character_popularity(&mut conn, last_ranking_update) {
                     error!("calc_character_popularity failed: {}", e);
                 }
+            }
+            if let Err(e) = update_decay(&mut conn, Utc::now().timestamp()) {
+                error!("update_decay failed: {}", e);
             }
             if let Err(e) = update_rankings(&mut conn) {
                 error!("update_rankings failed: {}", e);
             }
+
+            last_ranking_update += RANKING_PERIOD;
+
+            conn.execute(
+                "UPDATE config SET last_update = ?",
+                params![last_ranking_update],
+            )
+            .unwrap();
         }
     }
 }
 
 pub async fn update_once() {
     let mut conn = Connection::open(DB_NAME).unwrap();
+
+    while update_ratings(&mut conn, None) > 0 {}
+
     let last_rating_timestamp: i64 = conn
         .query_row("SELECT last_update FROM config", [], |r| r.get(0))
         .unwrap();
     update_player_distribution(&mut conn);
-    if let Err(e) = calc_versus_matchups(&mut conn) {
-        error!("calc_versus_matchups failed: {}", e);
-    }
-    if let Err(e) = calc_fraud_index(&mut conn) {
-        error!("calc_fraud_index failed: {}", e);
-    }
+    //if let Err(e) = calc_versus_matchups(&mut conn) {
+    //    error!("calc_versus_matchups failed: {}", e);
+    //}
+    //if let Err(e) = calc_fraud_index(&mut conn) {
+    //    error!("calc_fraud_index failed: {}", e);
+    //}
     if let Err(e) = update_rankings(&mut conn) {
         error!("update_rankings failed: {}", e);
     }
-    if let Err(e) = calc_character_popularity(&mut conn, last_rating_timestamp) {
-        error!("calc_character_popularity failed: {}", e);
-    }
+    //if let Err(e) = calc_character_popularity(&mut conn, last_rating_timestamp) {
+    //    error!("calc_character_popularity failed: {}", e);
+    //}
 }
 
 pub fn get_average_rating(conn: &Transaction, id: i64) -> f64 {
@@ -293,10 +302,12 @@ async fn grab_games(conn: &mut Connection, pages: usize) -> Result<()> {
     let old_count: i64 = conn.query_row("SELECT COUNT(*) FROM games", [], |r| r.get(0))?;
 
     let tx = conn.transaction()?;
-    for r in &replays {
-        add_game(&tx, r.clone());
-    }
 
+    let mut new_games = Vec::new();
+
+    for r in &replays {
+        new_games.extend(add_game(&tx, r.clone()));
+    }
     tx.commit()?;
 
     let count: i64 = conn.query_row("SELECT COUNT(*) FROM games", [], |r| r.get(0))?;
@@ -310,6 +321,10 @@ async fn grab_games(conn: &mut Connection, pages: usize) -> Result<()> {
         count,
         elapsed,
     );
+
+    assert_eq!(count - old_count, new_games.len() as i64);
+
+    update_ratings(conn, Some(new_games));
 
     if count - old_count == replays.len() as i64 {
         if replays.len() > 0 {
@@ -328,18 +343,17 @@ async fn grab_games(conn: &mut Connection, pages: usize) -> Result<()> {
     Ok(())
 }
 
-fn add_game(conn: &Transaction, game: ggst_api::Match) {
+fn add_game(conn: &Transaction, game: ggst_api::Match) -> Option<Game> {
     let ggst_api::Match {
         timestamp,
         players: (a, b),
         floor: game_floor,
         winner,
     } = game;
-    update_player(conn, a.id, &a.name, game_floor.to_u8() as i64);
-    update_player(conn, b.id, &b.name, game_floor.to_u8() as i64);
 
-    conn.execute(
-        "INSERT OR IGNORE INTO games (
+    let count = conn
+        .execute(
+            "INSERT OR IGNORE INTO games (
             timestamp,
             id_a,
             name_a,
@@ -350,33 +364,57 @@ fn add_game(conn: &Transaction, game: ggst_api::Match) {
             winner,
             game_floor
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        params![
-            timestamp.timestamp(),
-            a.id,
-            a.name,
-            a.character.to_u8(),
-            b.id,
-            b.name,
-            b.character.to_u8(),
-            match winner {
+            params![
+                timestamp.timestamp(),
+                a.id,
+                a.name,
+                a.character.to_u8(),
+                b.id,
+                b.name,
+                b.character.to_u8(),
+                match winner {
+                    ggst_api::Winner::Player1 => 1,
+                    ggst_api::Winner::Player2 => 2,
+                },
+                game_floor.to_u8(),
+            ],
+        )
+        .unwrap();
+
+    if count == 1 {
+        Some(Game {
+            timestamp: timestamp.timestamp(),
+            id_a: a.id,
+            char_a: a.character.to_u8() as i64,
+            name_a: a.name,
+            id_b: b.id,
+            char_b: b.character.to_u8() as i64,
+            name_b: b.name,
+            winner: match winner {
                 ggst_api::Winner::Player1 => 1,
                 ggst_api::Winner::Player2 => 2,
             },
-            game_floor.to_u8(),
-        ],
-    )
-    .unwrap();
+            game_floor: game_floor.to_u8() as i64,
+        })
+    } else {
+        None
+    }
+
+    //Check if it already exists in the db
+    //if it doesn't, add it to the list of things to calculate ratings based on
+
+    //sort the list by date
 }
 
 fn update_player(conn: &Transaction, id: i64, name: &str, floor: i64) {
-    while let Err(e) = conn.execute(
+    if let Err(e) = conn.execute(
         "REPLACE INTO players(id, name, floor) VALUES(?, ?, ?)",
         params![id, name, floor],
     ) {
         warn!("{}", e);
     }
 
-    while let Err(e) = conn.execute(
+    if let Err(e) = conn.execute(
         "INSERT OR IGNORE INTO player_names(id, name) VALUES(?, ?)",
         params![id, name],
     ) {
@@ -388,7 +426,7 @@ fn update_player_distribution(conn: &mut Connection) {
     let then = Utc::now();
     let tx = conn.transaction().unwrap();
 
-    let two_weeks_ago = then.timestamp() - RATING_PERIOD * 24 * 14;
+    let two_weeks_ago = then.timestamp() - 60 * 60 * 24 * 14;
 
     tx.execute("DELETE FROM player_floor_distribution", [])
         .unwrap();
@@ -421,7 +459,7 @@ fn update_player_distribution(conn: &mut Connection) {
         .unwrap();
     }
 
-    for r in 0..60 {
+    for r in 0..600 {
         let r_min = r * 50;
         let r_max = (r + 1) * 50;
 
@@ -430,11 +468,7 @@ fn update_player_distribution(conn: &mut Connection) {
                 "SELECT COUNT(*)
                 FROM player_ratings
                 WHERE value >= ? AND value < ? AND deviation < ?",
-                params![
-                    glicko_to_glicko2(r_min as f64),
-                    glicko_to_glicko2(r_max as f64),
-                    MAX_DEVIATION
-                ],
+                params![r_min as f64, r_max as f64, LOW_DEVIATION],
                 |r| r.get(0),
             )
             .unwrap();
@@ -448,7 +482,7 @@ fn update_player_distribution(conn: &mut Connection) {
                 "SELECT COUNT(*)
                 FROM player_ratings
                 WHERE value < ? AND deviation < ?",
-                params![glicko_to_glicko2(r_max as f64), MAX_DEVIATION],
+                params![r_max as f64, LOW_DEVIATION],
                 |r| r.get(0),
             )
             .unwrap();
@@ -471,24 +505,14 @@ fn update_player_distribution(conn: &mut Connection) {
     );
 }
 
-fn update_ratings(conn: &mut Connection) -> i64 {
+fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
+    info!("Updating ratings");
     let then = Utc::now();
-    let last_timestamp: i64 = conn
-        .query_row("SELECT last_update FROM config", [], |r| r.get(0))
-        .unwrap();
-    let next_timestamp = last_timestamp + RATING_PERIOD;
 
-    const RATING_PERIOD_OVERLAP: i64 = 24 * 60 * 60;
-
-    info!(
-        "Calculating ratings between {} and {}...",
-        NaiveDateTime::from_timestamp(last_timestamp, 0).format("%Y-%m-%d %H:%M"),
-        NaiveDateTime::from_timestamp(next_timestamp, 0).format("%Y-%m-%d %H:%M")
-    );
-
+    let tx = conn.transaction().unwrap();
     //Fetch the games from the rating period
-    let games = {
-        let mut stmt = conn
+    let (games, remaining) = games.map(|g| (g, 0)).unwrap_or_else(|| {
+        let mut stmt = tx
             .prepare(
                 "SELECT
                     games.timestamp,
@@ -505,51 +529,88 @@ fn update_ratings(conn: &mut Connection) -> i64 {
                     games.id_a == game_ratings.id_a
                     AND games.id_b == game_ratings.id_b
                     AND games.timestamp == game_ratings.timestamp
-                WHERE
-                    games.timestamp >= ?
-                    AND games.timestamp < ?
-                    AND game_ratings.id_a IS NULL",
+                WHERE game_ratings.id_a IS NULL
+                ORDER BY games.timestamp ASC
+                LIMIT 1000000",
             )
             .unwrap();
 
-        let mut rows = stmt
-            .query([last_timestamp - RATING_PERIOD_OVERLAP, next_timestamp])
-            .unwrap();
+        let mut rows = stmt.query([]).unwrap();
         let mut games = Vec::new();
         while let Some(row) = rows.next().unwrap() {
             games.push(Game::from_row(row));
         }
-        games
-    };
 
-    //Fetch all our rated players
-    let mut players = {
-        let mut players = FxHashMap::default();
+        let remaining = {
+            let mut stmt = tx
+                .prepare(
+                    "SELECT COUNT(*)
+                FROM
+                    games LEFT JOIN game_ratings ON
+                    games.id_a == game_ratings.id_a
+                    AND games.id_b == game_ratings.id_b
+                    AND games.timestamp == game_ratings.timestamp
+                WHERE game_ratings.id_a IS NULL",
+                )
+                .unwrap();
 
-        let mut stmt = conn
-            .prepare(
-                "SELECT
-                    id, char_id, wins, losses, value, deviation, volatility
-                FROM player_ratings",
-            )
-            .unwrap();
-        let mut rows = stmt.query([]).unwrap();
+            let count: i64 = stmt.query_row(params![], |r| r.get(0)).unwrap();
+            count
+        };
 
-        while let Some(row) = rows.next().unwrap() {
-            let player = RatedPlayer::from_row(row);
+        info!(
+            "Fetched {} games to rate from {} remaining - {}ms",
+            games.len(),
+            remaining,
+            (Utc::now() - then).num_milliseconds(),
+        );
+        (games, remaining)
+    });
+
+    //Fetch all the players in the games
+    let mut players = FxHashMap::default();
+    for g in &games {
+        if !players.contains_key(&(g.id_a, g.char_a)) {
             players.insert(
-                (player.id, player.char_id),
-                (player, Vec::<GameResult>::new()),
+                (g.id_a, g.char_a),
+                tx.query_row(
+                    "SELECT 
+                        id, char_id, wins, losses, value, deviation, last_decay
+                    FROM player_ratings
+                    WHERE id = ? AND char_id = ?",
+                    params![g.id_a, g.char_a],
+                    |r| Ok(RatedPlayer::from_row(r)),
+                )
+                .optional()
+                .unwrap()
+                .unwrap_or(RatedPlayer::new(g.id_a, g.char_a, g.timestamp)),
             );
         }
-        players
-    };
+        if !players.contains_key(&(g.id_b, g.char_b)) {
+            players.insert(
+                (g.id_b, g.char_b),
+                tx.query_row(
+                    "SELECT 
+                        id, char_id, wins, losses, value, deviation, last_decay
+                    FROM player_ratings
+                    WHERE id = ? AND char_id = ?",
+                    params![g.id_b, g.char_b],
+                    |r| Ok(RatedPlayer::from_row(r)),
+                )
+                .optional()
+                .unwrap()
+                .unwrap_or(RatedPlayer::new(g.id_b, g.char_b, g.timestamp)),
+            );
+        }
+    }
+
+    info!("Fetched {} players", players.len());
 
     //fetch all our known cheaters
     let cheaters = {
         let mut cheaters = FxHashSet::<i64>::default();
 
-        let mut stmt = conn
+        let mut stmt = tx
             .prepare(
                 "SELECT
                     id
@@ -564,35 +625,33 @@ fn update_ratings(conn: &mut Connection) -> i64 {
         cheaters
     };
 
-    let tx = conn.transaction().unwrap();
+    let mut counter = 0;
+
+    let mut last_timestamp = 0;
 
     for g in games {
+        assert_ge!(g.timestamp, last_timestamp);
+        last_timestamp = g.timestamp;
+
+        counter += 1;
+        if counter % 50_000 == 0 {
+            info!("On game {}...", counter);
+        }
         update_player(&tx, g.id_a, &g.name_a, g.game_floor);
         update_player(&tx, g.id_b, &g.name_b, g.game_floor);
 
-        let rating_a = players
-            .entry((g.id_a, g.char_a))
-            .or_insert_with(|| {
-                (
-                    RatedPlayer::new(g.id_a, get_average_rating(&tx, g.id_a), g.char_a),
-                    Vec::new(),
-                )
-            })
-            .0
-            .rating;
+        let a_win_prob = {
+            let rating_a = players
+                .entry((g.id_a, g.char_a))
+                .or_insert_with(|| RatedPlayer::new(g.id_a, g.char_a, g.timestamp))
+                .rating;
 
-        let rating_b = players
-            .entry((g.id_b, g.char_b))
-            .or_insert_with(|| {
-                (
-                    RatedPlayer::new(g.id_b, get_average_rating(&tx, g.id_b), g.char_b),
-                    Vec::new(),
-                )
-            })
-            .0
-            .rating;
-
-        let a_win_prob = rating_a.value.exp() / (rating_a.value.exp() + rating_b.value.exp());
+            let rating_b = players
+                .entry((g.id_b, g.char_b))
+                .or_insert_with(|| RatedPlayer::new(g.id_b, g.char_b, g.timestamp))
+                .rating;
+            Rating::expected(rating_a, rating_b)
+        };
         let b_win_prob = 1.0 - a_win_prob;
 
         //Prepping tables to make sure rows exist
@@ -630,20 +689,35 @@ fn update_ratings(conn: &mut Connection) -> i64 {
         let has_cheater = cheaters.contains(&g.id_a) || cheaters.contains(&g.id_b);
 
         if !has_cheater {
+            let old_rating_a = players.get(&(g.id_a, g.char_a)).unwrap().rating;
+            let old_rating_b = players.get(&(g.id_b, g.char_b)).unwrap().rating;
+
+            players
+                .get_mut(&(g.id_a, g.char_a))
+                .unwrap()
+                .decay(g.timestamp);
+            players
+                .get_mut(&(g.id_b, g.char_b))
+                .unwrap()
+                .decay(g.timestamp);
+
             match g.winner {
                 1 => {
-                    players
-                        .get_mut(&(g.id_a, g.char_a))
-                        .unwrap()
-                        .1
-                        .push(GameResult::win(rating_b));
-                    players
-                        .get_mut(&(g.id_b, g.char_b))
-                        .unwrap()
-                        .1
-                        .push(GameResult::loss(rating_a));
-                    players.get_mut(&(g.id_a, g.char_a)).unwrap().0.win_count += 1;
-                    players.get_mut(&(g.id_b, g.char_b)).unwrap().0.loss_count += 1;
+                    let rating_a = players.get(&(g.id_a, g.char_a)).unwrap().rating;
+                    let rating_b = players.get(&(g.id_b, g.char_b)).unwrap().rating;
+
+                    players.get_mut(&(g.id_a, g.char_a)).unwrap().rating =
+                        Rating::update(rating_a, rating_b, 1.0);
+                    players.get_mut(&(g.id_b, g.char_b)).unwrap().rating =
+                        Rating::update(rating_b, rating_a, 0.0);
+                    players.get_mut(&(g.id_a, g.char_a)).unwrap().win_count += 1;
+                    players.get_mut(&(g.id_b, g.char_b)).unwrap().loss_count += 1;
+
+                    let rating_a = players.get(&(g.id_a, g.char_a)).unwrap().rating;
+                    let rating_b = players.get(&(g.id_b, g.char_b)).unwrap().rating;
+
+                    assert!(rating_a > old_rating_a);
+                    assert!(rating_b < old_rating_b);
 
                     tx.execute(
                         "UPDATE player_matchups
@@ -661,7 +735,7 @@ fn update_ratings(conn: &mut Connection) -> i64 {
                     .unwrap();
 
                     //TODO I know this is awful
-                    if rating_a.deviation < MAX_DEVIATION && rating_b.deviation < MAX_DEVIATION {
+                    if rating_a.deviation < LOW_DEVIATION && rating_b.deviation < LOW_DEVIATION {
                         tx.execute(
                             "UPDATE player_matchups
                         SET wins_adjusted = wins_adjusted + ?
@@ -710,18 +784,28 @@ fn update_ratings(conn: &mut Connection) -> i64 {
                     }
                 }
                 2 => {
-                    players
-                        .get_mut(&(g.id_a, g.char_a))
-                        .unwrap()
-                        .1
-                        .push(GameResult::loss(rating_b));
-                    players
-                        .get_mut(&(g.id_b, g.char_b))
-                        .unwrap()
-                        .1
-                        .push(GameResult::win(rating_a));
-                    players.get_mut(&(g.id_a, g.char_a)).unwrap().0.loss_count += 1;
-                    players.get_mut(&(g.id_b, g.char_b)).unwrap().0.win_count += 1;
+                    let rating_a = players.get(&(g.id_a, g.char_a)).unwrap().rating;
+                    let rating_b = players.get(&(g.id_b, g.char_b)).unwrap().rating;
+
+                    Rating::update(rating_a, rating_b, 0.0);
+                    players.get_mut(&(g.id_a, g.char_a)).unwrap().rating =
+                        Rating::update(rating_a, rating_b, 0.0);
+                    players.get_mut(&(g.id_b, g.char_b)).unwrap().rating =
+                        Rating::update(rating_b, rating_a, 1.0);
+                    players.get_mut(&(g.id_a, g.char_a)).unwrap().loss_count += 1;
+                    players.get_mut(&(g.id_b, g.char_b)).unwrap().win_count += 1;
+
+                    let rating_a = players.get(&(g.id_a, g.char_a)).unwrap().rating;
+                    let rating_b = players.get(&(g.id_b, g.char_b)).unwrap().rating;
+
+                    if rating_a >= old_rating_a {
+                        panic!(
+                            "Rating went up on a loss vs {:?}!\nOld: {:?}\nNew{:?}",
+                            old_rating_b, old_rating_a, rating_a
+                        );
+                    }
+                    assert!(rating_a < old_rating_a);
+                    assert!(rating_b > old_rating_b);
 
                     tx.execute(
                         "UPDATE player_matchups
@@ -740,7 +824,7 @@ fn update_ratings(conn: &mut Connection) -> i64 {
                     .unwrap();
 
                     //TODO make this less repetitive
-                    if rating_a.deviation < MAX_DEVIATION && rating_b.deviation < MAX_DEVIATION {
+                    if rating_a.deviation < LOW_DEVIATION && rating_b.deviation < LOW_DEVIATION {
                         tx.execute(
                             "UPDATE player_matchups
                         SET losses_adjusted = losses_adjusted + ?
@@ -792,27 +876,27 @@ fn update_ratings(conn: &mut Connection) -> i64 {
                 _ => panic!("Bad winner"),
             }
         }
+        {
+            let rating_a = players.get(&(g.id_a, g.char_a)).unwrap().rating;
+            let rating_b = players.get(&(g.id_b, g.char_b)).unwrap().rating;
 
-        tx.execute(
-            "INSERT INTO game_ratings VALUES(?, ?, ?, ?, ?, ?, ?)",
-            params![
-                g.timestamp,
-                g.id_a,
-                rating_a.value,
-                rating_a.deviation,
-                g.id_b,
-                rating_b.value,
-                rating_b.deviation,
-            ],
-        )
-        .unwrap();
-
-        //TODO add to player_matchup
+            tx.execute(
+                "INSERT INTO game_ratings VALUES(?, ?, ?, ?, ?, ?, ?)",
+                params![
+                    g.timestamp,
+                    g.id_a,
+                    rating_a.value,
+                    rating_a.deviation,
+                    g.id_b,
+                    rating_b.value,
+                    rating_b.deviation,
+                ],
+            )
+            .unwrap();
+        }
     }
 
-    for (_, (mut player, results)) in players.into_iter() {
-        player.rating = glicko2::new_rating(player.rating, &results, SYS_CONSTANT);
-
+    for (_, player) in players.into_iter() {
         if player.rating.deviation < 0.0 {
             error!("Negative rating deviation???");
         }
@@ -826,14 +910,11 @@ fn update_ratings(conn: &mut Connection) -> i64 {
                 player.loss_count,
                 player.rating.value,
                 player.rating.deviation,
-                player.rating.volatility,
+                player.last_decay,
             ],
         )
         .unwrap();
     }
-
-    tx.execute("UPDATE config SET last_update=?", [next_timestamp])
-        .unwrap();
 
     tx.commit().unwrap();
 
@@ -842,7 +923,7 @@ fn update_ratings(conn: &mut Connection) -> i64 {
         (Utc::now() - then).num_milliseconds()
     );
 
-    next_timestamp
+    remaining
 }
 
 pub fn calc_character_popularity(conn: &mut Connection, last_timestamp: i64) -> Result<()> {
@@ -865,7 +946,7 @@ pub fn calc_character_popularity(conn: &mut Connection, last_timestamp: i64) -> 
         FROM
             games NATURAL JOIN game_ratings
         WHERE timestamp > ? AND (deviation_a < ? OR deviation_b < ?)",
-        params![one_week_ago, MAX_DEVIATION, MAX_DEVIATION],
+        params![one_week_ago, LOW_DEVIATION, LOW_DEVIATION],
     )?;
     info!("making indices");
     tx.execute("CREATE INDEX temp.i_char_a ON recent_games(char_a)", [])?;
@@ -907,13 +988,9 @@ pub fn calc_character_popularity(conn: &mut Connection, last_timestamp: i64) -> 
     }
 
     for r in 0..POP_RATING_BRACKETS {
-        let rating_min = if r > 0 {
-            glicko_to_glicko2((900 + r * 100) as f64)
-        } else {
-            -99.0
-        };
+        let rating_min = if r > 0 { (900 + r * 100) as f64 } else { -99.0 };
         let rating_max = if r < POP_RATING_BRACKETS - 1 {
-            glicko_to_glicko2((1000 + (r + 1) * 100) as f64)
+            (1000 + (r + 1) * 100) as f64
         } else {
             99.0
         };
@@ -929,10 +1006,10 @@ pub fn calc_character_popularity(conn: &mut Connection, last_timestamp: i64) -> 
             params![
                 rating_min,
                 rating_max,
-                MAX_DEVIATION,
+                LOW_DEVIATION,
                 rating_min,
                 rating_max,
-                MAX_DEVIATION
+                LOW_DEVIATION
             ],
             |r| r.get(0),
         )?;
@@ -955,11 +1032,11 @@ pub fn calc_character_popularity(conn: &mut Connection, last_timestamp: i64) -> 
                     c,
                     rating_min,
                     rating_max,
-                    MAX_DEVIATION,
+                    LOW_DEVIATION,
                     c,
                     rating_min,
                     rating_max,
-                    MAX_DEVIATION
+                    LOW_DEVIATION
                 ],
                 |r| r.get(0),
             )?;
@@ -995,7 +1072,7 @@ pub fn update_rankings(conn: &mut Connection) -> Result<()> {
          WHERE deviation < ? AND (losses > 10 OR wins <= 200)
          ORDER BY value - 2.0 * deviation DESC
          LIMIT 1000",
-        params![MAX_DEVIATION],
+        params![LOW_DEVIATION],
     )?;
 
     for c in 0..CHAR_COUNT {
@@ -1007,13 +1084,66 @@ pub fn update_rankings(conn: &mut Connection) -> Result<()> {
              WHERE deviation < ? AND char_id = ? AND (losses > 10 OR wins <= 200)
              ORDER BY value - 2.0 * deviation DESC
              LIMIT 1000",
-            params![MAX_DEVIATION, c],
+            params![LOW_DEVIATION, c],
         )?;
     }
 
     tx.commit()?;
     info!(
         "Updated rankings - {}ms",
+        (Utc::now() - then).num_milliseconds()
+    );
+    Ok(())
+}
+
+pub fn update_decay(conn: &mut Connection, timestamp: i64) -> Result<()> {
+    let then = Utc::now();
+
+    let tx = conn.transaction()?;
+
+    let mut players = {
+        let mut players = FxHashMap::default();
+
+        let mut stmt = tx
+            .prepare(
+                "SELECT
+                    id, char_id, wins, losses, value, deviation, last_decay
+                FROM player_ratings 
+                WHERE deviation < 350.0",
+            )
+            .unwrap();
+        let mut rows = stmt.query([]).unwrap();
+
+        while let Some(row) = rows.next().unwrap() {
+            let player = RatedPlayer::from_row(row);
+            players.insert((player.id, player.char_id), player);
+        }
+        players
+    };
+
+    for p in &mut players {
+        p.1.decay(timestamp);
+    }
+
+    for player in players.values() {
+        tx.execute(
+            "REPLACE INTO player_ratings VALUES(?, ?, ?, ?, ?, ?, ?)",
+            params![
+                player.id,
+                player.char_id,
+                player.win_count,
+                player.loss_count,
+                player.rating.value,
+                player.rating.deviation,
+                player.last_decay,
+            ],
+        )
+        .unwrap();
+    }
+
+    tx.commit()?;
+    info!(
+        "Updated decay - {}ms",
         (Utc::now() - then).num_milliseconds()
     );
     Ok(())
@@ -1063,7 +1193,7 @@ pub fn calc_fraud_index(conn: &mut Connection) -> Result<()> {
             )
             .unwrap();
 
-        let mut rows = stmt.query(params![MAX_DEVIATION, MAX_DEVIATION]).unwrap();
+        let mut rows = stmt.query(params![LOW_DEVIATION, LOW_DEVIATION]).unwrap();
 
         while let Some(row) = rows.next().unwrap() {
             let char_id: i64 = row.get(0).unwrap();
@@ -1111,7 +1241,7 @@ pub fn calc_fraud_index(conn: &mut Connection) -> Result<()> {
             )
             .unwrap();
 
-        let mut rows = stmt.query(params![MAX_DEVIATION, MAX_DEVIATION]).unwrap();
+        let mut rows = stmt.query(params![LOW_DEVIATION, LOW_DEVIATION]).unwrap();
 
         while let Some(row) = rows.next().unwrap() {
             let char_id: i64 = row.get(0).unwrap();
@@ -1159,7 +1289,7 @@ pub fn calc_fraud_index(conn: &mut Connection) -> Result<()> {
             )
             .unwrap();
 
-        let mut rows = stmt.query(params![MAX_DEVIATION, MAX_DEVIATION]).unwrap();
+        let mut rows = stmt.query(params![LOW_DEVIATION, LOW_DEVIATION]).unwrap();
 
         while let Some(row) = rows.next().unwrap() {
             let char_id: i64 = row.get(0).unwrap();
@@ -1191,7 +1321,7 @@ pub fn calc_versus_matchups(conn: &mut Connection) -> Result<()> {
     {
         let mut stmt = conn.prepare(
             "SELECT
-            id_a, char_a, value_a, id_b, char_b, value_b, winner
+            id_a, char_a, value_a, deviation_a, id_b, char_b, value_b, deviation_b, winner
             FROM games NATURAL JOIN game_ratings
             WHERE value_a > ? AND deviation_a < ? 
             AND value_b > ? AND deviation_b < ?;",
@@ -1199,29 +1329,41 @@ pub fn calc_versus_matchups(conn: &mut Connection) -> Result<()> {
 
         let mut rows = stmt.query(params![
             HIGH_RATING,
-            MAX_DEVIATION,
+            LOW_DEVIATION,
             HIGH_RATING,
-            MAX_DEVIATION
+            LOW_DEVIATION
         ])?;
 
         while let Some(row) = rows.next()? {
             let id_a: i64 = row.get(0)?;
             let char_a: i64 = row.get(1)?;
             let value_a: f64 = row.get(2)?;
-            let id_b: i64 = row.get(3)?;
-            let char_b: i64 = row.get(4)?;
-            let value_b: f64 = row.get(5)?;
-            let winner: i64 = row.get(6)?;
+            let deviation_a: f64 = row.get(3)?;
+            let id_b: i64 = row.get(4)?;
+            let char_b: i64 = row.get(5)?;
+            let value_b: f64 = row.get(6)?;
+            let deviation_b: f64 = row.get(7)?;
+            let winner: i64 = row.get(8)?;
 
-            if let Some((a, b, v_a, v_b, winner)) = {
+            if let Some((a, b, v_a, d_a, v_b, d_b, winner)) = {
                 if char_a < char_b {
-                    Some(((id_a, char_a), (id_b, char_b), value_a, value_b, winner))
+                    Some((
+                        (id_a, char_a),
+                        (id_b, char_b),
+                        value_a,
+                        deviation_a,
+                        value_b,
+                        deviation_b,
+                        winner,
+                    ))
                 } else if char_b < char_a {
                     Some((
                         (id_b, char_b),
                         (id_a, char_a),
                         value_b,
+                        deviation_b,
                         value_a,
+                        deviation_a,
                         if winner == 1 { 2 } else { 1 },
                     ))
                 } else {
@@ -1229,7 +1371,9 @@ pub fn calc_versus_matchups(conn: &mut Connection) -> Result<()> {
                 }
             } {
                 let p = pairs.entry((a, b)).or_insert((0.0, 0.0, 0));
-                let win_chance = v_a.exp() / (v_a.exp() + v_b.exp());
+                let rating_a = Rating::new(v_a, d_a);
+                let rating_b = Rating::new(v_b, d_b);
+                let win_chance = Rating::expected(rating_a, rating_b);
                 let loss_chance = 1.0 - win_chance;
 
                 match winner {
@@ -1292,6 +1436,7 @@ pub fn calc_versus_matchups(conn: &mut Connection) -> Result<()> {
     Ok(())
 }
 
+#[derive(Debug)]
 pub struct Game {
     timestamp: i64,
     id_a: i64,
@@ -1320,27 +1465,25 @@ impl Game {
     }
 }
 
+#[derive(Debug)]
 pub struct RatedPlayer {
     pub id: i64,
     pub char_id: i64,
     pub win_count: i64,
     pub loss_count: i64,
-    pub rating: Glicko2Rating,
+    pub rating: Rating,
+    pub last_decay: i64,
 }
 
 impl RatedPlayer {
-    pub fn new(id: i64, initial_rating: f64, char_id: i64) -> Self {
+    pub fn new(id: i64, char_id: i64, timestamp: i64) -> Self {
         Self {
             id,
             char_id,
             win_count: 0,
             loss_count: 0,
-            //rating: Glicko2Rating::unrated(),
-            rating: Glicko2Rating {
-                value: initial_rating,
-                deviation: 350.0 / 173.0,
-                volatility: 0.02,
-            },
+            rating: Rating::default(),
+            last_decay: timestamp,
         }
     }
     pub fn from_row(row: &Row) -> Self {
@@ -1349,11 +1492,20 @@ impl RatedPlayer {
             char_id: row.get(1).unwrap(),
             win_count: row.get(2).unwrap(),
             loss_count: row.get(3).unwrap(),
-            rating: Glicko2Rating {
-                value: row.get(4).unwrap(),
-                deviation: row.get(5).unwrap(),
-                volatility: row.get(6).unwrap(),
-            },
+            rating: Rating::new(row.get(4).unwrap(), row.get(5).unwrap()),
+            last_decay: row.get(6).unwrap(),
+        }
+    }
+
+    pub fn decay(&mut self, timestamp: i64) {
+        let delta = timestamp - self.last_decay;
+        if delta < 0 {
+            self.last_decay = timestamp;
+        }
+        if delta > RATING_PERIOD {
+            self.rating
+                .decay_deviation(delta / RATING_PERIOD, DECAY_CONSTANT);
+            self.last_decay = timestamp;
         }
     }
 }

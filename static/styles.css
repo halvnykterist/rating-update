@@ -57,6 +57,15 @@ table {
   white-space: nowrap !important;
 }
 
+.maybe_long_name {
+  display: inline-block;
+  width: 10em;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+
 /*! bulma.io v0.9.3 | MIT License | github.com/jgthms/bulma */
 /* Bulma Utilities */
 .pagination-previous,

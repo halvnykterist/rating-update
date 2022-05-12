@@ -4,5 +4,6 @@ extern crate rocket;
 extern crate log;
 
 mod api;
+mod glicko;
 pub mod rater;
 pub mod website;

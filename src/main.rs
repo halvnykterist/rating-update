@@ -1,11 +1,13 @@
 #![feature(proc_macro_hygiene, decl_macro)]
 
+#[macro_use]
+extern crate all_asserts;
+
 use simplelog::*;
 use std::{fs::File, ops::Deref};
 use tokio::try_join;
 
 use rating_update::{rater, website};
-
 
 fn init_logging() {
     if cfg!(debug_assertions) {
