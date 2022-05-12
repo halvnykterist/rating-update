@@ -965,9 +965,9 @@ impl RawPlayerSet {
             opponent_rating_deviation: self.opponent_deviation.round(),
 
             rating_change: format!("{:+.1}", rating_change_sum,),
-            rating_change_class: if rating_change_sum >= 0.1 {
+            rating_change_class: if rating_change_sum >= 0.05 {
                 "has-text-success"
-            } else if rating_change_sum > -20.0 {
+            } else if rating_change_sum > -25.0 {
                 "has-text-warning"
             } else {
                 "has-text-danger"
