@@ -1,8 +1,5 @@
 #![feature(proc_macro_hygiene, decl_macro)]
 
-#[macro_use]
-extern crate all_asserts;
-
 use simplelog::*;
 use std::{fs::File, ops::Deref};
 use tokio::try_join;

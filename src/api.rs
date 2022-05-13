@@ -947,11 +947,12 @@ impl RawPlayerSet {
         );
 
         let rating_change_sum = self.rating_change_sequence.iter().copied().sum::<f64>();
+        let average_rating_change = rating_change_sum / (self.result_wins + self.result_losses) as f64;
 
         PlayerSet {
             timestamp,
             own_rating_value: self.own_value.round(),
-            own_rating_deviation: self.own_deviation.round(),
+            own_rating_deviation: (2.0 * self.own_deviation).round(),
             floor: match self.floor {
                 f @ 1..=10 => format!("F{:0}", f),
                 _ => "C".to_owned(),
@@ -962,17 +963,17 @@ impl RawPlayerSet {
             opponent_character: website::CHAR_NAMES[self.opponent_char as usize].1,
 
             opponent_rating_value: self.opponent_value.round(),
-            opponent_rating_deviation: self.opponent_deviation.round(),
+            opponent_rating_deviation: (2.0 * self.opponent_deviation).round(),
 
             rating_change: format!("{:+.1}", rating_change_sum,),
-            rating_change_class: if rating_change_sum >= 0.05 {
+            rating_change_class: if average_rating_change >= 2.0 {
                 "has-text-success"
-            } else if rating_change_sum > -25.0 {
+            } else if average_rating_change > -2.0 {
                 "has-text-warning"
             } else {
                 "has-text-danger"
             },
-            rating_change_sequence: self.rating_change_sequence.iter().copied().fold(
+            rating_change_sequence: self.rating_change_sequence.iter().rev().copied().fold(
                 String::new(),
                 |mut s, c| {
                     s.push_str(&format!("{:+.1} ", c));
@@ -1019,6 +1020,9 @@ fn add_to_grouped_sets(
         .last_mut()
         .filter(|set| set.opponent_id == opponent_id && set.opponent_char == opponent_char)
     {
+        set.timestamp = timestamp;
+        set.own_value = own_value;
+        set.own_deviation = own_deviation;
         set.opponent_value = opponent_value;
         set.opponent_deviation = opponent_deviation;
 

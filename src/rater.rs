@@ -637,22 +637,9 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
         if counter % 50_000 == 0 {
             info!("On game {}...", counter);
         }
+
         update_player(&tx, g.id_a, &g.name_a, g.game_floor);
         update_player(&tx, g.id_b, &g.name_b, g.game_floor);
-
-        let a_win_prob = {
-            let rating_a = players
-                .entry((g.id_a, g.char_a))
-                .or_insert_with(|| RatedPlayer::new(g.id_a, g.char_a, g.timestamp))
-                .rating;
-
-            let rating_b = players
-                .entry((g.id_b, g.char_b))
-                .or_insert_with(|| RatedPlayer::new(g.id_b, g.char_b, g.timestamp))
-                .rating;
-            Rating::expected(rating_a, rating_b)
-        };
-        let b_win_prob = 1.0 - a_win_prob;
 
         //Prepping tables to make sure rows exist
         tx.execute(
@@ -689,9 +676,6 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
         let has_cheater = cheaters.contains(&g.id_a) || cheaters.contains(&g.id_b);
 
         if !has_cheater {
-            let old_rating_a = players.get(&(g.id_a, g.char_a)).unwrap().rating;
-            let old_rating_b = players.get(&(g.id_b, g.char_b)).unwrap().rating;
-
             players
                 .get_mut(&(g.id_a, g.char_a))
                 .unwrap()
@@ -701,199 +685,105 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
                 .unwrap()
                 .decay(g.timestamp);
 
-            match g.winner {
-                1 => {
-                    let rating_a = players.get(&(g.id_a, g.char_a)).unwrap().rating;
-                    let rating_b = players.get(&(g.id_b, g.char_b)).unwrap().rating;
-
-                    players.get_mut(&(g.id_a, g.char_a)).unwrap().rating =
-                        Rating::update(rating_a, rating_b, 1.0);
-                    players.get_mut(&(g.id_b, g.char_b)).unwrap().rating =
-                        Rating::update(rating_b, rating_a, 0.0);
-                    players.get_mut(&(g.id_a, g.char_a)).unwrap().win_count += 1;
-                    players.get_mut(&(g.id_b, g.char_b)).unwrap().loss_count += 1;
-
-                    let rating_a = players.get(&(g.id_a, g.char_a)).unwrap().rating;
-                    let rating_b = players.get(&(g.id_b, g.char_b)).unwrap().rating;
-
-                    assert!(rating_a > old_rating_a);
-                    assert!(rating_b < old_rating_b);
-
-                    tx.execute(
-                        "UPDATE player_matchups
-                    SET wins_real = wins_real + 1
-                    WHERE id=? AND char_id=? AND opp_char_id=?",
-                        params![g.id_a, g.char_a, g.char_b,],
-                    )
-                    .unwrap();
-                    tx.execute(
-                        "UPDATE player_matchups
-                    SET losses_real = losses_real + 1
-                    WHERE id=? AND char_id=? AND opp_char_id=?",
-                        params![g.id_b, g.char_b, g.char_a,],
-                    )
-                    .unwrap();
-
-                    //TODO I know this is awful
-                    if rating_a.deviation < LOW_DEVIATION && rating_b.deviation < LOW_DEVIATION {
-                        tx.execute(
-                            "UPDATE player_matchups
-                        SET wins_adjusted = wins_adjusted + ?
-                        WHERE id=? AND char_id=? AND opp_char_id=?",
-                            params![b_win_prob, g.id_a, g.char_a, g.char_b,],
-                        )
-                        .unwrap();
-                        tx.execute(
-                            "UPDATE player_matchups
-                        SET losses_adjusted = losses_adjusted + ?
-                        WHERE id=? AND char_id=? AND opp_char_id=?",
-                            params![b_win_prob, g.id_b, g.char_b, g.char_a,],
-                        )
-                        .unwrap();
-                        tx.execute(
-                            "UPDATE global_matchups
-                        SET wins_real = wins_real + 1, wins_adjusted = wins_adjusted + ?
-                        WHERE char_id=? AND opp_char_id=?",
-                            params![b_win_prob, g.char_a, g.char_b,],
-                        )
-                        .unwrap();
-                        tx.execute(
-                            "UPDATE global_matchups
-                        SET losses_real = losses_real + 1, losses_adjusted = losses_adjusted + ?
-                        WHERE char_id=? AND opp_char_id=?",
-                            params![b_win_prob, g.char_b, g.char_a,],
-                        )
-                        .unwrap();
-
-                        if rating_a.value > HIGH_RATING && rating_b.value > HIGH_RATING {
-                            tx.execute(
-                                "UPDATE high_rated_matchups
-                            SET wins_real = wins_real + 1, wins_adjusted = wins_adjusted + ?
-                            WHERE char_id=? AND opp_char_id=?",
-                                params![b_win_prob, g.char_a, g.char_b,],
-                            )
-                            .unwrap();
-                            tx.execute(
-                                "UPDATE high_rated_matchups
-                            SET losses_real = losses_real + 1, losses_adjusted = losses_adjusted + ?
-                            WHERE char_id=? AND opp_char_id=?",
-                                params![b_win_prob, g.char_b, g.char_a,],
-                            )
-                            .unwrap();
-                        }
-                    }
-                }
-                2 => {
-                    let rating_a = players.get(&(g.id_a, g.char_a)).unwrap().rating;
-                    let rating_b = players.get(&(g.id_b, g.char_b)).unwrap().rating;
-
-                    Rating::update(rating_a, rating_b, 0.0);
-                    players.get_mut(&(g.id_a, g.char_a)).unwrap().rating =
-                        Rating::update(rating_a, rating_b, 0.0);
-                    players.get_mut(&(g.id_b, g.char_b)).unwrap().rating =
-                        Rating::update(rating_b, rating_a, 1.0);
-                    players.get_mut(&(g.id_a, g.char_a)).unwrap().loss_count += 1;
-                    players.get_mut(&(g.id_b, g.char_b)).unwrap().win_count += 1;
-
-                    let rating_a = players.get(&(g.id_a, g.char_a)).unwrap().rating;
-                    let rating_b = players.get(&(g.id_b, g.char_b)).unwrap().rating;
-
-                    if rating_a >= old_rating_a {
-                        panic!(
-                            "Rating went up on a loss vs {:?}!\nOld: {:?}\nNew{:?}",
-                            old_rating_b, old_rating_a, rating_a
-                        );
-                    }
-                    assert!(rating_a < old_rating_a);
-                    assert!(rating_b > old_rating_b);
-
-                    tx.execute(
-                        "UPDATE player_matchups
-                    SET losses_real = losses_real + 1
-                    WHERE id=? AND char_id=? AND opp_char_id=?",
-                        params![g.id_a, g.char_a, g.char_b,],
-                    )
-                    .unwrap();
-
-                    tx.execute(
-                        "UPDATE player_matchups
-                    SET wins_real = wins_real + 1
-                    WHERE id=? AND char_id=? AND opp_char_id=?",
-                        params![g.id_b, g.char_b, g.char_a,],
-                    )
-                    .unwrap();
-
-                    //TODO make this less repetitive
-                    if rating_a.deviation < LOW_DEVIATION && rating_b.deviation < LOW_DEVIATION {
-                        tx.execute(
-                            "UPDATE player_matchups
-                        SET losses_adjusted = losses_adjusted + ?
-                        WHERE id=? AND char_id=? AND opp_char_id=?",
-                            params![a_win_prob, g.id_a, g.char_a, g.char_b,],
-                        )
-                        .unwrap();
-                        tx.execute(
-                            "UPDATE player_matchups
-                        SET wins_adjusted = wins_adjusted + ?
-                        WHERE id=? AND char_id=? AND opp_char_id=?",
-                            params![a_win_prob, g.id_b, g.char_b, g.char_a,],
-                        )
-                        .unwrap();
-
-                        tx.execute(
-                            "UPDATE global_matchups
-                        SET wins_real = wins_real + 1, wins_adjusted = wins_adjusted + ?
-                        WHERE char_id=? AND opp_char_id=?",
-                            params![a_win_prob, g.char_b, g.char_a,],
-                        )
-                        .unwrap();
-                        tx.execute(
-                            "UPDATE global_matchups
-                        SET losses_real = losses_real + 1, losses_adjusted = losses_adjusted + ?
-                        WHERE char_id=? AND opp_char_id=?",
-                            params![a_win_prob, g.char_a, g.char_b,],
-                        )
-                        .unwrap();
-
-                        if rating_a.value > HIGH_RATING && rating_b.value > HIGH_RATING {
-                            tx.execute(
-                                "UPDATE high_rated_matchups
-                            SET wins_real = wins_real + 1, wins_adjusted = wins_adjusted + ?
-                            WHERE char_id=? AND opp_char_id=?",
-                                params![b_win_prob, g.char_b, g.char_a,],
-                            )
-                            .unwrap();
-                            tx.execute(
-                                "UPDATE high_rated_matchups
-                            SET losses_real = losses_real + 1, losses_adjusted = losses_adjusted + ?
-                            WHERE char_id=? AND opp_char_id=?",
-                                params![b_win_prob, g.char_a, g.char_b,],
-                            )
-                            .unwrap();
-                        }
-                    }
-                }
+            let (winner, loser) = match g.winner {
+                1 => ((g.id_a, g.char_a), (g.id_b, g.char_b)),
+                2 => ((g.id_b, g.char_b), (g.id_a, g.char_a)),
                 _ => panic!("Bad winner"),
-            }
-        }
-        {
-            let rating_a = players.get(&(g.id_a, g.char_a)).unwrap().rating;
-            let rating_b = players.get(&(g.id_b, g.char_b)).unwrap().rating;
+            };
+
+            let rating_winner = players.get(&winner).unwrap().rating;
+            let rating_loser = players.get(&loser).unwrap().rating;
+
+            players.get_mut(&winner).unwrap().rating = rating_winner.update(rating_loser, 1.0);
+            players.get_mut(&winner).unwrap().win_count += 1;
+
+            players.get_mut(&loser).unwrap().rating = rating_loser.update(rating_winner, 0.0);
+            players.get_mut(&loser).unwrap().loss_count += 1;
 
             tx.execute(
-                "INSERT INTO game_ratings VALUES(?, ?, ?, ?, ?, ?, ?)",
-                params![
-                    g.timestamp,
-                    g.id_a,
-                    rating_a.value,
-                    rating_a.deviation,
-                    g.id_b,
-                    rating_b.value,
-                    rating_b.deviation,
-                ],
+                "UPDATE player_matchups
+                    SET wins_real = wins_real + 1
+                    WHERE id=? AND char_id=? AND opp_char_id=?",
+                params![winner.0, winner.1, loser.1,],
             )
             .unwrap();
+
+            tx.execute(
+                "UPDATE player_matchups
+                    SET losses_real = losses_real + 1
+                    WHERE id=? AND char_id=? AND opp_char_id=?",
+                params![loser.0, loser.1, winner.1,],
+            )
+            .unwrap();
+
+            if rating_winner.deviation < LOW_DEVIATION && rating_loser.deviation < LOW_DEVIATION {
+                let winner_win_prob = rating_winner.expected(rating_loser);
+                let loser_win_prob = 1.0 - winner_win_prob;
+
+                tx.execute(
+                    "UPDATE player_matchups
+                    SET wins_adjusted = wins_adjusted + ?
+                    WHERE id=? AND char_id=? AND opp_char_id=?",
+                    params![loser_win_prob, winner.0, winner.1, loser.1],
+                )
+                .unwrap();
+                tx.execute(
+                    "UPDATE player_matchups
+                    SET losses_adjusted = losses_adjusted + ?
+                    WHERE id=? AND char_id=? AND opp_char_id=?",
+                    params![loser_win_prob, loser.0, loser.1, winner.1],
+                )
+                .unwrap();
+                tx.execute(
+                    "UPDATE global_matchups
+                    SET wins_real = wins_real + 1, wins_adjusted = wins_adjusted + ?
+                    WHERE char_id=? AND opp_char_id=?",
+                    params![loser_win_prob, winner.1, loser.1],
+                )
+                .unwrap();
+                tx.execute(
+                    "UPDATE global_matchups
+                    SET losses_real = losses_real + 1, losses_adjusted = losses_adjusted + ?
+                    WHERE char_id=? AND opp_char_id=?",
+                    params![loser_win_prob, loser.1, winner.1],
+                )
+                .unwrap();
+
+                if rating_winner.value > HIGH_RATING && rating_loser.value > HIGH_RATING {
+                    tx.execute(
+                        "UPDATE high_rated_matchups
+                        SET wins_real = wins_real + 1, wins_adjusted = wins_adjusted + ?
+                        WHERE char_id=? AND opp_char_id=?",
+                        params![loser_win_prob, winner.1, loser.1],
+                    )
+                    .unwrap();
+                    tx.execute(
+                        "UPDATE high_rated_matchups
+                        SET losses_real = losses_real + 1, losses_adjusted = losses_adjusted + ?
+                        WHERE char_id=? AND opp_char_id=?",
+                        params![loser_win_prob, loser.1, winner.1],
+                    )
+                    .unwrap();
+                }
+            }
         }
+
+        let final_rating_a = players.get(&(g.id_a, g.char_a)).unwrap().rating;
+        let final_rating_b = players.get(&(g.id_b, g.char_b)).unwrap().rating;
+
+        tx.execute(
+            "INSERT INTO game_ratings VALUES(?, ?, ?, ?, ?, ?, ?)",
+            params![
+                g.timestamp,
+                g.id_a,
+                final_rating_a.value,
+                final_rating_a.deviation,
+                g.id_b,
+                final_rating_b.value,
+                final_rating_b.deviation,
+            ],
+        )
+        .unwrap();
     }
 
     for (_, player) in players.into_iter() {
