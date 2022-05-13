@@ -947,7 +947,8 @@ impl RawPlayerSet {
         );
 
         let rating_change_sum = self.rating_change_sequence.iter().copied().sum::<f64>();
-        let average_rating_change = rating_change_sum / (self.result_wins + self.result_losses) as f64;
+        let average_rating_change =
+            rating_change_sum / (self.result_wins + self.result_losses) as f64;
 
         PlayerSet {
             timestamp,
@@ -1520,7 +1521,7 @@ pub async fn get_fraud(conn: &RatingsDbConn) -> Vec<FraudStats> {
             res.push(FraudStats {
                 character_name: website::CHAR_NAMES[row.get::<_, usize>(0).unwrap()].1,
                 player_count: row.get(1).unwrap(),
-                average_offset: format!("{:+.1}", (row.get::<_, f64>(2).unwrap() * 173.7178)),
+                average_offset: format!("{:+.1}", (row.get::<_, f64>(1).unwrap())),
             });
         }
 
@@ -1542,7 +1543,7 @@ pub async fn get_fraud_higher_rated(conn: &RatingsDbConn) -> Vec<FraudStats> {
             res.push(FraudStats {
                 character_name: website::CHAR_NAMES[row.get::<_, usize>(0).unwrap()].1,
                 player_count: row.get(1).unwrap(),
-                average_offset: format!("{:+.1}", (row.get::<_, f64>(2).unwrap() * 173.7178)),
+                average_offset: format!("{:+.1}", (row.get::<_, f64>(2).unwrap())),
             });
         }
 
@@ -1564,7 +1565,7 @@ pub async fn get_fraud_highest_rated(conn: &RatingsDbConn) -> Vec<FraudStats> {
             res.push(FraudStats {
                 character_name: website::CHAR_NAMES[row.get::<_, usize>(0).unwrap()].1,
                 player_count: row.get(1).unwrap(),
-                average_offset: format!("{:+.1}", (row.get::<_, f64>(2).unwrap() * 173.7178)),
+                average_offset: format!("{:+.1}", (row.get::<_, f64>(2).unwrap())),
             });
         }
 
