@@ -1,6 +1,6 @@
 use all_asserts::*;
 use anyhow::Context;
-use chrono::{DateTime, NaiveDate, Utc};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use fxhash::{FxHashMap, FxHashSet};
 use glob::glob;
 use lazy_static::lazy_static;
@@ -531,7 +531,7 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
                     AND games.timestamp == game_ratings.timestamp
                 WHERE game_ratings.id_a IS NULL
                 ORDER BY games.timestamp ASC
-                LIMIT 1000000",
+                LIMIT 250000",
             )
             .unwrap();
 
@@ -575,7 +575,11 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
                 (g.id_a, g.char_a),
                 tx.query_row(
                     "SELECT 
-                        id, char_id, wins, losses, value, deviation, last_decay
+                        id, char_id, wins, losses, value, deviation, last_decay,
+                        top_rating_value, top_rating_deviation, top_rating_timestamp,
+                        top_defeated_id, top_defeated_char_id, top_defeated_name,
+                        top_defeated_value, top_defeated_deviation, top_defeated_floor,
+                        top_defeated_timestamp
                     FROM player_ratings
                     WHERE id = ? AND char_id = ?",
                     params![g.id_a, g.char_a],
@@ -591,7 +595,11 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
                 (g.id_b, g.char_b),
                 tx.query_row(
                     "SELECT 
-                        id, char_id, wins, losses, value, deviation, last_decay
+                        id, char_id, wins, losses, value, deviation, last_decay,
+                        top_rating_value, top_rating_deviation, top_rating_timestamp,
+                        top_defeated_id, top_defeated_char_id, top_defeated_name,
+                        top_defeated_value, top_defeated_deviation, top_defeated_floor,
+                        top_defeated_timestamp
                     FROM player_ratings
                     WHERE id = ? AND char_id = ?",
                     params![g.id_b, g.char_b],
@@ -675,6 +683,9 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
 
         let has_cheater = cheaters.contains(&g.id_a) || cheaters.contains(&g.id_b);
 
+        let old_rating_a = players.get(&(g.id_a, g.char_a)).unwrap().rating;
+        let old_rating_b = players.get(&(g.id_b, g.char_b)).unwrap().rating;
+
         if !has_cheater {
             players
                 .get_mut(&(g.id_a, g.char_a))
@@ -691,14 +702,37 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
                 _ => panic!("Bad winner"),
             };
 
-            let rating_winner = players.get(&winner).unwrap().rating;
-            let rating_loser = players.get(&loser).unwrap().rating;
+            let winner_rating = players.get(&winner).unwrap().rating;
+            let loser_rating = players.get(&loser).unwrap().rating;
 
-            players.get_mut(&winner).unwrap().rating = rating_winner.update(rating_loser, 1.0);
+            players.get_mut(&winner).unwrap().rating = winner_rating.update(loser_rating, 1.0);
             players.get_mut(&winner).unwrap().win_count += 1;
 
-            players.get_mut(&loser).unwrap().rating = rating_loser.update(rating_winner, 0.0);
+            players.get_mut(&loser).unwrap().rating = loser_rating.update(winner_rating, 0.0);
             players.get_mut(&loser).unwrap().loss_count += 1;
+
+            players
+                .get_mut(&winner)
+                .unwrap()
+                .update_top_rating(g.timestamp);
+
+            let loser_name = match g.winner {
+                1 => g.name_b,
+                2 => g.name_a,
+                _ => panic!("Bad winner"),
+            };
+            players.get_mut(&winner).unwrap().update_top_defeated(
+                loser.0,
+                loser.1,
+                loser_name.to_owned(),
+                loser_rating,
+                g.game_floor,
+                g.timestamp,
+            );
+            players
+                .get_mut(&loser)
+                .unwrap()
+                .update_top_rating(g.timestamp);
 
             tx.execute(
                 "UPDATE player_matchups
@@ -716,8 +750,46 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
             )
             .unwrap();
 
-            if rating_winner.deviation < LOW_DEVIATION && rating_loser.deviation < LOW_DEVIATION {
-                let winner_win_prob = rating_winner.expected(rating_loser);
+            {
+                let day_timestamp = NaiveDateTime::from_timestamp(g.timestamp, 0)
+                    .date()
+                    .and_hms(0, 0, 0)
+                    .timestamp();
+
+                let winner_new_rating = players.get(&winner).unwrap().rating;
+                let loser_new_rating = players.get(&loser).unwrap().rating;
+
+                if winner_new_rating.deviation < LOW_DEVIATION {
+                    tx.execute(
+                        "REPLACE INTO daily_ratings VALUES(?, ?, ?, ?, ?)",
+                        params![
+                            winner.0,
+                            winner.1,
+                            day_timestamp,
+                            winner_new_rating.value,
+                            winner_new_rating.deviation
+                        ],
+                    )
+                    .unwrap();
+                }
+
+                if loser_new_rating.deviation < LOW_DEVIATION {
+                    tx.execute(
+                        "REPLACE INTO daily_ratings VALUES(?, ?, ?, ?, ?)",
+                        params![
+                            loser.0,
+                            loser.1,
+                            day_timestamp,
+                            loser_new_rating.value,
+                            loser_new_rating.deviation
+                        ],
+                    )
+                    .unwrap();
+                }
+            }
+
+            if winner_rating.deviation < LOW_DEVIATION && loser_rating.deviation < LOW_DEVIATION {
+                let winner_win_prob = winner_rating.expected(loser_rating);
                 let loser_win_prob = 1.0 - winner_win_prob;
 
                 tx.execute(
@@ -749,7 +821,7 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
                 )
                 .unwrap();
 
-                if rating_winner.value > HIGH_RATING && rating_loser.value > HIGH_RATING {
+                if winner_rating.value > HIGH_RATING && loser_rating.value > HIGH_RATING {
                     tx.execute(
                         "UPDATE high_rated_matchups
                         SET wins_real = wins_real + 1, wins_adjusted = wins_adjusted + ?
@@ -768,19 +840,16 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
             }
         }
 
-        let final_rating_a = players.get(&(g.id_a, g.char_a)).unwrap().rating;
-        let final_rating_b = players.get(&(g.id_b, g.char_b)).unwrap().rating;
-
         tx.execute(
             "INSERT INTO game_ratings VALUES(?, ?, ?, ?, ?, ?, ?)",
             params![
                 g.timestamp,
                 g.id_a,
-                final_rating_a.value,
-                final_rating_a.deviation,
+                old_rating_a.value,
+                old_rating_a.deviation,
                 g.id_b,
-                final_rating_b.value,
-                final_rating_b.deviation,
+                old_rating_b.value,
+                old_rating_b.deviation,
             ],
         )
         .unwrap();
@@ -792,7 +861,10 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
         }
 
         tx.execute(
-            "REPLACE INTO player_ratings VALUES(?, ?, ?, ?, ?, ?, ?)",
+            "REPLACE INTO player_ratings VALUES(
+                ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, 
+                ?, ?, ?, ?, ?, ?, ?)",
             params![
                 player.id,
                 player.char_id,
@@ -801,6 +873,18 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
                 player.rating.value,
                 player.rating.deviation,
                 player.last_decay,
+                //
+                player.top_rating.as_ref().map(|r| r.value),
+                player.top_rating.as_ref().map(|r| r.deviation),
+                player.top_rating.as_ref().map(|r| r.timestamp),
+                //
+                player.top_defeated.as_ref().map(|t| t.id),
+                player.top_defeated.as_ref().map(|t| t.char_id),
+                player.top_defeated.as_ref().map(|t| t.name.clone()),
+                player.top_defeated.as_ref().map(|t| t.value),
+                player.top_defeated.as_ref().map(|t| t.deviation),
+                player.top_defeated.as_ref().map(|t| t.floor),
+                player.top_defeated.as_ref().map(|t| t.timestamp),
             ],
         )
         .unwrap();
@@ -997,7 +1081,11 @@ pub fn update_decay(conn: &mut Connection, timestamp: i64) -> Result<()> {
         let mut stmt = tx
             .prepare(
                 "SELECT
-                    id, char_id, wins, losses, value, deviation, last_decay
+                    id, char_id, wins, losses, value, deviation, last_decay,
+                    top_rating_value, top_rating_deviation, top_rating_timestamp,
+                    top_defeated_id, top_defeated_char_id, top_defeated_name,
+                    top_defeated_value, top_defeated_deviation, top_defeated_floor,
+                    top_defeated_timestamp
                 FROM player_ratings 
                 WHERE deviation < 350.0",
             )
@@ -1363,10 +1451,32 @@ pub struct RatedPlayer {
     pub loss_count: i64,
     pub rating: Rating,
     pub last_decay: i64,
+
+    pub top_rating: Option<TopRating>,
+
+    pub top_defeated: Option<TopDefeated>,
+}
+
+#[derive(Debug)]
+pub struct TopRating {
+    value: f64,
+    deviation: f64,
+    timestamp: i64,
+}
+
+#[derive(Debug)]
+pub struct TopDefeated {
+    id: i64,
+    char_id: i64,
+    name: String,
+    value: f64,
+    deviation: f64,
+    floor: i64,
+    timestamp: i64,
 }
 
 impl RatedPlayer {
-    pub fn new(id: i64, char_id: i64, timestamp: i64) -> Self {
+    fn new(id: i64, char_id: i64, timestamp: i64) -> Self {
         Self {
             id,
             char_id,
@@ -1374,6 +1484,9 @@ impl RatedPlayer {
             loss_count: 0,
             rating: Rating::default(),
             last_decay: timestamp,
+
+            top_rating: None,
+            top_defeated: None,
         }
     }
     pub fn from_row(row: &Row) -> Self {
@@ -1384,10 +1497,36 @@ impl RatedPlayer {
             loss_count: row.get(3).unwrap(),
             rating: Rating::new(row.get(4).unwrap(), row.get(5).unwrap()),
             last_decay: row.get(6).unwrap(),
+
+            top_rating: row
+                .get(7)
+                .map(|value| {
+                    Some(TopRating {
+                        value,
+                        deviation: row.get(8).unwrap(),
+                        timestamp: row.get(9).unwrap(),
+                    })
+                })
+                .unwrap_or_default(),
+
+            top_defeated: row
+                .get(10)
+                .map(|id| {
+                    Some(TopDefeated {
+                        id,
+                        char_id: row.get(11).unwrap(),
+                        name: row.get(12).unwrap(),
+                        value: row.get(13).unwrap(),
+                        deviation: row.get(14).unwrap(),
+                        floor: row.get(15).unwrap(),
+                        timestamp: row.get(16).unwrap(),
+                    })
+                })
+                .unwrap_or_default(),
         }
     }
 
-    pub fn decay(&mut self, timestamp: i64) {
+    fn decay(&mut self, timestamp: i64) {
         let delta = timestamp - self.last_decay;
         if delta < 0 {
             self.last_decay = timestamp;
@@ -1396,6 +1535,50 @@ impl RatedPlayer {
             self.rating
                 .decay_deviation(delta / RATING_PERIOD, DECAY_CONSTANT);
             self.last_decay = timestamp;
+        }
+    }
+
+    fn update_top_rating(&mut self, timestamp: i64) {
+        if self.rating.deviation < LOW_DEVIATION
+            && self
+                .top_rating
+                .as_ref()
+                .map(|r| self.rating.value >= r.value)
+                .unwrap_or(true)
+        {
+            self.top_rating = Some(TopRating {
+                value: self.rating.value,
+                deviation: self.rating.deviation,
+                timestamp,
+            });
+        }
+    }
+
+    fn update_top_defeated(
+        &mut self,
+        id: i64,
+        char_id: i64,
+        name: String,
+        opponent_rating: Rating,
+        floor: i64,
+        timestamp: i64,
+    ) {
+        if opponent_rating.deviation < LOW_DEVIATION
+            && self
+                .top_defeated
+                .as_ref()
+                .map(|t| opponent_rating.value > t.value)
+                .unwrap_or(true)
+        {
+            self.top_defeated = Some(TopDefeated {
+                id,
+                char_id,
+                name,
+                value: opponent_rating.value,
+                deviation: opponent_rating.deviation,
+                floor,
+                timestamp,
+            });
         }
     }
 }

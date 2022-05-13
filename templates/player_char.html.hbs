@@ -75,6 +75,11 @@
                   <span class="tag is-warning is-medium">#{{player.data.global_rank}} Overall</span>
                 {{/if}}
               </h2>
+              {{#if player.data.top_rating_value}}
+                  <h4>Top rating:
+                      {{player.data.top_rating_value}}±{{player.data.top_rating_deviation}} ({{player.data.top_rating_timestamp}})
+                  </h4>
+              {{/if}}
 
               <div id="history">
                   <p>Loading match history..<p>

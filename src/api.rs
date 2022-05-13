@@ -533,6 +533,11 @@ struct PlayerCharacterData {
     rating_deviation: f64,
     global_rank: Option<i32>,
     character_rank: Option<i32>,
+
+    top_rating_value: Option<f64>,
+    top_rating_deviation: Option<f64>,
+    top_rating_timestamp: Option<String>,
+
     win_rate: f64,
     adjusted_win_rate: f64,
     game_count: i32,
@@ -813,9 +818,22 @@ fn get_player_character_data(
     id: i64,
     char_id: i64,
 ) -> Result<Option<PlayerCharacterData>> {
-    let (wins, losses, value, deviation, global_rank, character_rank) = match conn.query_row(
-        "SELECT wins, losses, value, deviation, global_rank, character_rank
-            FROM player_ratings
+    let (
+        wins,
+        losses,
+        value,
+        deviation,
+        top_rating_value,
+        top_rating_deviation,
+        top_rating_timestamp,
+        global_rank,
+        character_rank,
+    ) = match conn.query_row(
+        "SELECT 
+            wins, losses, value, deviation, 
+            top_rating_value, top_rating_deviation, top_rating_timestamp, 
+            global_rank, character_rank
+        FROM player_ratings
             LEFT JOIN ranking_global ON
                 ranking_global.id = player_ratings.id AND
                 ranking_global.char_id = player_ratings.char_id
@@ -830,8 +848,11 @@ fn get_player_character_data(
                 row.get::<_, i32>(1).unwrap(),
                 row.get::<_, f64>(2).unwrap(),
                 row.get::<_, f64>(3).unwrap(),
-                row.get::<_, Option<i32>>(4).unwrap(),
-                row.get::<_, Option<i32>>(5).unwrap(),
+                row.get::<_, Option<f64>>(4).unwrap(),
+                row.get::<_, Option<f64>>(5).unwrap(),
+                row.get::<_, Option<i64>>(6).unwrap(),
+                row.get::<_, Option<i32>>(7).unwrap(),
+                row.get::<_, Option<i32>>(8).unwrap(),
             ))
         },
     ) {
@@ -895,6 +916,13 @@ fn get_player_character_data(
                 .round(),
             rating_value: value.round(),
             rating_deviation: (deviation * 2.0).round(),
+            top_rating_value: top_rating_value.map(|r| r.round()),
+            top_rating_deviation: top_rating_deviation.map(|d| (2.0 * d).round()),
+            top_rating_timestamp: top_rating_timestamp.map(|t| {
+                NaiveDateTime::from_timestamp(t, 0)
+                    .format("%Y-%m-%d")
+                    .to_string()
+            }),
             matchups,
             character_rank,
             global_rank,
