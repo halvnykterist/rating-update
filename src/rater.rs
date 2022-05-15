@@ -218,9 +218,9 @@ pub async fn update_statistics_continuous() -> Result<()> {
                 info!("New statistics period, updating statistics.");
                 last_statistics_update = last_ranking_update;
                 update_player_distribution(&mut conn);
-                if let Err(e) = calc_versus_matchups(&mut conn) {
-                    error!("calc_versus_matchups failed: {}", e);
-                }
+                //if let Err(e) = calc_versus_matchups(&mut conn) {
+                //    error!("calc_versus_matchups failed: {}", e);
+                //}
                 if let Err(e) = calc_fraud_index(&mut conn) {
                     error!("calc_fraud_index failed: {}", e);
                 }
