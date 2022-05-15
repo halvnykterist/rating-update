@@ -71,7 +71,7 @@ CREATE TABLE player_ratings (
     top_defeated_value REAL,
     top_defeated_deviation REAL,
     top_defeated_floor INTEGER,
-    top_defeated_timestamp REAL,
+    top_defeated_timestamp INTEGER,
 
     PRIMARY KEY(id, char_id)
 );

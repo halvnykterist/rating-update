@@ -210,7 +210,8 @@ pub async fn update_statistics_continuous() -> Result<()> {
 
     loop {
         interval.tick().await;
-        if Utc::now().timestamp() - last_ranking_update > RANKING_PERIOD {
+        let now = Utc::now().timestamp();
+        if now - last_ranking_update > RANKING_PERIOD {
             info!("New ranking period, updating decay and rankings");
 
             if last_ranking_update - last_statistics_update >= STATISTICS_PERIOD {
@@ -227,6 +228,7 @@ pub async fn update_statistics_continuous() -> Result<()> {
                     error!("calc_character_popularity failed: {}", e);
                 }
             }
+
             if let Err(e) = update_decay(&mut conn, Utc::now().timestamp()) {
                 error!("update_decay failed: {}", e);
             }
@@ -234,7 +236,14 @@ pub async fn update_statistics_continuous() -> Result<()> {
                 error!("update_rankings failed: {}", e);
             }
 
-            last_ranking_update += RANKING_PERIOD;
+            while now - last_ranking_update > RANKING_PERIOD {
+                last_ranking_update += RANKING_PERIOD;
+            }
+
+            info!(
+                "Last ranking period: {}",
+                NaiveDateTime::from_timestamp(last_ranking_update, 0)
+            );
 
             conn.execute(
                 "UPDATE config SET last_update = ?",
@@ -260,12 +269,19 @@ pub async fn update_once() {
     //if let Err(e) = calc_fraud_index(&mut conn) {
     //    error!("calc_fraud_index failed: {}", e);
     //}
+
     if let Err(e) = update_rankings(&mut conn) {
         error!("update_rankings failed: {}", e);
     }
     //if let Err(e) = calc_character_popularity(&mut conn, last_rating_timestamp) {
     //    error!("calc_character_popularity failed: {}", e);
     //}
+}
+
+pub async fn update_decay_once() {
+    let mut conn = Connection::open(DB_NAME).unwrap();
+
+    update_decay(&mut conn, Utc::now().timestamp()).unwrap();
 }
 
 pub fn get_average_rating(conn: &Transaction, id: i64) -> f64 {
@@ -1033,6 +1049,7 @@ pub fn calc_character_popularity(conn: &mut Connection, last_timestamp: i64) -> 
 }
 
 pub fn update_rankings(conn: &mut Connection) -> Result<()> {
+    info!("Updating rankings");
     let then = Utc::now();
     let tx = conn.transaction()?;
     tx.execute("DELETE FROM ranking_global", [])?;
@@ -1071,6 +1088,7 @@ pub fn update_rankings(conn: &mut Connection) -> Result<()> {
 }
 
 pub fn update_decay(conn: &mut Connection, timestamp: i64) -> Result<()> {
+    info!("Updating decay");
     let then = Utc::now();
 
     let tx = conn.transaction()?;
@@ -1099,21 +1117,23 @@ pub fn update_decay(conn: &mut Connection, timestamp: i64) -> Result<()> {
         players
     };
 
+    let mut total_decay = 0;
     for p in &mut players {
-        p.1.decay(timestamp);
+        total_decay += p.1.decay(timestamp);
     }
+
+    info!("Exzecuted {} decay cycles.", total_decay);
 
     for player in players.values() {
         tx.execute(
-            "REPLACE INTO player_ratings VALUES(?, ?, ?, ?, ?, ?, ?)",
+            "UPDATE player_ratings SET
+            deviation = ?, last_decay = ? WHERE 
+            id = ? AND char_id = ?",
             params![
-                player.id,
-                player.char_id,
-                player.win_count,
-                player.loss_count,
-                player.rating.value,
                 player.rating.deviation,
                 player.last_decay,
+                player.id,
+                player.char_id,
             ],
         )
         .unwrap();
@@ -1526,15 +1546,19 @@ impl RatedPlayer {
         }
     }
 
-    fn decay(&mut self, timestamp: i64) {
+    fn decay(&mut self, timestamp: i64) -> i64 {
         let delta = timestamp - self.last_decay;
         if delta < 0 {
             self.last_decay = timestamp;
-        }
-        if delta > RATING_PERIOD {
+            0
+        } else if delta > RATING_PERIOD {
             self.rating
                 .decay_deviation(delta / RATING_PERIOD, DECAY_CONSTANT);
             self.last_decay = timestamp;
+
+            delta / RATING_PERIOD
+        } else {
+            0
         }
     }
 

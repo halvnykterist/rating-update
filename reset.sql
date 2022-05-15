@@ -1,6 +1,7 @@
 DELETE FROM game_ratings;
 DELETE FROM players;
 DELETE FROM player_ratings;
+DELETE FROM daily_ratings;
 DELETE FROM player_matchups;
 DELETE FROM global_matchups;
 DELETE FROM high_rated_matchups;

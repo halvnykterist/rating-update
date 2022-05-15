@@ -23,3 +23,11 @@ stats:
     total players
     games in the last day
     different players in the last day
+
+TODO:
+    buttons for rank/character rank
+    buttons for supporter
+
+    section for highest rating
+    section for highest defeated
+
