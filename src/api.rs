@@ -538,6 +538,14 @@ struct PlayerCharacterData {
     top_rating_deviation: Option<f64>,
     top_rating_timestamp: Option<String>,
 
+    top_defeated_id: Option<String>,
+    top_defeated_char_id: Option<&'static str>,
+    top_defeated_name: Option<String>,
+    top_defeated_value: Option<f64>,
+    top_defeated_deviation: Option<f64>,
+    top_defeated_floor: Option<String>,
+    top_defeated_timestamp: Option<String>,
+
     win_rate: f64,
     adjusted_win_rate: f64,
     game_count: i32,
@@ -826,12 +834,24 @@ fn get_player_character_data(
         top_rating_value,
         top_rating_deviation,
         top_rating_timestamp,
+        top_defeated_id,
+        top_defeated_char_id,
+        top_defeated_name,
+        top_defeated_value,
+        top_defeated_deviation,
+        top_defeated_floor,
+        top_defeated_timestamp,
         global_rank,
         character_rank,
     ) = match conn.query_row(
         "SELECT 
             wins, losses, value, deviation, 
             top_rating_value, top_rating_deviation, top_rating_timestamp, 
+
+            top_defeated_id, top_defeated_char_id, top_defeated_name,
+            top_defeated_value, top_defeated_deviation, top_defeated_floor,
+            top_defeated_timestamp,
+
             global_rank, character_rank
         FROM player_ratings
             LEFT JOIN ranking_global ON
@@ -848,11 +868,21 @@ fn get_player_character_data(
                 row.get::<_, i32>(1).unwrap(),
                 row.get::<_, f64>(2).unwrap(),
                 row.get::<_, f64>(3).unwrap(),
+                //top rating
                 row.get::<_, Option<f64>>(4).unwrap(),
                 row.get::<_, Option<f64>>(5).unwrap(),
                 row.get::<_, Option<i64>>(6).unwrap(),
-                row.get::<_, Option<i32>>(7).unwrap(),
-                row.get::<_, Option<i32>>(8).unwrap(),
+                //top defeated
+                row.get::<_, Option<i64>>(7).unwrap(),
+                row.get::<_, Option<i64>>(8).unwrap(),
+                row.get::<_, Option<String>>(9).unwrap(),
+                row.get::<_, Option<f64>>(10).unwrap(),
+                row.get::<_, Option<f64>>(11).unwrap(),
+                row.get::<_, Option<i64>>(12).unwrap(),
+                row.get::<_, Option<i64>>(13).unwrap(),
+                //rank
+                row.get::<_, Option<i32>>(14).unwrap(),
+                row.get::<_, Option<i32>>(15).unwrap(),
             ))
         },
     ) {
@@ -923,6 +953,17 @@ fn get_player_character_data(
                     .format("%Y-%m-%d")
                     .to_string()
             }),
+            top_defeated_id: top_defeated_id.map(|id| format!("{:X}", id)),
+            top_defeated_char_id: top_defeated_char_id.map(|id| website::CHAR_NAMES[id as usize].0),
+            top_defeated_name,
+            top_defeated_value: top_defeated_value.map(f64::round),
+            top_defeated_deviation: top_defeated_deviation.map(|r| (2.0 * r).round()),
+            top_defeated_floor: top_defeated_floor.map(stringify_floor),
+            top_defeated_timestamp: top_defeated_timestamp.map(|t| {
+                NaiveDateTime::from_timestamp(t, 0)
+                    .format("%Y-%m-%d")
+                    .to_string()
+            }),
             matchups,
             character_rank,
             global_rank,
@@ -982,10 +1023,7 @@ impl RawPlayerSet {
             timestamp,
             own_rating_value: self.own_value.round(),
             own_rating_deviation: (2.0 * self.own_deviation).round(),
-            floor: match self.floor {
-                f @ 1..=10 => format!("F{:0}", f),
-                _ => "C".to_owned(),
-            },
+            floor: stringify_floor(self.floor),
             opponent_name: self.opponent_name,
             opponent_id: format!("{:X}", self.opponent_id),
             opponent_character_short: website::CHAR_NAMES[self.opponent_char as usize].0,
@@ -1021,6 +1059,13 @@ impl RawPlayerSet {
 
             expected_outcome,
         }
+    }
+}
+
+fn stringify_floor(floor: i64) -> String {
+    match floor {
+        f @ 1..=10 => format!("F{:0}", f),
+        _ => "C".to_owned(),
     }
 }
 

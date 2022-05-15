@@ -80,6 +80,15 @@
                       {{player.data.top_rating_value}}±{{player.data.top_rating_deviation}} ({{player.data.top_rating_timestamp}})
                   </h4>
               {{/if}}
+              {{#if player.data.top_defeated_id}}
+                  <h4>Top defeated:
+                      <a href="/player/{{player.data.top_defeated_id}}/{{player.data.top_defeated_char_id}}">
+                          <span class="maybe_long_name" title="{{name}}">{{player.data.top_defeated_name}}</span>
+                          <span>({{player.data.top_defeated_char_id}})</span>
+                      </a>
+                      {{player.data.top_defeated_value}}±{{player.data.top_defeated_deviation}} ({{player.data.top_defeated_timestamp}})
+                  </h4>
+              {{/if}}
 
               <div id="history">
                   <p>Loading match history..<p>

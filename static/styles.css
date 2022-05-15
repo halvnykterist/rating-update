@@ -59,10 +59,11 @@ table {
 
 .maybe_long_name {
   display: inline-block;
-  width: 10em;
+  max-width: 10em;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  vertical-align: bottom;
 }
 
 
