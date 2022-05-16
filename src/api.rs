@@ -1734,8 +1734,6 @@ pub async fn rating_experience_player(
                 let id_b: i64 = row.get(1).unwrap();
                 let a: f64 = row.get(2).unwrap();
                 let b: f64 = row.get(3).unwrap();
-                let a = a * 173.718 + 1500.0;
-                let b = b * 173.718 + 1500.0;
 
                 if id_a == id {
                     let delta = b - a;
