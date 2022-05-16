@@ -45,6 +45,9 @@ async fn main() {
         Some("update") => {
             rater::update_once().await;
         }
+        Some("fraud") => {
+            rater::update_fraud_once().await;
+        }
         Some("decay") => {
             rater::update_decay_once().await;
         }
