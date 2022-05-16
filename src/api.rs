@@ -1594,7 +1594,7 @@ pub async fn get_fraud(conn: &RatingsDbConn) -> Vec<FraudStats> {
             res.push(FraudStats {
                 character_name: website::CHAR_NAMES[row.get::<_, usize>(0).unwrap()].1,
                 player_count: row.get(1).unwrap(),
-                average_offset: format!("{:+.1}", (row.get::<_, f64>(1).unwrap())),
+                average_offset: format!("{:+.1}", (row.get::<_, f64>(2).unwrap())),
             });
         }
 
@@ -1701,6 +1701,7 @@ pub async fn rating_experience_player(
     player_id: &str,
 ) -> Json<RatingDiffStats> {
     let id = i64::from_str_radix(player_id, 16).unwrap();
+
     Json(
         conn.run(move |conn| {
             let mut stmt = conn

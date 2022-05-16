@@ -266,9 +266,9 @@ pub async fn update_once() {
     //if let Err(e) = calc_versus_matchups(&mut conn) {
     //    error!("calc_versus_matchups failed: {}", e);
     //}
-    //if let Err(e) = calc_fraud_index(&mut conn) {
-    //    error!("calc_fraud_index failed: {}", e);
-    //}
+    if let Err(e) = calc_fraud_index(&mut conn) {
+        error!("calc_fraud_index failed: {}", e);
+    }
 
     if let Err(e) = update_rankings(&mut conn) {
         error!("update_rankings failed: {}", e);
@@ -1171,7 +1171,7 @@ pub fn calc_fraud_index(conn: &mut Connection) -> Result<()> {
                             avg(value) as avg_value, 
                             count(char_id) as char_count
                         from player_ratings
-                        where deviation < ? and wins + losses >= 100
+                        where deviation < ? and wins + losses >= 300
                         group by id
                     ) as averages
                     where char_count > 1
@@ -1182,7 +1182,7 @@ pub fn calc_fraud_index(conn: &mut Connection) -> Result<()> {
                 (
                     select id, char_id, value
                     from player_ratings
-                    where deviation < ? and wins + losses >= 100
+                    where deviation < ? and wins + losses >= 300
                 ) as char_ratings
 
                 on filtered_averages.id = char_ratings.id
@@ -1219,10 +1219,10 @@ pub fn calc_fraud_index(conn: &mut Connection) -> Result<()> {
                             avg(value) as avg_value, 
                             count(char_id) as char_count
                         from player_ratings
-                        where deviation < ? and wins + losses >= 100
+                        where deviation < ? and wins + losses > 200
                         group by id
                     ) as averages
-                    where char_count > 1 AND avg_value > 0.0
+                    where char_count > 1 AND avg_value > 1500.0 
                 ) as filtered_averages
 
                 join
@@ -1230,7 +1230,7 @@ pub fn calc_fraud_index(conn: &mut Connection) -> Result<()> {
                 (
                     select id, char_id, value
                     from player_ratings
-                    where deviation < ? and wins + losses >= 100
+                    where deviation < ? and wins + losses >= 200
                 ) as char_ratings
 
                 on filtered_averages.id = char_ratings.id
@@ -1270,7 +1270,7 @@ pub fn calc_fraud_index(conn: &mut Connection) -> Result<()> {
                         where deviation < ? and wins + losses >= 100
                         group by id
                     ) as averages
-                    where char_count > 1 AND avg_value > 1.7
+                    where char_count > 1 AND avg_value > 1800
                 ) as filtered_averages
 
                 join
