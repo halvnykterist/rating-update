@@ -21,7 +21,7 @@
 
 .form-table > p > label {
     display: table-cell;
-    width: 12em;
+    width: 8em;
     text-align: end;
     padding-right: 0.5em;
 }

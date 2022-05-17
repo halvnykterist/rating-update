@@ -13,17 +13,15 @@
             </div>
         </section>
         <section class="section">
-            <p>Use this to calculate rating changes and get more of a sense for the algorithm.</p>
+            <p>Use this to calculate rating changes or get more of a sense for how the algorithm works.</p>
             <br>
-
-
 
             <form class="form-table">
                 <p>
                     <span></span>
-                    <span>Own rating:</span>
+                    <span>P1 rating:</span>
                     <span></span>
-                    <span>Opponent rating:</span>
+                    <span>P2 rating:</span>
                 </p>
                 <p>
                     <label for="own_rating">Rating</label>
@@ -37,15 +35,29 @@
                     <label for="opp_deviation">Deviation</label>
                     <input id="opp_deviation" type="number" min="50" max="750" value="100" step="10" oninput="update()">
                 </p>
+                <br>
                 <p>
-                    <label>Expected outcome</label>
+                    <label></label>
+                    <label>Win chance:</label>
                     <span id="expected_outcome"></span>
                 </p>
                 <p>
-                    <label>On win:</label>
+                    <label>P1 Win:</label>
                     <span id="own_win_delta"></span>
-                    <span>
+                    <label></label>
+                    <span id="opp_loss_delta"></span>
+                </p>
+                <p>
+                    <label>P2 Win:</label>
+                    <span id="own_loss_delta"></span>
+                    <label></label>
                     <span id="opp_win_delta"></span>
+                </p>
+                <p>
+                    <label>New deviation</label>
+                    <span id="own_new_deviation"></span>
+                    <label></label>
+                    <span id="opp_new_deviation"></span>
                 </p>
             </form>
         </section>
