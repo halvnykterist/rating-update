@@ -57,7 +57,7 @@ impl Activity {
         let over_1700 = conn
             .query_row(
                 "SELECT COUNT(*) FROM game_ratings WHERE timestamp > ?
-                    AND (value_a > 1800 OR value_b > 1700)",
+                    AND (value_a > 1700 OR value_b > 1700)",
                 params![t],
                 |r| r.get(0),
             )
