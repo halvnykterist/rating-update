@@ -7,6 +7,30 @@
   width: auto;
 }
 
+.form-table {
+    display: table;
+}
+
+.form-table > p {
+    display: table-row;
+}
+
+.form-table > p > span {
+    display: table-cell;
+}
+
+.form-table > p > label {
+    display: table-cell;
+    width: 12em;
+    text-align: end;
+    padding-right: 0.5em;
+}
+
+.form-table > p > input {
+    display: table-cell;
+}
+
+
 tr:nth-child(n) td.uncertain {
   background-color: #363636;
 }

@@ -58,6 +58,7 @@ pub async fn run() {
                 about,
                 stats,
                 supporters,
+                rating_calculator,
                 api::stats,
                 api::player_rating,
                 api::player_rating_accuracy,
@@ -107,6 +108,25 @@ async fn about(conn: RatingsDbConn) -> Cached<Template> {
     };
 
     Cached::new(Template::render("about", &context), 999)
+}
+
+#[get("/rating_calculator")]
+async fn rating_calculator(conn: RatingsDbConn) -> Cached<Template> {
+    api::add_hit(&conn, format!("rating_calculator")).await;
+
+    #[derive(Serialize)]
+    struct Context {
+        platform: &'static str,
+        is_pc: bool,
+        all_characters: &'static [(&'static str, &'static str)],
+    }
+    let context = Context {
+        platform: PLATFORM,
+        is_pc: PLATFORM == "PC",
+        all_characters: CHAR_NAMES,
+    };
+
+    Cached::new(Template::render("rating_calculator", &context), 999)
 }
 
 #[get("/stats")]

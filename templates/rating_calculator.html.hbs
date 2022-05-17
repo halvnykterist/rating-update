@@ -1,0 +1,54 @@
+<!DOCTYPE html> 
+<html class="has-navbar-fixed-top">
+    <meta charset = "UTF-8">
+    <head>
+        {{> metadata title="Rating calculator" }}
+        <script src="/glicko_calculator.js"></script>
+    </head>
+    <body onload="update()">
+        {{> navbar}}
+        <section class="hero is-primary">
+            <div class="hero-body has-text-centered">
+                <p class="title">Rating calculator</p>
+            </div>
+        </section>
+        <section class="section">
+            <p>Use this to calculate rating changes and get more of a sense for the algorithm.</p>
+            <br>
+
+
+
+            <form class="form-table">
+                <p>
+                    <span></span>
+                    <span>Own rating:</span>
+                    <span></span>
+                    <span>Opponent rating:</span>
+                </p>
+                <p>
+                    <label for="own_rating">Rating</label>
+                    <input id="own_rating" type="number" value="1500" step="10" oninput="update()">
+                    <label for="opp_rating">Rating</label>
+                    <input id="opp_rating" type="number" value="1500" step="10" oninput="update()">
+                </p>
+                <p>
+                    <label for="own_deviation">Deviation</label>
+                    <input id="own_deviation" type="number" min="50" max="750" value="100" step="10" oninput="update()">
+                    <label for="opp_deviation">Deviation</label>
+                    <input id="opp_deviation" type="number" min="50" max="750" value="100" step="10" oninput="update()">
+                </p>
+                <p>
+                    <label>Expected outcome</label>
+                    <span id="expected_outcome"></span>
+                </p>
+                <p>
+                    <label>On win:</label>
+                    <span id="own_win_delta"></span>
+                    <span>
+                    <span id="opp_win_delta"></span>
+                </p>
+            </form>
+        </section>
+    </body>
+    {{> footer }}
+</html>
