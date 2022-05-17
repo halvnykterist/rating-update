@@ -133,8 +133,6 @@ pub async fn stats_inner(conn: &RatingsDbConn) -> Stats {
             .query_row("SELECT COUNT(*) FROM players", [], |r| r.get(0))
             .unwrap();
 
-        let t = Utc::now().timestamp() - 60 * 60 * 24;
-
         let activity_7d = Activity::calculate(conn, 60 * 60 * 24 * 7);
         let activity_24h = Activity::calculate(conn, 60 * 60 * 24);
         let activity_1h = Activity::calculate(conn, 60 * 60);
@@ -1126,11 +1124,13 @@ impl RawPlayerSet {
 
             rating_change: format!("{:+.1}", rating_change_sum,),
             rating_change_class: if average_rating_change >= 2.0 {
-                "has-text-success"
-            } else if average_rating_change > -2.0 {
-                "has-text-warning"
+                "rating-up"
+            } else if average_rating_change >= 0.0  {
+                "rating-barely-up"
+            } else if average_rating_change >= -2.0 {
+                "rating-barely-down"
             } else {
-                "has-text-danger"
+                "rating-down"
             },
             rating_change_sequence: self.rating_change_sequence.iter().rev().copied().fold(
                 String::new(),

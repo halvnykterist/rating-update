@@ -66,6 +66,22 @@ table {
   vertical-align: bottom;
 }
 
+.rating-up {
+    color: #48c78e !important
+}
+
+.rating-barely-up {
+    color: #ffe789 !important
+}
+
+.rating-barely-down {
+    color: #ffa589 !important
+}
+
+.rating-down {
+    color: #ff0000 !important
+}
+
 
 /*! bulma.io v0.9.3 | MIT License | github.com/jgthms/bulma */
 /* Bulma Utilities */
