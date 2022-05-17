@@ -15,9 +15,108 @@ type Result<T> = std::result::Result<T, anyhow::Error>;
 pub struct Stats {
     game_count: i64,
     player_count: i64,
-    next_update_in: String,
-    pub last_update: i64,
-    pub last_update_string: String,
+    activity_7d: Activity,
+    activity_24h: Activity,
+    activity_1h: Activity,
+}
+
+#[derive(Serialize)]
+pub struct Activity {
+    players: i64,
+    games: i64,
+    over_1700: i64,
+    over_1900: i64,
+    over_2100: i64,
+    sub_1300: i64,
+    sub_1100: i64,
+    sub_900: i64,
+}
+
+impl Activity {
+    fn calculate(conn: &mut Connection, time_offset: i64) -> Self {
+        let t = Utc::now().timestamp() - time_offset;
+        let players = conn
+            .query_row(
+                "SELECT COUNT(DISTINCT(id)) FROM
+                    (SELECT id_a as id FROM game_ratings WHERE timestamp > ?
+                        UNION
+                    SELECT id_b as id FROM game_ratings WHERE timestamp > ?)",
+                params![t, t],
+                |r| r.get(0),
+            )
+            .unwrap();
+
+        let games = conn
+            .query_row(
+                "SELECT COUNT(*) FROM game_ratings WHERE timestamp > ?",
+                params![t],
+                |r| r.get(0),
+            )
+            .unwrap();
+
+        let over_1700 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM game_ratings WHERE timestamp > ?
+                    AND (value_a > 1800 OR value_b > 1700)",
+                params![t],
+                |r| r.get(0),
+            )
+            .unwrap();
+
+        let over_1900 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM game_ratings WHERE timestamp > ?
+                    AND (value_a > 1900 OR value_b > 1900)",
+                params![t],
+                |r| r.get(0),
+            )
+            .unwrap();
+
+        let over_2100 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM game_ratings WHERE timestamp > ?
+                    AND (value_a > 2100 OR value_b > 2100)",
+                params![t],
+                |r| r.get(0),
+            )
+            .unwrap();
+
+        let sub_1300 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM game_ratings WHERE timestamp > ?
+                    AND (value_a < 1200 OR value_b < 1300)",
+                params![t],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let sub_1100 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM game_ratings WHERE timestamp > ?
+                    AND (value_a < 1100 OR value_b < 1100)",
+                params![t],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let sub_900 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM game_ratings WHERE timestamp > ?
+                    AND (value_a < 900 OR value_b < 900)",
+                params![t],
+                |r| r.get(0),
+            )
+            .unwrap();
+
+        Self {
+            players,
+            games,
+            over_1700,
+            over_1900,
+            over_2100,
+            sub_1300,
+            sub_1100,
+            sub_900,
+        }
+    }
 }
 
 #[get("/api/stats")]
@@ -33,26 +132,19 @@ pub async fn stats_inner(conn: &RatingsDbConn) -> Stats {
         let player_count: i64 = conn
             .query_row("SELECT COUNT(*) FROM players", [], |r| r.get(0))
             .unwrap();
-        let last_update: i64 = conn
-            .query_row("SELECT last_update FROM config", [], |r| r.get(0))
-            .unwrap();
 
-        let time_to_update =
-            Duration::seconds(last_update + rater::RATING_PERIOD - Utc::now().timestamp());
+        let t = Utc::now().timestamp() - 60 * 60 * 24;
+
+        let activity_7d = Activity::calculate(conn, 60 * 60 * 24 * 7);
+        let activity_24h = Activity::calculate(conn, 60 * 60 * 24);
+        let activity_1h = Activity::calculate(conn, 60 * 60);
 
         Stats {
             game_count,
             player_count,
-            last_update,
-            next_update_in: format!(
-                "{:}:{:02}",
-                time_to_update.num_hours(),
-                time_to_update.num_minutes() - time_to_update.num_hours() * 60
-            ),
-            last_update_string: format!(
-                "{} UTC",
-                NaiveDateTime::from_timestamp(last_update, 0).format("%H:%M")
-            ),
+            activity_7d,
+            activity_24h,
+            activity_1h,
         }
     })
     .await

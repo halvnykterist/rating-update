@@ -14,11 +14,68 @@
         <section class="section">
             <div class="container">
                 <div class="content">
-                    {{#if stats.game_count}}
-                    Data from {{stats.game_count}} games between {{stats.player_count}} players.<br>
-                    Leaderboards require a rating deviation ≤150.<br>
-                    Time until next update is {{stats.next_update_in}} (last update was at {{stats.last_update_string}}.)
-                    {{/if}}
+                    <p>Data from {{stats.game_count}} games between {{stats.player_count}} players.</p>
+
+                    <h4>Recent activity</h4>
+                    <div class="table-container">
+                      <table>
+                          <tr>
+                            <th>&nbsp;</th>
+                            <th>7 days</th>
+                            <th>24 hours</th>
+                            <th>1 hour</th>
+                          </tr>
+                          <tr>
+                              <th>Players</th>
+                              <td>{{stats.activity_7d.players}}</td>
+                              <td>{{stats.activity_24h.players}}</td>
+                              <td>{{stats.activity_1h.players}}</td>
+                          </tr>
+                          <tr>
+                              <th>Games</th>
+                              <td>{{stats.activity_7d.games}}</td>
+                              <td>{{stats.activity_24h.games}}</td>
+                              <td>{{stats.activity_1h.games}}</td>
+                          </tr>
+                          <tr>
+                              <th>Games (≥1700)</th>
+                              <td>{{stats.activity_7d.over_1700}}</td>
+                              <td>{{stats.activity_24h.over_1700}}</td>
+                              <td>{{stats.activity_1h.over_1700}}</td>
+                          </tr>
+                          <tr>
+                              <th>Games (≥1900)</th>
+                              <td>{{stats.activity_7d.over_1900}}</td>
+                              <td>{{stats.activity_24h.over_1900}}</td>
+                              <td>{{stats.activity_1h.over_1900}}</td>
+                          </tr>
+                          <tr>
+                              <th>Games (≥2100)</th>
+                              <td>{{stats.activity_7d.over_2100}}</td>
+                              <td>{{stats.activity_24h.over_2100}}</td>
+                              <td>{{stats.activity_1h.over_2100}}</td>
+                          </tr>
+                          <tr>
+                              <th>Games (≤1300)</th>
+                              <td>{{stats.activity_7d.sub_1300}}</td>
+                              <td>{{stats.activity_24h.sub_1300}}</td>
+                              <td>{{stats.activity_1h.sub_1300}}</td>
+                          </tr>
+                          <tr>
+                              <th>Games (≤1100)</th>
+                              <td>{{stats.activity_7d.sub_1100}}</td>
+                              <td>{{stats.activity_24h.sub_1100}}</td>
+                              <td>{{stats.activity_1h.sub_1100}}</td>
+                          </tr>
+                          <tr>
+                              <th>Games (≤900)</th>
+                              <td>{{stats.activity_7d.sub_900}}</td>
+                              <td>{{stats.activity_24h.sub_900}}</td>
+                              <td>{{stats.activity_1h.sub_900}}</td>
+                          </tr>
+                      </table>
+                    </div>
+                    <i>Games (≤1300) means that at least one of the players needs to be sub 1300 rating, but not necessarily both.</i>
                 </div>
             </div>
         </section>
