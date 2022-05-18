@@ -278,6 +278,98 @@ pub async fn update_once() {
     //}
 }
 
+pub async fn mark_cheater(
+    cheater_id: Option<&str>,
+    cheater_type: Option<&str>,
+    notes: Option<&str>,
+) {
+    let cheater_id = i64::from_str_radix(cheater_id.unwrap(), 16).unwrap();
+
+    let conn = Connection::open(DB_NAME).unwrap();
+
+    struct Game {
+        id_a: i64,
+        char_a: i64,
+        value_a: f64,
+        deviation_a: f64,
+        id_b: i64,
+        char_b: i64,
+        value_b: f64,
+        deviation_b: f64,
+        winner: i64,
+    };
+
+    let games = {
+        let mut stmt = conn.prepare(
+            "SELECT id_a, char_a, value_a, deviation_a, id_b, char_b, value_b, deviation_b, winner
+            FROM game_ratings
+            NATURAL JOIN games
+            WHERE id_a = ? OR id_b = ?").unwrap();
+
+        let mut games = Vec::new();
+        let mut rows = stmt.query(params![cheater_id, cheater_id]).unwrap();
+
+        while let Some(row) = rows.next().unwrap() {
+            games.push(Game {
+                id_a: row.get(0).unwrap(),
+                char_a: row.get(1).unwrap(),
+                value_a: row.get(2).unwrap(),
+                deviation_a: row.get(3).unwrap(),
+                id_b: row.get(4).unwrap(),
+                char_b: row.get(5).unwrap(),
+                value_b: row.get(6).unwrap(),
+                deviation_b: row.get(7).unwrap(),
+                winner: row.get(8).unwrap(),
+            });
+        }
+
+        games
+    };
+
+    let mut player_offsets = FxHashMap::<(i64, i64), f64>::default();
+
+    for g in games {
+        if g.id_a == cheater_id {
+            let change = Rating::new(g.value_b, g.deviation_b).rating_change(
+                Rating::new(g.value_a, g.deviation_a),
+                if g.winner == 1 { 0.0 } else { 1.0 },
+            );
+
+            *player_offsets.entry((g.id_b, g.char_b)).or_default() -= change;
+        } else {
+            let change = Rating::new(g.value_a, g.deviation_a).rating_change(
+                Rating::new(g.value_b, g.deviation_b),
+                if g.winner == 1 { 1.0 } else { 0.0 },
+            );
+
+            *player_offsets.entry((g.id_a, g.char_a)).or_default() -= change;
+        }
+    }
+
+    for (key, value) in &player_offsets {
+        println!("{:?}: {:.1}", key, value);
+    }
+
+    if cheater_type.is_some() {
+        for ((id, char_id), offset) in player_offsets {
+            conn.execute(
+                "UPDATE player_ratings 
+            SET value = value + ?
+            WHERE id= ? AND char_id = ?",
+                params![offset, id, char_id],
+            )
+            .unwrap();
+        }
+
+        conn.execute(
+            "INSERT INTO cheater_status
+            VALUES(?, ?, ?)",
+            params![cheater_id, cheater_type, notes.unwrap_or("")],
+        )
+        .unwrap();
+    }
+}
+
 pub async fn update_fraud_once() {
     let mut conn = Connection::open(DB_NAME).unwrap();
 
@@ -285,7 +377,6 @@ pub async fn update_fraud_once() {
         error!("calc_fraud_index failed: {}", e);
     }
 }
-
 
 pub async fn update_decay_once() {
     let mut conn = Connection::open(DB_NAME).unwrap();

@@ -48,6 +48,14 @@ async fn main() {
         Some("fraud") => {
             rater::update_fraud_once().await;
         }
+        Some("mark_cheater") => {
+            rater::mark_cheater(
+                args.get(1).map(|r| r.deref()),
+                args.get(2).map(|r| r.deref()),
+                args.get(3).map(|r| r.deref()),
+            )
+            .await;
+        }
         Some("decay") => {
             rater::update_decay_once().await;
         }
