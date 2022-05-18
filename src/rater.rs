@@ -1159,8 +1159,8 @@ pub fn update_rankings(conn: &mut Connection) -> Result<()> {
         "INSERT INTO ranking_global (global_rank, id, char_id)
          SELECT ROW_NUMBER()
          OVER (ORDER BY value - 2.0 * deviation DESC) as global_rank, id, char_id
-         FROM player_ratings
-         WHERE deviation < ? AND (losses > 10 OR wins <= 200)
+         FROM player_ratings NATURAL LEFT JOIN cheater_status
+         WHERE deviation < ? AND cheater_status IS NULL
          ORDER BY value - 2.0 * deviation DESC
          LIMIT 1000",
         params![LOW_DEVIATION],
@@ -1171,8 +1171,8 @@ pub fn update_rankings(conn: &mut Connection) -> Result<()> {
             "INSERT INTO ranking_character (character_rank, id, char_id)
              SELECT ROW_NUMBER() 
              OVER (ORDER BY value - 2.0 * deviation DESC) as character_rank, id, char_id
-             FROM player_ratings
-             WHERE deviation < ? AND char_id = ? AND (losses > 10 OR wins <= 200)
+             FROM player_ratings NATURAL LEFT JOIN cheater_status
+             WHERE deviation < ? AND char_id = ? AND cheater_status IS NULL
              ORDER BY value - 2.0 * deviation DESC
              LIMIT 1000",
             params![LOW_DEVIATION, c],
