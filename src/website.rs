@@ -61,6 +61,7 @@ pub async fn run() {
                 rating_calculator,
                 api::stats,
                 api::player_rating,
+                api::player_rating_all,
                 api::player_rating_accuracy,
                 api::top_all,
                 api::top_char,

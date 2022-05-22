@@ -208,6 +208,45 @@ pub async fn top_all(conn: RatingsDbConn) -> Json<Vec<RankingPlayer>> {
     Json(top_all_inner(&conn).await)
 }
 
+#[get("/api/player_rating/<player>")]
+pub async fn player_rating_all(conn: RatingsDbConn, player: &str) -> Json<Vec<Rating>> {
+    let id = i64::from_str_radix(&player, 16).unwrap();
+    let mut res = vec![Rating::default(); website::CHAR_NAMES.len()];
+    Json(
+        conn.run(move |conn| {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT char_id, value, deviation 
+        FROM player_ratings
+        WHERE id = ?",
+                )
+                .unwrap();
+
+            let mut rows = stmt.query(params![id]).unwrap();
+            while let Some(row) = rows.next().unwrap() {
+                let char_id: usize = row.get(0).unwrap();
+                res[char_id] = Rating::new(row.get(1).unwrap(), row.get(2).unwrap());
+            }
+
+            res
+        })
+        .await,
+    )
+
+    //for char_id in 0..website::CHAR_NAMES.len() {
+    //    let conn.run(move |conn| {
+    //        conn
+    //            .query_row(
+    //                "SELECT value, deviation
+    //                            FROM player_ratings
+    //                            WHERE id=? AND char_id=?",
+    //                params![id, char_id],
+    //                |r| Ok((r.get::<_, f64>(0)?, r.get::<_, f64>(1)?)),
+    //            )
+    //            .optional()
+    //}
+}
+
 #[get("/api/player_rating/<player>/<character_short>")]
 pub async fn player_rating(
     conn: RatingsDbConn,
@@ -1125,7 +1164,7 @@ impl RawPlayerSet {
             rating_change: format!("{:+.1}", rating_change_sum,),
             rating_change_class: if average_rating_change >= 2.0 {
                 "rating-up"
-            } else if average_rating_change >= 0.0  {
+            } else if average_rating_change >= 0.0 {
                 "rating-barely-up"
             } else if average_rating_change >= -2.0 {
                 "rating-barely-down"
