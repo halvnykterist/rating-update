@@ -19,7 +19,9 @@ const d2 = (own_rating, other_rating) => {
 }
 
 const new_rating_value = (own_rating, other_rating, outcome) => {
-    return own_rating.value + (q / (1.0 / Math.pow(own_rating.deviation, 2.0) + (1.0 / d2(own_rating, other_rating)))) * g(other_rating.deviation) * (outcome - e(own_rating, other_rating));
+    return own_rating.value + 
+        (q / (1.0 / Math.pow(own_rating.deviation, 2.0) + (1.0 / d2(own_rating, other_rating)))) * 
+        g(other_rating.deviation) * (outcome - e(own_rating, other_rating));
 }
 
 const new_rating_deviation = (own_rating, other_rating) => {
@@ -49,12 +51,12 @@ const set_win_probability = (x) => 3 * Math.pow(x, 2) - 2 * Math.pow(x, 3);
 const update = () => {
     const own_rating = {
         value: document.getElementById("own_rating").valueAsNumber,
-        deviation: document.getElementById("own_deviation").valueAsNumber * 0.5,
+        deviation: Math.max(document.getElementById("own_deviation").valueAsNumber * 0.5, 25.0),
     };
 
     const other_rating = {
         value: document.getElementById("opp_rating").valueAsNumber,
-        deviation: document.getElementById("opp_deviation").valueAsNumber * 0.5,
+        deviation: Math.max(document.getElementById("opp_deviation").valueAsNumber * 0.5, 25.0),
     };
 
     const win_chance = expected_outcome(own_rating, other_rating);
@@ -74,11 +76,11 @@ const update = () => {
         maximumFractionDigits: 1,
     });
 
-
     document.getElementById("own_win_delta").innerHTML = f.format(own_win_delta);
     document.getElementById("own_win_delta").className = colorize(own_win_delta);
     document.getElementById("own_loss_delta").innerHTML = f.format(own_loss_delta);
     document.getElementById("own_loss_delta").className = colorize(own_loss_delta);
+
     document.getElementById("opp_win_delta").innerHTML = f.format(other_win_delta);
     document.getElementById("opp_win_delta").className = colorize(other_win_delta);
     document.getElementById("opp_loss_delta").innerHTML = f.format(other_loss_delta);
