@@ -56,6 +56,12 @@ async fn main() {
             )
             .await;
         }
+        Some("mark_vip") => {
+            rater::mark_vip(args.get(1).unwrap(), args.get(2).unwrap());
+        }
+        Some("print_rankings") => {
+            rater::print_rankings();
+        }
         Some("decay") => {
             rater::update_decay_once().await;
         }

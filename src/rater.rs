@@ -259,9 +259,9 @@ pub async fn update_once() {
 
     while update_ratings(&mut conn, None) > 0 {}
 
-    let last_rating_timestamp: i64 = conn
-        .query_row("SELECT last_update FROM config", [], |r| r.get(0))
-        .unwrap();
+    //let last_rating_timestamp: i64 = conn
+    //    .query_row("SELECT last_update FROM config", [], |r| r.get(0))
+    //    .unwrap();
     update_player_distribution(&mut conn);
     //if let Err(e) = calc_versus_matchups(&mut conn) {
     //    error!("calc_versus_matchups failed: {}", e);
@@ -276,6 +276,52 @@ pub async fn update_once() {
     //if let Err(e) = calc_character_popularity(&mut conn, last_rating_timestamp) {
     //    error!("calc_character_popularity failed: {}", e);
     //}
+}
+
+pub fn print_rankings() {
+    let conn = Connection::open(DB_NAME).unwrap();
+
+    println!("| Rank | Name | Character | Rating | Games |");
+    println!("|------|------|-----------|--------|-------|");
+
+    let mut stmt = conn
+            .prepare(
+                "SELECT name, char_id, value, deviation, (wins + losses) as games, (100.0 * wins) / (wins + losses) as win_rate
+                FROM player_ratings NATURAL JOIN players
+                WHERE deviation < 350.0
+                ORDER BY value - 2.0 * deviation DESC
+                LIMIT 100
+                ",
+            )
+            .unwrap();
+
+    let mut rank = 1;
+    let mut rows = stmt.query([]).unwrap();
+
+    while let Some(row) = rows.next().unwrap() {
+        let name: String = row.get(0).unwrap();
+        let char_name = website::CHAR_NAMES[row.get::<_, usize>(1).unwrap()].1;
+        let value: f64 = row.get(2).unwrap();
+        let deviation: f64 = row.get(3).unwrap();
+        let games: i64 = row.get(4).unwrap();
+        let rate: f64 = row.get(5).unwrap();
+        println!(
+            "| {} | {} | {} | {:.0} ±{:.0} | {} ({:.0}%) |",
+            rank, name, char_name, value, deviation, games, rate
+        );
+
+        rank += 1;
+    }
+}
+
+pub fn mark_vip(vip_id: &str, notes: &str) {
+    let conn = Connection::open(DB_NAME).unwrap();
+    conn.execute(
+        "INSERT INTO cheater_status
+            VALUES(?, 'VIP', ?)",
+        params![vip_id, notes],
+    )
+    .unwrap();
 }
 
 pub async fn mark_cheater(
@@ -297,7 +343,7 @@ pub async fn mark_cheater(
         value_b: f64,
         deviation_b: f64,
         winner: i64,
-    };
+    }
 
     let games = {
         let mut stmt = conn.prepare(
