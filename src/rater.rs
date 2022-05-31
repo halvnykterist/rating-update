@@ -288,7 +288,7 @@ pub fn print_rankings() {
             .prepare(
                 "SELECT name, char_id, value, deviation, (wins + losses) as games, (100.0 * wins) / (wins + losses) as win_rate
                 FROM player_ratings NATURAL JOIN players
-                WHERE deviation < 350.0
+                WHERE deviation < 75.0 
                 ORDER BY value - 2.0 * deviation DESC
                 LIMIT 100
                 ",
