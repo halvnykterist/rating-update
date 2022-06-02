@@ -319,7 +319,7 @@ pub fn mark_vip(vip_id: &str, notes: &str) {
 
     let conn = Connection::open(DB_NAME).unwrap();
     conn.execute(
-        "INSERT INTO cheater_status
+        "INSERT INTO vip_status
             VALUES(?, 'VIP', ?)",
         params![vip_id, notes],
     )
