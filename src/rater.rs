@@ -315,6 +315,8 @@ pub fn print_rankings() {
 }
 
 pub fn mark_vip(vip_id: &str, notes: &str) {
+    let vip_id = i64::from_str_radix(vip_id, 16).unwrap();
+
     let conn = Connection::open(DB_NAME).unwrap();
     conn.execute(
         "INSERT INTO cheater_status
