@@ -1253,7 +1253,7 @@ pub fn update_decay(conn: &mut Connection, timestamp: i64) -> Result<()> {
                     top_defeated_value, top_defeated_deviation, top_defeated_floor,
                     top_defeated_timestamp
                 FROM player_ratings 
-                WHERE deviation < 350.0",
+                WHERE deviation < 75.0",
             )
             .unwrap();
         let mut rows = stmt.query([]).unwrap();
