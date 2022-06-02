@@ -831,6 +831,26 @@ pub async fn get_player_char_history(
                         opponent_vip.is_some(),
                         opponent_cheater.is_some(),
                     );
+                } else {
+                    add_ungrouped_set(
+                        &mut history,
+                        timestamp,
+                        floor,
+                        own_value,
+                        own_deviation,
+                        opponent_name,
+                        opponent_id,
+                        opponent_char,
+                        opponent_value,
+                        opponent_deviation,
+                        match winner {
+                            1 | 4 => true,
+                            2 | 3 => false,
+                            _ => panic!("Bad winner"),
+                        },
+                        opponent_vip.is_some(),
+                        opponent_cheater.is_some(),
+                    );
                 }
             }
 
@@ -1254,6 +1274,45 @@ fn add_to_grouped_sets(
             result_losses: if winner { 0 } else { 1 },
         });
     }
+}
+
+fn add_ungrouped_set(
+    sets: &mut Vec<RawPlayerSet>,
+    timestamp: i64,
+    floor: i64,
+    own_value: f64,
+    own_deviation: f64,
+    opponent_name: String,
+    opponent_id: i64,
+    opponent_char: i64,
+    opponent_value: f64,
+    opponent_deviation: f64,
+    winner: bool,
+    opponent_vip: bool,
+    opponent_cheater: bool,
+) {
+    let own_rating = Rating::new(own_value, own_deviation);
+    let opp_rating = Rating::new(opponent_value, opponent_deviation);
+
+    let rating_change =
+        Rating::rating_change(own_rating, opp_rating, if winner { 1.0 } else { 0.0 });
+
+    sets.push(RawPlayerSet {
+        timestamp,
+        own_value,
+        own_deviation,
+        floor,
+        opponent_name,
+        opponent_vip,
+        opponent_cheater,
+        opponent_id,
+        opponent_char,
+        opponent_value,
+        opponent_deviation,
+        rating_change_sequence: vec![rating_change],
+        result_wins: if winner { 1 } else { 0 },
+        result_losses: if winner { 0 } else { 1 },
+    });
 }
 
 #[derive(Serialize)]
