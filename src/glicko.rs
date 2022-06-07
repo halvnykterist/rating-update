@@ -91,12 +91,16 @@ impl Rating {
 
 const Q: f64 = 0.0057565;
 
-fn g(rd: f64) -> f64 {
+pub fn g(rd: f64) -> f64 {
     1.0 / (1.0 + 3.0 * Q * Q * rd * rd / (PI * PI)).sqrt()
 }
 
-fn e(r: f64, r_j: f64, rd_j: f64) -> f64 {
+pub fn e(r: f64, r_j: f64, rd_j: f64) -> f64 {
     1.0 / (1.0 + 10.0f64.powf(-g(rd_j) * (r - r_j) / 400.0))
+}
+
+pub fn e_vscaled(r: f64, scaling: f64) -> f64 {
+    1.0 / (1.0 + (10.0f64.powf(r / 400.0)).powf(1.0 / scaling))
 }
 
 #[cfg(test)]

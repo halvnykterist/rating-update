@@ -1,7 +1,11 @@
-<a href="/player/{{id}}/{{char}}" class="maybe_long_name" title="{{name}}">{{name}}</a>
-{{#if vip_status}}
-    <span class="tag is-warning" title="This user supports the site!">VIP</span>
-{{/if}}
-{{#if cheater_status}}
-    <span class="tag is-danger">(Cheater)</span>
+{{#if hidden_status}}
+    (Hidden)
+{{else}}
+    <a href="/player/{{id}}/{{char}}" class="maybe_long_name" title="{{name}}">{{name}}</a>
+    {{#if vip_status}}
+        <span class="tag is-warning" title="This user supports the site!">VIP</span>
+    {{/if}}
+    {{#if cheater_status}}
+        <span class="tag is-danger">(Cheater)</span>
+    {{/if}}
 {{/if}}

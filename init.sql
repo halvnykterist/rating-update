@@ -205,6 +205,13 @@ CREATE TABLE cheater_status (
     PRIMARY KEY(id)
 );
 
+CREATE TABLE hidden_status (
+    id INTEGER NOT NULL,
+    hidden_status TEXT NOT NULL,
+    notes TEXT NOT NULL,
+    PRIMARY KEY(id)
+);
+
 
 CREATE TABLE config (
     last_update INTEGER NOT NULL

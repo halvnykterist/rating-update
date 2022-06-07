@@ -68,6 +68,7 @@ pub async fn run() {
                 api::search,
                 api::search_exact,
                 api::outcomes,
+                api::outcomes_delta,
                 api::floor_rating_distribution,
                 api::rating_experience,
                 api::rating_experience_player,
