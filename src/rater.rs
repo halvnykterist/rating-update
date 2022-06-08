@@ -1196,6 +1196,11 @@ pub fn calc_character_popularity(conn: &mut Connection, last_timestamp: i64) -> 
     Ok(())
 }
 
+pub fn update_rankings_once() {
+    let mut conn = Connection::open(DB_NAME).unwrap();
+    update_rankings(&mut conn).unwrap();
+}
+
 pub fn update_rankings(conn: &mut Connection) -> Result<()> {
     info!("Updating rankings");
     let then = Utc::now();
@@ -1206,8 +1211,10 @@ pub fn update_rankings(conn: &mut Connection) -> Result<()> {
     tx.execute(
         "INSERT INTO ranking_global (global_rank, id, char_id)
          SELECT ROW_NUMBER()
-         OVER (ORDER BY value DESC) as global_rank, id, char_id
-         FROM player_ratings NATURAL LEFT JOIN cheater_status NATURAL LEFT JOIN hidden_status
+         OVER (ORDER BY value DESC) as global_rank, player_ratings.id, char_id
+         FROM player_ratings
+            LEFT JOIN cheater_status on player_ratings.id = cheater_status.id
+            LEFT JOIN hidden_status on player_ratings.id = hidden_status.id
          WHERE deviation < ? AND cheater_status IS NULL AND hidden_status IS NULL
          ORDER BY value DESC
          LIMIT 1000",
@@ -1218,8 +1225,10 @@ pub fn update_rankings(conn: &mut Connection) -> Result<()> {
         tx.execute(
             "INSERT INTO ranking_character (character_rank, id, char_id)
              SELECT ROW_NUMBER() 
-             OVER (ORDER BY value DESC) as character_rank, id, char_id
-             FROM player_ratings NATURAL LEFT JOIN cheater_status NATURAL LEFT JOIN hidden_status
+             OVER (ORDER BY value DESC) as character_rank, player_ratings.id, char_id
+             FROM player_ratings
+                LEFT JOIN cheater_status on player_ratings.id = cheater_status.id
+                LEFT JOIN hidden_status on player_ratings.id = hidden_status.id
              WHERE deviation < ? AND char_id = ? AND cheater_status IS NULL AND hidden_status IS NULL
              ORDER BY value DESC
              LIMIT 1000",
