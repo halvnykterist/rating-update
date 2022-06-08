@@ -911,15 +911,21 @@ pub async fn get_player_data_char(
             )
             .unwrap()
         {
-            let (name, vip_status, cheater_status): (String, Option<String>, Option<String>) = conn
+            let (name, vip_status, cheater_status, hidden_status): (
+                String,
+                Option<String>,
+                Option<String>,
+                Option<String>,
+            ) = conn
                 .query_row(
-                    "SELECT name, vip_status, cheater_status FROM players
+                    "SELECT name, vip_status, cheater_status, hidden_status FROM players
                         LEFT JOIN vip_status ON vip_status.id = players.id
                         LEFT JOIN cheater_status ON cheater_status.id = players.id
+                        LEFT JOIN hidden_status ON hidden_status.id = players.id
                            WHERE players.id=?
                            ",
                     params![id],
-                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
                 )
                 .unwrap();
             info!(
@@ -927,6 +933,11 @@ pub async fn get_player_data_char(
                 name,
                 website::CHAR_NAMES[char_id as usize].0
             );
+
+            if hidden_status.is_some() {
+                return None;
+            }
+
             let other_names = get_player_other_names(conn, id, &name);
 
             let other_characters = get_player_other_characters(conn, id);
@@ -2316,14 +2327,11 @@ pub async fn outcomes(conn: RatingsDbConn) -> Json<(Vec<i64>, Vec<f64>, Vec<f64>
     )
 }
 
-#[get("/api/outcomes_delta?<scaling_factor>")]
-pub async fn outcomes_delta(
-    conn: RatingsDbConn,
-    scaling_factor: f64,
-) -> Json<(Vec<i64>, Vec<f64>, Vec<f64>, Vec<f64>)> {
+#[get("/api/outcomes_delta")]
+pub async fn outcomes_delta(conn: RatingsDbConn) -> Json<(Vec<i64>, Vec<f64>, Vec<f64>)> {
     Json(
         conn.run(move |conn| {
-            let mut outcomes = vec![(0.0, 0.0); 151];
+            let mut outcomes = vec![(0.0, 0.0); 201];
 
             let mut stmt = conn
                 .prepare(
@@ -2342,8 +2350,8 @@ pub async fn outcomes_delta(
                 let delta = glicko::g(rating_a.deviation)
                     * glicko::g(rating_b.deviation)
                     * (rating_a.value - rating_b.value);
-                let delta_category = (delta / 10.0).round() as i32 + 75;
-                if delta_category >= 0 && delta_category <= 150 {
+                let delta_category = (delta / 10.0).round() as i32 + 100;
+                if delta_category >= 0 && delta_category <= 200 {
                     let delta_category = delta_category as usize;
                     let o = outcomes.get_mut(delta_category).unwrap();
                     if winner == 1 {
@@ -2354,18 +2362,15 @@ pub async fn outcomes_delta(
             }
 
             (
-                (0..=150).into_iter().map(|i| (i - 75) * 10).collect(),
+                (0..=200).into_iter().map(|i| (i - 100) * 10).collect(),
+                (0..=200)
+                    .into_iter()
+                    .map(|i| (i - 100) * 10)
+                    .map(|i| crate::glicko::e(i as f64, 0.0, 0.0))
+                    .collect(),
                 outcomes
                     .into_iter()
                     .map(|(wins, total)| wins / total)
-                    .collect(),
-                (0..=150)
-                    .into_iter()
-                    .map(|i| glicko::e_vscaled(-(i as f64 - 75.0) * 10.0, scaling_factor))
-                    .collect(),
-                (0..=150)
-                    .into_iter()
-                    .map(|i| glicko::e_vscaled(-(i as f64 - 75.0) * 10.0, scaling_factor))
                     .collect(),
             )
         })
