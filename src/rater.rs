@@ -10,7 +10,7 @@ use serde::Deserialize;
 use std::{fs::File, io::BufReader, sync::Mutex, time::Duration};
 use tokio::{time, try_join};
 
-use crate::{glicko::Rating, website};
+use crate::{glicko, glicko::Rating, website};
 
 const DECAY_CONSTANT: f64 = 0.4;
 
@@ -502,6 +502,9 @@ async fn grab_games(conn: &mut Connection, pages: usize) -> Result<()> {
 
     if errors.len() > 0 {
         warn!("{} replays failed to parse!", errors.len());
+        for e in errors.iter().take(1) {
+            error!("{:?}", e);
+        }
     }
 
     Ok(())
@@ -1679,6 +1682,21 @@ impl RatedPlayer {
             rating: Rating::default(),
             last_decay: timestamp,
 
+            top_rating: None,
+            top_defeated: None,
+        }
+    }
+    pub fn new_from_rating(id: i64, char_id: i64, timestamp: i64, rating: f64) -> Self {
+        Self {
+            id,
+            char_id,
+            win_count: 0,
+            loss_count: 0,
+            rating: Rating {
+                value: rating,
+                ..Rating::default()
+            },
+            last_decay: timestamp,
             top_rating: None,
             top_defeated: None,
         }
