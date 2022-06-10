@@ -51,7 +51,8 @@ impl Rating {
                 * (1.0 - e(self.value, other.value, other.deviation)));
         let res = Rating {
             value: self.value
-                + (Q / ((1.0 / self.deviation.powf(2.0)) + (1.0 / (d_2))))
+                + UPDATE_SPEED
+                    * (Q / ((1.0 / self.deviation.powf(2.0)) + (1.0 / (d_2))))
                     * g(other.deviation)
                     * (result - e(self.value, other.value, other.deviation)),
             deviation: (1.0 / (1.0 / self.deviation.powf(2.0) + 1.0 / d_2))
@@ -82,6 +83,7 @@ impl Rating {
     pub fn expected(self, other: Rating) -> f64 {
         1.0 / (1.0
             + 10.0f64.powf(
+                //(1.0 - UNCERTAINTY) *
                 -g((self.deviation * self.deviation + other.deviation * other.deviation).sqrt())
                     * (self.value - other.value)
                     / 400.0,
@@ -90,17 +92,15 @@ impl Rating {
 }
 
 const Q: f64 = 0.0057565;
+const UNCERTAINTY: f64 = 0.2;
+const UPDATE_SPEED: f64 = 1.0;
 
 pub fn g(rd: f64) -> f64 {
     1.0 / (1.0 + 3.0 * Q * Q * rd * rd / (PI * PI)).sqrt()
 }
 
 pub fn e(r: f64, r_j: f64, rd_j: f64) -> f64 {
-    1.0 / (1.0 + 10.0f64.powf(-g(rd_j) * (r - r_j) / 400.0))
-}
-
-pub fn e_vscaled(r: f64, scaling: f64) -> f64 {
-    1.0 / (1.0 + (10.0f64.powf(r / 400.0)).powf(1.0 / scaling))
+    1.0 / (1.0 + 10.0f64.powf((1.0 - UNCERTAINTY) * -g(rd_j) * (r - r_j) / 400.0))
 }
 
 #[cfg(test)]
