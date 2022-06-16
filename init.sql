@@ -92,40 +92,52 @@ CREATE TABLE player_matchups (
     id INTEGER NOT NULL,
     char_id INTEGER NOT NULL,
     opp_char_id INTEGER NOT NULL,
-    wins_real REAL NOT NULL,
-    wins_adjusted REAL NOT NULL,
-    losses_real REAL NOT NULL,
-    losses_adjusted REAL NOT NULL,
+    rating_value REAL NOT NULL,
+    rating_deviation REAL NOT NULL,
+    rating_timestamp INTEGER NO NULL,
+    wins INTEGER NOT NULL,
+    losses INTEGER NOT NULL,
     PRIMARY KEY(id, char_id, opp_char_id)
 );
 
 CREATE TABLE global_matchups(
     char_id INTEGER NOT NULL,
     opp_char_id INTEGER NOT NULL,
-    wins_real REAL NOT NULL,
-    wins_adjusted REAL NOT NULL,
-    losses_real REAL NOT NULL,
-    losses_adjusted REAL NOT NULL,
+    rating_value REAL NOT NULL,
+    rating_deviation REAL NOT NULL,
+    wins INTEGER NOT NULL,
+    losses INTEGER NOT NULL,
     PRIMARY KEY(char_id, opp_char_id)
 );
 
-CREATE TABLE high_rated_matchups(
+CREATE TABLE top_1000_matchups(
     char_id INTEGER NOT NULL,
     opp_char_id INTEGER NOT NULL,
-    wins_real REAL NOT NULL,
-    wins_adjusted REAL NOT NULL,
-    losses_real REAL NOT NULL,
-    losses_adjusted REAL NOT NULL,
+    rating_value REAL NOT NULL,
+    rating_deviation REAL NOT NULL,
+    wins INTEGER NOT NULL,
+    losses INTEGER NOT NULL,
     PRIMARY KEY(char_id, opp_char_id)
 );
 
-CREATE TABLE versus_matchups(
-    char_a INTEGER NOT NULL,
-    char_b INTEGER NOT NULL,
-    game_count INTEGER NOT NULL,
-    pair_count INTEGER NOT NULL,
-    win_rate REAL NOT NULL,
-    PRIMARY KEY(char_a, char_b)
+CREATE TABLE top_100_matchups(
+    char_id INTEGER NOT NULL,
+    opp_char_id INTEGER NOT NULL,
+    rating_value REAL NOT NULL,
+    rating_deviation REAL NOT NULL,
+    wins INTEGER NOT NULL,
+    losses INTEGER NOT NULL,
+    PRIMARY KEY(char_id, opp_char_id)
+);
+
+CREATE TABLE proportional_matchups(
+    char_id INTEGER NOT NULL,
+    opp_char_id INTEGER NOT NULL,
+    rating_value REAL NOT NULL,
+    rating_deviation REAL NOT NULL,
+    wins INTEGER NOT NULL,
+    losses INTEGER NOT NULL,
+    PRIMARY KEY(char_id, opp_char_id)
 );
 
 CREATE TABLE player_floor_distribution(

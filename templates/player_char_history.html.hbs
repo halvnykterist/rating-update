@@ -26,9 +26,9 @@
               {{#if ../cheater_status}}
                 <td><span class="cheater">Cheater</span></td>
               {{else}}
-                <td>{{this.own_rating_value}} ±{{this.own_rating_deviation}}</td>
+                <td class="centered">{{this.own_rating_value}} ±{{this.own_rating_deviation}}</td>
               {{/if}}
-              <td>{{this.floor}}</td>
+              <td class="centered">{{this.floor}}</td>
               <td>{{>player_link
                             name=this.opponent_name 
                             id=this.opponent_id char=this.opponent_character_short
@@ -55,8 +55,8 @@
               {{/if}}
             {{/if}}
           </td>
-          <td><span title="{{this.result_percent}}%">{{this.result_wins}} - {{this.result_losses}}</span></td>
-          <td><span title="{{this.rating_change_sequence}}" class="{{this.rating_change_class}}">{{this.rating_change}}</span></td>
+          <td class="centered"><span title="{{this.result_percent}}%">{{this.result_wins}} - {{this.result_losses}}</span></td>
+          <td class="centered"><span title="{{this.rating_change_sequence}}" class="{{this.rating_change_class}} centered">{{this.rating_change}}</span></td>
         </tr>
         {{/each}}
         </table>

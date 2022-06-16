@@ -700,7 +700,6 @@ struct PlayerCharacterData {
     top_defeated_timestamp: Option<String>,
 
     win_rate: f64,
-    adjusted_win_rate: f64,
     game_count: i32,
     matchups: Vec<PlayerMatchup>,
 }
@@ -710,7 +709,7 @@ pub struct PlayerCharacterHistory {
     history: Vec<PlayerSet>,
 }
 
-const MATCHUP_MIN_GAMES: f64 = 250.0;
+const MATCHUP_MIN_GAMES: i64 = 250;
 
 #[derive(Serialize)]
 struct PlayerSet {
@@ -739,9 +738,12 @@ struct PlayerSet {
 #[derive(Serialize)]
 struct PlayerMatchup {
     character: String,
-    game_count: i32,
-    win_rate_real: f64,
-    win_rate_adjusted: f64,
+    game_count: i64,
+    win_rate: f64,
+    rating_offset: String,
+    rating_deviation: i64,
+    rating: i64,
+    rating_change_class: &'static str,
 }
 
 pub async fn get_player_highest_rated_character(conn: &RatingsDbConn, id: i64) -> Option<i64> {
@@ -1010,6 +1012,8 @@ fn get_player_other_characters(conn: &Connection, id: i64) -> Vec<OtherPlayerCha
         });
     }
 
+    other_characters.sort_by_key(|c| c.rating_deviation as i64);
+
     other_characters
 }
 
@@ -1085,22 +1089,18 @@ fn get_player_character_data(
     {
         let character_name = website::CHAR_NAMES[char_id as usize].1.to_owned();
 
-        let mut total_wins_adjusted = 0.0;
-        let mut total_losses_adjusted = 0.0;
-
         let matchups = {
             let mut stmt = conn
                 .prepare_cached(
                     "SELECT
                         opp_char_id,
-                        wins_real,
-                        wins_adjusted,
-                        losses_real,
-                        losses_adjusted
+                        rating_value,
+                        rating_deviation,
+                        wins,
+                        losses
                     FROM player_matchups
                     WHERE id = ?
-                        AND char_id = ?
-                    ORDER BY wins_real DESC",
+                        AND char_id = ?",
                 )
                 .unwrap();
 
@@ -1108,23 +1108,31 @@ fn get_player_character_data(
             let mut matchups = Vec::<PlayerMatchup>::new();
             while let Some(row) = rows.next().unwrap() {
                 let opp_char_id: usize = row.get(0).unwrap();
-                let wins_real: f64 = row.get(1).unwrap();
-                let wins_adjusted: f64 = row.get(2).unwrap();
-                let losses_real: f64 = row.get(3).unwrap();
-                let losses_adjusted: f64 = row.get(4).unwrap();
+                let rating_value: f64 = row.get::<_, f64>(1).unwrap();
+                let rating_deviation: f64 = row.get(2).unwrap();
+                let wins: i64 = row.get(3).unwrap();
+                let losses: i64 = row.get(4).unwrap();
+                let rating_offset = rating_value - value;
                 matchups.push(PlayerMatchup {
                     character: website::CHAR_NAMES[opp_char_id].1.to_owned(),
-                    game_count: (wins_real + losses_real) as i32,
-                    win_rate_real: (wins_real / (wins_real + losses_real) * 100.0).round(),
-                    win_rate_adjusted: (wins_adjusted / (wins_adjusted + losses_adjusted) * 100.0)
-                        .round(),
+                    game_count: wins + losses,
+                    win_rate: (100.0 * wins as f64 / (wins + losses) as f64).round(),
+                    rating_offset: format!("{:+.0} ±{:.0}", rating_offset, 2.0 * rating_deviation),
+                    rating_deviation: (rating_deviation * 2.0) as i64,
+                    rating: rating_value as i64,
+                    rating_change_class: if rating_offset >= 50.0 {
+                        "rating-up"
+                    } else if rating_offset >= 0.0 {
+                        "rating-barely-up"
+                    } else if rating_offset >= -50.0 {
+                        "rating-barely-down"
+                    } else {
+                        "rating-down"
+                    },
                 });
-
-                total_wins_adjusted += wins_adjusted;
-                total_losses_adjusted += losses_adjusted;
             }
 
-            matchups.sort_by_key(|m| -(m.win_rate_adjusted as i32));
+            matchups.sort_by_key(|m| -(m.rating as i64));
 
             matchups
         };
@@ -1133,9 +1141,6 @@ fn get_player_character_data(
             character_name,
             game_count: wins + losses,
             win_rate: (100.0 * wins as f64 / (wins + losses) as f64).round(),
-            adjusted_win_rate: (100.0 * total_wins_adjusted
-                / (total_wins_adjusted + total_losses_adjusted))
-                .round(),
             rating_value: value.round(),
             rating_deviation: (deviation * 2.0).round(),
             top_rating_value: top_rating_value.map(|r| r.round()),
@@ -1372,19 +1377,20 @@ pub struct CharacterMatchups {
 
 #[derive(Serialize)]
 pub struct Matchup {
-    win_rate_real: f64,
-    win_rate_adjusted: f64,
-    game_count: i32,
+    matchup: String,
+    win_rate: f64,
+    game_count: i64,
+    rating_delta: String,
+    expected: f64,
     suspicious: bool,
     evaluation: &'static str,
 }
 
-fn get_evaluation(wins: f64, losses: f64, game_count: f64) -> &'static str {
+fn get_evaluation(r: f64, game_count: i64) -> &'static str {
     if game_count < MATCHUP_MIN_GAMES {
         return "none";
     }
 
-    let r = wins / (wins + losses);
     if r > 0.6 {
         "verygood"
     } else if r > 0.56 {
@@ -1402,184 +1408,60 @@ fn get_evaluation(wins: f64, losses: f64, game_count: f64) -> &'static str {
     }
 }
 
-pub async fn matchups_global_inner(conn: &RatingsDbConn) -> Vec<CharacterMatchups> {
+pub async fn get_matchups(conn: &RatingsDbConn, table: &'static str) -> Vec<CharacterMatchups> {
     conn.run(move |conn| {
-        (0..website::CHAR_NAMES.len())
-            .map(|char_id| CharacterMatchups {
-                name: website::CHAR_NAMES[char_id].1.to_owned(),
-                matchups: (0..website::CHAR_NAMES.len())
-                    .map(|opp_char_id| {
-                        conn.query_row(
-                            "SELECT
-                                wins_real,
-                                wins_adjusted,
-                                losses_real,
-                                losses_adjusted
-                            FROM global_matchups
-                            WHERE char_id = ? AND opp_char_id = ?",
-                            params![char_id, opp_char_id],
-                            |row| {
-                                Ok((
-                                    row.get::<_, f64>(0).unwrap(),
-                                    row.get::<_, f64>(1).unwrap(),
-                                    row.get::<_, f64>(2).unwrap(),
-                                    row.get::<_, f64>(3).unwrap(),
-                                ))
-                            },
-                        )
-                        .optional()
-                        .unwrap()
-                        .map(
-                            |(wins_real, wins_adjusted, losses_real, losses_adjusted)| Matchup {
-                                win_rate_real: (wins_real / (wins_real + losses_real) * 100.0)
-                                    .round(),
-                                win_rate_adjusted: (wins_adjusted
-                                    / (wins_adjusted + losses_adjusted)
-                                    * 100.0)
-                                    .round(),
-                                game_count: (wins_real + losses_real) as i32,
-                                suspicious: wins_real + losses_real < MATCHUP_MIN_GAMES,
-                                evaluation: get_evaluation(
-                                    wins_adjusted,
-                                    losses_adjusted,
-                                    wins_real + losses_real,
-                                ),
-                            },
-                        )
-                        .unwrap_or(Matchup {
-                            win_rate_real: f64::NAN,
-                            win_rate_adjusted: f64::NAN,
-                            game_count: 0,
-                            suspicious: true,
-                            evaluation: "none",
-                        })
-                    })
-                    .collect(),
-            })
-            .collect()
-    })
-    .await
-}
+        let tx = conn.transaction().unwrap();
+        let mut all_matchups = FxHashMap::default();
 
-pub async fn matchups_high_rated_inner(conn: &RatingsDbConn) -> Vec<CharacterMatchups> {
-    conn.run(move |conn| {
-        (0..website::CHAR_NAMES.len())
-            .map(|char_id| CharacterMatchups {
-                name: website::CHAR_NAMES[char_id].1.to_owned(),
-                matchups: (0..website::CHAR_NAMES.len())
-                    .map(|opp_char_id| {
-                        conn.query_row(
-                            "SELECT
-                                wins_real,
-                                wins_adjusted,
-                                losses_real,
-                                losses_adjusted
-                            FROM high_rated_matchups
-                            WHERE char_id = ? AND opp_char_id = ?",
-                            params![char_id, opp_char_id],
-                            |row| {
-                                Ok((
-                                    row.get::<_, f64>(0).unwrap(),
-                                    row.get::<_, f64>(1).unwrap(),
-                                    row.get::<_, f64>(2).unwrap(),
-                                    row.get::<_, f64>(3).unwrap(),
-                                ))
-                            },
-                        )
-                        .optional()
-                        .unwrap()
-                        .map(
-                            |(wins_real, wins_adjusted, losses_real, losses_adjusted)| Matchup {
-                                win_rate_real: (wins_real / (wins_real + losses_real) * 100.0)
-                                    .round(),
-                                win_rate_adjusted: (wins_adjusted
-                                    / (wins_adjusted + losses_adjusted)
-                                    * 100.0)
-                                    .round(),
-                                game_count: (wins_real + losses_real) as i32,
-                                suspicious: wins_real + losses_real < MATCHUP_MIN_GAMES,
-                                evaluation: get_evaluation(
-                                    wins_adjusted,
-                                    losses_adjusted,
-                                    wins_real + losses_real,
-                                ),
-                            },
-                        )
-                        .unwrap_or(Matchup {
-                            win_rate_real: f64::NAN,
-                            win_rate_adjusted: f64::NAN,
-                            game_count: 0,
-                            suspicious: true,
-                            evaluation: "none",
-                        })
-                    })
-                    .collect(),
-            })
-            .collect()
-    })
-    .await
-}
+        let mut stmt = tx
+            .prepare(&format!(
+                "SELECT char_id, opp_char_id, rating_value, rating_deviation, wins, losses FROM {}",
+                table
+            ))
+            .unwrap();
 
-#[derive(Serialize)]
-pub struct VersusCharacterMatchups {
-    name: String,
-    matchups: Vec<VersusMatchup>,
-}
+        let mut rows = stmt.query([]).unwrap();
 
-#[derive(Serialize)]
-pub struct VersusMatchup {
-    win_rate: f64,
-    game_count: i32,
-    pair_count: i32,
-    suspicious: bool,
-    evaluation: &'static str,
-}
+        while let Some(row) = rows.next().unwrap() {
+            let char_id: i64 = row.get(0).unwrap();
+            let opp_char_id: i64 = row.get(1).unwrap();
+            let rating_value: f64 = row.get(2).unwrap();
+            let rating_deviation: f64 = row.get(3).unwrap();
+            let wins: i64 = row.get(4).unwrap();
+            let losses: i64 = row.get(5).unwrap();
 
-pub async fn matchups_versus(conn: &RatingsDbConn) -> Vec<VersusCharacterMatchups> {
-    conn.run(move |conn| {
-        (0..website::CHAR_NAMES.len())
-            .map(|char_id| VersusCharacterMatchups {
-                name: website::CHAR_NAMES[char_id].1.to_owned(),
-                matchups: (0..website::CHAR_NAMES.len())
-                    .map(|opp_char_id| {
-                        if char_id == opp_char_id {
-                            VersusMatchup {
-                                win_rate: 50.0,
-                                game_count: 0,
-                                pair_count: 0,
-                                suspicious: false,
-                                evaluation: "ok",
-                            }
-                        } else {
-                            conn.query_row(
-                                "SELECT win_rate, game_count, pair_count
-                                FROM versus_matchups
-                                WHERE char_a = ? AND char_b = ?",
-                                params![char_id, opp_char_id],
-                                |row| {
-                                    Ok((
-                                        row.get::<_, f64>(0)?,
-                                        row.get::<_, i32>(1)?,
-                                        row.get::<_, i32>(2)?,
-                                    ))
-                                },
-                            )
-                            .optional()
-                            .unwrap()
-                            .map(|(win_rate, game_count, pair_count)| VersusMatchup {
-                                win_rate: (win_rate * 100.0).round(),
-                                game_count,
-                                pair_count,
-                                suspicious: pair_count < 50 || game_count < 250,
-                                evaluation: get_evaluation(win_rate, 1.0 - win_rate, f64::INFINITY),
-                            })
-                            .unwrap_or(VersusMatchup {
-                                win_rate: f64::NAN,
-                                game_count: 0,
-                                pair_count: 0,
-                                suspicious: true,
-                                evaluation: "none",
-                            })
+            all_matchups.insert(
+                (char_id, opp_char_id),
+                (rating_value, rating_deviation, wins, losses),
+            );
+        }
+
+        (0..website::CHAR_NAMES.len() as i64)
+            .map(|c| CharacterMatchups {
+                name: website::CHAR_NAMES[c as usize].1.to_owned(),
+                matchups: (0..website::CHAR_NAMES.len() as i64)
+                    .map(|o| {
+                        let (own_value, own_deviation, wins, losses) =
+                            *all_matchups.get(&(c, o)).unwrap_or(&(1500.0, 350.0, 0, 0));
+
+                        let (opp_value, opp_deviation, ..) =
+                            *all_matchups.get(&(o, c)).unwrap_or(&(1500.0, 350.0, 0, 0));
+
+                        let expected = Rating::new(own_value, own_deviation)
+                            .expected(Rating::new(opp_value, opp_deviation));
+
+                        Matchup {
+                            matchup: format!(
+                                "{} vs {}",
+                                website::CHAR_NAMES[c as usize].0,
+                                website::CHAR_NAMES[o as usize].0
+                            ),
+                            win_rate: (100.0 * wins as f64 / (wins + losses) as f64).round(),
+                            game_count: wins + losses,
+                            rating_delta: format!("{:+.0}", own_value - opp_value),
+                            expected: (100.0 * expected).round(),
+                            evaluation: get_evaluation(expected, wins + losses),
+                            suspicious: wins + losses < MATCHUP_MIN_GAMES,
                         }
                     })
                     .collect(),

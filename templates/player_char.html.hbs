@@ -100,30 +100,22 @@
                 <tr>
                   <th>Matchup</th>
                   <th>Games</th>
-                  <th>Win rate (raw)</th>
-                  <th>Win rate (rating adjusted)</th>
+                  <th>Win rate</th>
+                  <th>Rating offset</th>
                 </tr>
                 {{#each player.data.matchups}}
                   <tr>
                     <td>{{this.character}}</td>
-                    <td>{{this.game_count}}</td>
-                    <td>{{this.win_rate_real}}%</td>
-                    {{#if this.win_rate_adjusted}}
-                      <td>{{this.win_rate_adjusted}}%</td>
-                    {{else}}
-                      <td>N/A</td>
-                    {{/if}}
+                    <td class="centered">{{this.game_count}}</td>
+                    <td class="centered">{{this.win_rate}}%</td>
+                    <td title="{{this.rating}} ±{{this.rating_deviation}}" class="{{this.rating_change_class}} centered">{{this.rating_offset}}</td>
                   </tr>
                 {{/each}}
                   <tr>
                       <td><b>Overall</b></td>
-                    <td><b>{{player.data.game_count}}</b></td>
-                    <td><b>{{player.data.win_rate}}%</b></td>
-                    {{#if player.data.adjusted_win_rate}}
-                        <td><b>{{player.data.adjusted_win_rate}}%</b></td>
-                    {{else}}
-                      <td>N/A</td>
-                    {{/if}}
+                    <td class="centered"><b>{{player.data.game_count}}</b></td>
+                    <td class="centered"><b>{{player.data.win_rate}}%</b></td>
+                    <td></td>
                   </tr>
               </table>
             </div>

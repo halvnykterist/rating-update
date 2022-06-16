@@ -1,8 +1,8 @@
 use rocket::serde::Serialize;
 use std::f64::consts::PI;
 
-const INITIAL_DEVIATION: f64 = 350.0;
-const MIN_DEVIATION: f64 = 25.0;
+pub const INITIAL_DEVIATION: f64 = 350.0;
+pub const MIN_DEVIATION: f64 = 25.0;
 
 #[derive(Copy, Clone, Serialize, Debug, PartialEq)]
 pub struct Rating {
@@ -43,6 +43,7 @@ impl Rating {
         new.value - self.value
     }
 
+    #[must_use]
     pub fn update(self, other: Rating, result: f64) -> Rating {
         let d_2 = 1.0
             / (Q.powf(2.0)

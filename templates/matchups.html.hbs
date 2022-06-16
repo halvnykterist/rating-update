@@ -14,14 +14,7 @@
         <section class="section">
             <div class="container">
                 <div class="content">
-                <div>
-                        <p>The following matchup charts can be fun to look at but they have some serious issues, so don't go using them for anything too scientific. Of course, if you're just looking for information justifying your preexisting beliefs go straight ahead.</p>
-                        <p>The main problem is that while a matchup chart is meant to account for players of equal skill going against each other, these charts don't take into account actual player skill but instead their results. If a character is easier to play than others that won't show up as them having an overall greater than 50% win rate but in the players who use this character having their rating inflated.</p>
-                        <p>This also goes the other way around, if a character is overall underpowered it won't actually show up in the matchup charts since the players will just have a lower rating. I'm not going to name any names here, of course, but it can be enligtening to look at the global top 100 and see which characters are represented and which ones aren't.</p>
-                        <p>The other issue that I hope to the fix in the future is the systematic bias towards higher win rates that new characters get. When a DLC character comes out and everyone tries them out they of course initially play terrible and tank the rating. However, after they've started figuring things out their skill level rapidly increases and the system can't keep up. This means their ratings are constantly under what they should be and the adjusted win rates become too high.</p>
-                        <p>What's worse is that a lot of people drop the character after that initial learning and go back to their mains, so there isn't as much "good" data to drown out the worse stuff. I've got some ideas on how to fix this but none of them are implemented yet.</p>
-                        <p>For actually useful info I suggest taking a look at the top few players of the character you're interested in and looking at their personal adjustd winrates, that's usually a pretty good hint.</p>
-                </div>
+
                     <h3>Global matchups</h3>
                     <div class="table-container">
                     <table class="table is-bordered">
@@ -39,20 +32,19 @@
                                         {{#if this.suspicious}}
                                             class="uncertain"
                                         {{else}}
-                                                class="{{this.evaluation}}"
+                                            class="{{this.evaluation}}"
                                         {{/if}}
-                                        title="Raw: {{this.win_rate_real}}%. Based on {{this.game_count}} games"
-                                    >
-                                        <span {{#if this.suspicious}} class="uncertain" {{/if}}>
-                                    {{this.win_rate_adjusted}}% </span>
+                                            title="{{this.matchup}} Expected: {{this.expected}}% Raw: {{this.win_rate}}%. Based on {{this.game_count}} games">
+                                            <span {{#if this.suspicious}} class="uncertain" {{/if}}>
+                                                {{this.rating_delta}}</span>
                                     </td>
                                 {{/each}}
-                            </tr>
-                        {{/each}}
-                    </table>
-                    </div>
-                    <h3>Versus calculated matchups (≥1800)</h3>
-                    <p>These matchups are calculated based on the average of high rated players' records against each other. They should be less vulnerable to a single player playing a lot of games and skewing things.</p>
+                              </tr>
+                            {{/each}}
+                        </table>
+
+                    <h3>Top 1000</h3>
+                    <div>This table is based on games between top 1000 (character) players</div>
                     <div class="table-container">
                     <table class="table is-bordered">
                         <tr>
@@ -61,7 +53,7 @@
                                 <th>{{this}}</th>
                             {{/each}}
                         </tr>
-                        {{#each matchups_versus}}
+                        {{#each matchups_top_1000}}
                             <tr>
                                 <th>{{this.name}}</th>
                                 {{#each this.matchups}}
@@ -69,20 +61,19 @@
                                         {{#if this.suspicious}}
                                             class="uncertain"
                                         {{else}}
-                                                class="{{this.evaluation}}"
+                                            class="{{this.evaluation}}"
                                         {{/if}}
-                                                title="Based on {{this.game_count}} games between {{this.pair_count}} pairs"
-                                    >
-                                        <span {{#if this.suspicious}} class="uncertain" {{/if}}>
-                                    {{this.win_rate}}% </span>
+                                        title="{{this.matchup}} Expected: {{this.expected}}% Raw: {{this.win_rate}}%. Based on {{this.game_count}} games">
+                                            <span {{#if this.suspicious}} class="uncertain" {{/if}}>
+                                                {{this.rating_delta}}</span>
                                     </td>
                                 {{/each}}
-                            </tr>
-                        {{/each}}
-                    </table>
-                    </div>
-                    <h3>High rated matchups (≥1800)</h3>
-                    <p>Matchups with fewer than 250 games are <i>italicized.</i></p>
+                              </tr>
+                            {{/each}}
+                        </table>
+
+                    <h3>Proportional</h3>
+                    <div>This is the top 1000 but multiplied out by popularity. For example, if Sol has 15% popularity the top 150 players are counted.</div>
                     <div class="table-container">
                     <table class="table is-bordered">
                         <tr>
@@ -91,7 +82,7 @@
                                 <th>{{this}}</th>
                             {{/each}}
                         </tr>
-                        {{#each matchups_high_rated}}
+                        {{#each matchups_proportional}}
                             <tr>
                                 <th>{{this.name}}</th>
                                 {{#each this.matchups}}
@@ -99,17 +90,47 @@
                                         {{#if this.suspicious}}
                                             class="uncertain"
                                         {{else}}
-                                                class="{{this.evaluation}}"
+                                            class="{{this.evaluation}}"
                                         {{/if}}
-                                        title="Raw: {{this.win_rate_real}}%. Based on {{this.game_count}} games"
-                                    >
-                                        <span {{#if this.suspicious}} class="uncertain" {{/if}}>
-                                    {{this.win_rate_adjusted}}% </span>
+                                        title="{{this.matchup}} Expected: {{this.expected}}% Raw: {{this.win_rate}}%. Based on {{this.game_count}} games">
+                                            <span {{#if this.suspicious}} class="uncertain" {{/if}}>
+                                                {{this.rating_delta}}</span>
                                     </td>
                                 {{/each}}
-                            </tr>
-                        {{/each}}
-                    </table>
+                              </tr>
+                            {{/each}}
+                        </table>
+
+                    <h3>Top 100</h3>
+                    <div>This table is based on games between top 100 (character) players</div>
+                    <div class="table-container">
+                    <table class="table is-bordered">
+                        <tr>
+                            <th>&nbsp;</th>
+                            {{#each character_shortnames}}
+                                <th>{{this}}</th>
+                            {{/each}}
+                        </tr>
+                        {{#each matchups_top_100}}
+                            <tr>
+                                <th>{{this.name}}</th>
+                                {{#each this.matchups}}
+                                    <td
+                                        {{#if this.suspicious}}
+                                            class="uncertain"
+                                        {{else}}
+                                            class="{{this.evaluation}}"
+                                        {{/if}}
+                                        title="{{this.matchup}} Expected: {{this.expected}}% Raw: {{this.win_rate}}%. Based on {{this.game_count}} games">
+                                            <span {{#if this.suspicious}} class="uncertain" {{/if}}>
+                                                {{this.rating_delta}}</span>
+                                    </td>
+                                {{/each}}
+                              </tr>
+                            {{/each}}
+                        </table>
+
+
                     </div>
                 </div>
             </div>

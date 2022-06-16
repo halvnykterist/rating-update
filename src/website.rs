@@ -37,7 +37,7 @@ pub const CHAR_NAMES: &[(&str, &str)] = &[
 pub const PLATFORM: &str = &"PC";
 
 pub async fn run() {
-    rocket::build()
+    let _ = rocket::build()
         .attach(RatingsDbConn::fairing())
         .attach(Template::fairing())
         .mount(
@@ -243,15 +243,17 @@ async fn matchups(conn: RatingsDbConn) -> Cached<Template> {
         is_pc: bool,
         character_shortnames: Vec<&'static str>,
         matchups_global: Vec<api::CharacterMatchups>,
-        matchups_high_rated: Vec<api::CharacterMatchups>,
-        matchups_versus: Vec<api::VersusCharacterMatchups>,
+        matchups_top_1000: Vec<api::CharacterMatchups>,
+        matchups_proportional: Vec<api::CharacterMatchups>,
+        matchups_top_100: Vec<api::CharacterMatchups>,
         all_characters: &'static [(&'static str, &'static str)],
     }
 
-    let (matchups_global, matchups_high_rated, matchups_versus) = tokio::join!(
-        api::matchups_global_inner(&conn),
-        api::matchups_high_rated_inner(&conn),
-        api::matchups_versus(&conn),
+    let (matchups_global, matchups_top_1000, matchups_proportional, matchups_top_100) = tokio::join!(
+        api::get_matchups(&conn, "global_matchups"),
+        api::get_matchups(&conn, "top_1000_matchups"),
+        api::get_matchups(&conn, "proportional_matchups"),
+        api::get_matchups(&conn, "top_100_matchups"),
     );
 
     let context = Context {
@@ -259,8 +261,9 @@ async fn matchups(conn: RatingsDbConn) -> Cached<Template> {
         is_pc: PLATFORM == "PC",
         character_shortnames: CHAR_NAMES.iter().map(|c| c.0).collect(),
         matchups_global,
-        matchups_high_rated,
-        matchups_versus,
+        matchups_top_1000,
+        matchups_proportional,
+        matchups_top_100,
         all_characters: CHAR_NAMES,
     };
 
