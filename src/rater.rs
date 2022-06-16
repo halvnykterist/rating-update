@@ -1508,6 +1508,46 @@ fn decay_matchups(conn: &mut Connection, _timestamp: i64) -> Result<()> {
         },
     )?;
 
+    tx.execute(
+        "UPDATE top_1000_matchups
+        SET rating_deviation = min(
+                 :initial_deviation, 
+                 sqrt(rating_deviation * rating_deviation + :c * :c)),
+            rating_timestamp = :timestamp
+        WHERE 
+            rating_deviation < :initial_deviation",
+        named_params! {
+            ":initial_deviation": glicko::INITIAL_DEVIATION,
+            ":c": DECAY_CONSTANT,
+        },
+    )?;
+    tx.execute(
+        "UPDATE top_100_matchups
+        SET rating_deviation = min(
+                 :initial_deviation, 
+                 sqrt(rating_deviation * rating_deviation + :c * :c)),
+            rating_timestamp = :timestamp
+        WHERE 
+            rating_deviation < :initial_deviation",
+        named_params! {
+            ":initial_deviation": glicko::INITIAL_DEVIATION,
+            ":c": DECAY_CONSTANT,
+        },
+    )?;
+    tx.execute(
+        "UPDATE proportional_matchups
+        SET rating_deviation = min(
+                 :initial_deviation, 
+                 sqrt(rating_deviation * rating_deviation + :c * :c)),
+            rating_timestamp = :timestamp
+        WHERE 
+            rating_deviation < :initial_deviation",
+        named_params! {
+            ":initial_deviation": glicko::INITIAL_DEVIATION,
+            ":c": DECAY_CONSTANT,
+        },
+    )?;
+
     tx.commit()?;
 
     Ok(())
