@@ -37,6 +37,7 @@ tr:nth-child(n) td.uncertain {
 
 span.uncertain {
   font-style: italic;
+  color: #808080;
 }
 
 tr:nth-child(n) td.verybad {
@@ -75,6 +76,10 @@ tr:nth-child(n) td.verygood {
 
 .cheater {
   color: #811104;
+}
+
+.centered {
+    text-align: center !important;
 }
 
 table {

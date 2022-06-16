@@ -34,72 +34,75 @@
                                         {{else}}
                                             class="{{this.evaluation}}"
                                         {{/if}}
-                                            title="{{this.matchup}} Expected: {{this.expected}}% Raw: {{this.win_rate}}%. Based on {{this.game_count}} games">
+                                            title="{{this.matchup}} Rating offset: {{this.rating_delta}} Raw: {{this.win_rate}}%. Based on {{this.game_count}} games">
                                             <span {{#if this.suspicious}} class="uncertain" {{/if}}>
-                                                {{this.rating_delta}}</span>
-                                    </td>
-                                {{/each}}
-                              </tr>
+                                                {{this.expected}}%</span>
+                                </td>
                             {{/each}}
-                        </table>
+                          </tr>
+                        {{/each}}
+                    </table>
+                    </div>
 
                     <h3>Top 1000</h3>
                     <div>This table is based on games between top 1000 (character) players</div>
                     <div class="table-container">
-                    <table class="table is-bordered">
-                        <tr>
-                            <th>&nbsp;</th>
-                            {{#each character_shortnames}}
-                                <th>{{this}}</th>
-                            {{/each}}
-                        </tr>
-                        {{#each matchups_top_1000}}
+                        <table class="table is-bordered">
                             <tr>
-                                <th>{{this.name}}</th>
-                                {{#each this.matchups}}
-                                    <td
-                                        {{#if this.suspicious}}
-                                            class="uncertain"
-                                        {{else}}
-                                            class="{{this.evaluation}}"
-                                        {{/if}}
-                                        title="{{this.matchup}} Expected: {{this.expected}}% Raw: {{this.win_rate}}%. Based on {{this.game_count}} games">
-                                            <span {{#if this.suspicious}} class="uncertain" {{/if}}>
-                                                {{this.rating_delta}}</span>
+                                <th>&nbsp;</th>
+                                {{#each character_shortnames}}
+                                    <th>{{this}}</th>
+                                {{/each}}
+                            </tr>
+                            {{#each matchups_global}}
+                                <tr>
+                                    <th>{{this.name}}</th>
+                                    {{#each this.matchups}}
+                                        <td
+                                            {{#if this.suspicious}}
+                                                class="uncertain"
+                                            {{else}}
+                                                class="{{this.evaluation}}"
+                                            {{/if}}
+                                                title="{{this.matchup}} Rating offset: {{this.rating_delta}} Raw: {{this.win_rate}}%. Based on {{this.game_count}} games">
+                                                <span {{#if this.suspicious}} class="uncertain" {{/if}}>
+                                                    {{this.expected}}%</span>
                                     </td>
                                 {{/each}}
                               </tr>
                             {{/each}}
                         </table>
+                    </div>
 
                     <h3>Proportional</h3>
                     <div>This is the top 1000 but multiplied out by popularity. For example, if Sol has 15% popularity the top 150 players are counted.</div>
                     <div class="table-container">
-                    <table class="table is-bordered">
-                        <tr>
-                            <th>&nbsp;</th>
-                            {{#each character_shortnames}}
-                                <th>{{this}}</th>
-                            {{/each}}
-                        </tr>
-                        {{#each matchups_proportional}}
+                        <table class="table is-bordered">
                             <tr>
-                                <th>{{this.name}}</th>
-                                {{#each this.matchups}}
-                                    <td
-                                        {{#if this.suspicious}}
-                                            class="uncertain"
-                                        {{else}}
-                                            class="{{this.evaluation}}"
-                                        {{/if}}
-                                        title="{{this.matchup}} Expected: {{this.expected}}% Raw: {{this.win_rate}}%. Based on {{this.game_count}} games">
-                                            <span {{#if this.suspicious}} class="uncertain" {{/if}}>
-                                                {{this.rating_delta}}</span>
+                                <th>&nbsp;</th>
+                                {{#each character_shortnames}}
+                                    <th>{{this}}</th>
+                                {{/each}}
+                            </tr>
+                            {{#each matcuhps_proportional}}
+                                <tr>
+                                    <th>{{this.name}}</th>
+                                    {{#each this.matchups}}
+                                        <td
+                                            {{#if this.suspicious}}
+                                                class="uncertain"
+                                            {{else}}
+                                                class="{{this.evaluation}}"
+                                            {{/if}}
+                                                title="{{this.matchup}} Rating offset: {{this.rating_delta}} Raw: {{this.win_rate}}%. Based on {{this.game_count}} games">
+                                                <span {{#if this.suspicious}} class="uncertain" {{/if}}>
+                                                    {{this.expected}}%</span>
                                     </td>
                                 {{/each}}
                               </tr>
                             {{/each}}
-                        </table>
+                    </table>
+                    </div>
 
                     <h3>Top 100</h3>
                     <div>This table is based on games between top 100 (character) players</div>
@@ -121,16 +124,14 @@
                                         {{else}}
                                             class="{{this.evaluation}}"
                                         {{/if}}
-                                        title="{{this.matchup}} Expected: {{this.expected}}% Raw: {{this.win_rate}}%. Based on {{this.game_count}} games">
+                                            title="{{this.matchup}} Rating offset: {{this.rating_delta}} Raw: {{this.win_rate}}%. Based on {{this.game_count}} games">
                                             <span {{#if this.suspicious}} class="uncertain" {{/if}}>
-                                                {{this.rating_delta}}</span>
-                                    </td>
-                                {{/each}}
-                              </tr>
+                                                {{this.expected}}%</span>
+                                </td>
                             {{/each}}
-                        </table>
-
-
+                          </tr>
+                        {{/each}}
+                    </table>
                     </div>
                 </div>
             </div>
