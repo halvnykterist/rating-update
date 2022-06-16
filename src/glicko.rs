@@ -44,7 +44,7 @@ impl Rating {
     }
 
     #[must_use]
-    pub fn update(self, other: Rating, result: f64) -> Rating {
+    pub fn update_with_min_dev(self, other: Rating, result: f64, min_deviation) -> Rating {
         let d_2 = 1.0
             / (Q.powf(2.0)
                 * g(other.deviation).powf(2.0)
@@ -58,7 +58,7 @@ impl Rating {
                     * (result - e(self.value, other.value, other.deviation)),
             deviation: (1.0 / (1.0 / self.deviation.powf(2.0) + 1.0 / d_2))
                 .sqrt()
-                .max(MIN_DEVIATION),
+                .max(min_deviation),
         };
 
         if result == 0.0 {
@@ -79,6 +79,11 @@ impl Rating {
         }
 
         res
+    }
+
+    #[must_use]
+    pub fn update(self, other: Rating, result: f64) -> Rating {
+        Self::update_with_min_dev(self, other, result, MIN_DEVIATION)
     }
 
     pub fn expected(self, other: Rating) -> f64 {

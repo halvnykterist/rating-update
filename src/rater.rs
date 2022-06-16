@@ -1064,10 +1064,16 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
                     )
                     .unwrap();
 
-                let new_winner = Rating::new(winner_value, winner_deviation)
-                    .update(Rating::new(loser_value, loser_deviation), 1.0);
-                let new_loser = Rating::new(loser_value, loser_deviation)
-                    .update(Rating::new(winner_value, winner_deviation), 0.0);
+                let new_winner = Rating::new(winner_value, winner_deviation).update_with_min_dev(
+                    Rating::new(loser_value, loser_deviation),
+                    1.0,
+                    5.0,
+                );
+                let new_loser = Rating::new(loser_value, loser_deviation).update_with_min_dev(
+                    Rating::new(winner_value, winner_deviation),
+                    0.0,
+                    5.0,
+                );
 
                 winner_wins += 1;
                 loser_losses += 1;
