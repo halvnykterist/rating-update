@@ -44,7 +44,7 @@ impl Rating {
     }
 
     #[must_use]
-    pub fn update_with_min_dev(self, other: Rating, result: f64, min_deviation) -> Rating {
+    pub fn update_with_min_dev(self, other: Rating, result: f64, min_deviation: f64) -> Rating {
         let d_2 = 1.0
             / (Q.powf(2.0)
                 * g(other.deviation).powf(2.0)
