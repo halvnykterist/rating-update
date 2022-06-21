@@ -1,4 +1,4 @@
-use chrono::{NaiveDateTime, Utc};
+use chrono::{Duration, NaiveDateTime, Utc};
 use fxhash::FxHashMap;
 use rocket::serde::{json::Json, Serialize};
 use rusqlite::{named_params, params, Connection, OptionalExtension};
@@ -147,6 +147,43 @@ pub async fn stats_inner(conn: &RatingsDbConn) -> Stats {
         }
     })
     .await
+}
+
+#[get("/api/daily_games?<length>")]
+pub async fn daily_games(
+    conn: RatingsDbConn,
+    length: Option<i64>,
+) -> Json<(Vec<String>, Vec<i64>)> {
+    Json(
+        conn.run(move |conn| {
+            let tx = conn.transaction().unwrap();
+            let now = NaiveDateTime::from_timestamp(Utc::now().timestamp(), 0);
+            let now_date = now.date();
+            let length = length.unwrap_or(60);
+            let then = now_date - Duration::days(length);
+
+            (
+                then.iter_days()
+                    .take(length as usize)
+                    .map(|date| date.format("%Y-%m-%d").to_string())
+                    .collect(),
+                then.iter_days()
+                    .take(length as usize)
+                    .map(|date| {
+                        let from = date.and_hms(0, 0, 0).timestamp();
+                        let to = from + 24 * 60 * 60;
+                        tx.query_row(
+                            "SELECT COUNT(*) FROM games WHERe timestamp > ? ANd timestamp < ?",
+                            params![from, to],
+                            |r| r.get(0),
+                        )
+                        .unwrap()
+                    })
+                    .collect(),
+            )
+        })
+        .await,
+    )
 }
 
 pub async fn add_hit(_conn: &RatingsDbConn, _page: String) {
