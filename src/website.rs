@@ -75,6 +75,7 @@ pub async fn run() {
                 api::player_lookup,
                 api::active_players,
                 api::daily_games,
+                api::daily_character_games,
             ],
         )
         .register("/", catchers![catch_404, catch_500, catch_503])
