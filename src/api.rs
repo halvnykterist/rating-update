@@ -153,7 +153,7 @@ pub async fn stats_inner(conn: &RatingsDbConn) -> Stats {
 pub async fn daily_games(
     conn: RatingsDbConn,
     length: Option<i64>,
-) -> Json<(Vec<String>, Vec<i64>)> {
+) -> Json<(Vec<String>, Vec<i64>, Vec<i64>)> {
     Json(
         conn.run(move |conn| {
             let tx = conn.transaction().unwrap();
@@ -173,8 +173,26 @@ pub async fn daily_games(
                         let from = date.and_hms(0, 0, 0).timestamp();
                         let to = from + 24 * 60 * 60;
                         tx.query_row(
-                            "SELECT COUNT(*) FROM games WHERe timestamp > ? ANd timestamp < ?",
+                            "select count(*) from games where timestamp > ? and timestamp < ?",
                             params![from, to],
+                            |r| r.get(0),
+                        )
+                        .unwrap()
+                    })
+                    .collect(),
+                then.iter_days()
+                    .take(length as usize)
+                    .map(|date| {
+                        let from = date.and_hms(0, 0, 0).timestamp();
+                        let to = from + 24 * 60 * 60;
+                        tx.query_row(
+                            "select count(distinct id) from (
+                                select id_a as id from games where timestamp > ? and timestamp < ?
+                                union
+                                select id_b as id from games where timestamp > ? and timestamp < ?
+                            )
+                            ",
+                            params![from, to, from, to],
                             |r| r.get(0),
                         )
                         .unwrap()
