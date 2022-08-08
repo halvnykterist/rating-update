@@ -472,11 +472,11 @@ async fn catch_503() -> NamedFile {
 }
 
 #[get("/<file..>")]
-async fn files(file: PathBuf) -> Cached<Option<NamedFile>> {
-    Cached::new(
-        NamedFile::open(Path::new("static/").join(file)).await.ok(),
-        600,
-    )
+async fn files(file: PathBuf) -> Option<NamedFile> {
+    NamedFile::open(Path::new("static/").join(file)).await.ok()
+    //Cached::new(
+    //600,
+    //)
 }
 
 struct Cached<R> {
