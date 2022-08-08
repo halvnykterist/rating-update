@@ -1128,8 +1128,8 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
             if winner_rank <= 1000 && loser_rank <= 1000 {
                 update_global_matchup(&tx, "top_1000_matchups", winner.1, loser.1);
             }
-            if winner_rank as f64 <= popularities.get(&winner_char).unwrap_or_default() * 1000.0
-                && loser_rank as f64 <= popularities.get(&loser_char).unwrap_or_default() * 1000.0
+            if winner_rank as f64 <= popularities.get(&winner_char).unwrap_or(&0.0) * 1000.0
+                && loser_rank as f64 <= popularities.get(&loser_char).unwrap_or(&0.0) * 1000.0
             {
                 update_global_matchup(&tx, "proportional_matchups", winner.1, loser.1);
             }
