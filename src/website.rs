@@ -32,6 +32,7 @@ pub const CHAR_NAMES: &[(&str, &str)] = &[
     ("HA", "Happy Chaos"),
     ("BA", "Baiken"),
     ("TE", "Testament"),
+    ("BI", "Bridget"),
 ];
 
 pub const PLATFORM: &str = &"PC";
