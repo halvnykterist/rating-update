@@ -472,11 +472,11 @@ async fn catch_503() -> NamedFile {
 }
 
 #[get("/<file..>")]
-async fn files(file: PathBuf) -> Option<NamedFile> {
-    NamedFile::open(Path::new("static/").join(file)).await.ok()
-    //Cached::new(
-    //600,
-    //)
+async fn files(file: PathBuf) -> Cached<Option<NamedFile>> {
+    Cached::new(
+        NamedFile::open(Path::new("static/").join(file)).await.ok(),
+        600,
+    )
 }
 
 struct Cached<R> {
@@ -501,6 +501,7 @@ impl<'r, 'o: 'r, R: Responder<'r, 'o>> Responder<'r, 'o> for Cached<R> {
                 format!("max-age={}", self.cache_control),
             ));
             r.adjoin_header(Header::new("age", "0"));
+            r.remove_header("content-length");
             r
         })
     }
