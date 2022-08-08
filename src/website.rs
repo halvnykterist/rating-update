@@ -501,7 +501,7 @@ impl<'r, 'o: 'r, R: Responder<'r, 'o>> Responder<'r, 'o> for Cached<R> {
                 format!("max-age={}", self.cache_control),
             ));
             r.adjoin_header(Header::new("age", "0"));
-            r.remove_header("content-length");
+            r.remove_header("Content-Length");
             r
         })
     }
