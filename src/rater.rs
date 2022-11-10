@@ -5,7 +5,9 @@ use fxhash::{FxHashMap, FxHashSet};
 use glob::glob;
 use lazy_static::lazy_static;
 use rocket::serde::json::serde_json;
-use rusqlite::{named_params, params, Connection, OptionalExtension, Row, Transaction};
+use rusqlite::{
+    functions::FunctionFlags, named_params, params, Connection, OptionalExtension, Row, Transaction,
+};
 use serde::Deserialize;
 use std::{fs::File, io::BufReader, sync::Mutex, time::Duration};
 use tokio::{time, try_join};
@@ -327,6 +329,18 @@ pub fn mark_vip(vip_id: &str, notes: &str) {
         "INSERT INTO vip_status
             VALUES(?, 'VIP', ?)",
         params![vip_id, notes],
+    )
+    .unwrap();
+}
+
+pub fn mark_hidden(hidden_id: &str, notes: &str) {
+    let hidden_id = i64::from_str_radix(hidden_id, 16).unwrap();
+
+    let conn = Connection::open(DB_NAME).unwrap();
+    conn.execute(
+        "INSERT INTO hidden_status
+            VALUES(?, 'hidden', ?)",
+        params![hidden_id, notes],
     )
     .unwrap();
 }
@@ -850,32 +864,37 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
         let old_rating_a = players.get(&(g.id_a, g.char_a)).unwrap().rating;
         let old_rating_b = players.get(&(g.id_b, g.char_b)).unwrap().rating;
 
-        if !has_cheater {
-            players
-                .get_mut(&(g.id_a, g.char_a))
-                .unwrap()
-                .decay(g.timestamp);
-            players
-                .get_mut(&(g.id_b, g.char_b))
-                .unwrap()
-                .decay(g.timestamp);
+        players
+            .get_mut(&(g.id_a, g.char_a))
+            .unwrap()
+            .decay(g.timestamp);
+        players
+            .get_mut(&(g.id_b, g.char_b))
+            .unwrap()
+            .decay(g.timestamp);
 
-            let (winner, loser) = match g.winner {
-                1 => ((g.id_a, g.char_a), (g.id_b, g.char_b)),
-                2 => ((g.id_b, g.char_b), (g.id_a, g.char_a)),
-                _ => panic!("Bad winner"),
-            };
+        let (winner, loser) = match g.winner {
+            1 => ((g.id_a, g.char_a), (g.id_b, g.char_b)),
+            2 => ((g.id_b, g.char_b), (g.id_a, g.char_a)),
+            _ => panic!("Bad winner"),
+        };
 
-            let winner_rating = players.get(&winner).unwrap().rating;
-            let winner_rank = players
-                .get(&winner)
-                .unwrap()
-                .character_rank
-                .unwrap_or(99999);
-            let winner_char = players.get(&winner).unwrap().char_id;
-            let loser_rating = players.get(&loser).unwrap().rating;
-            let loser_rank = players.get(&loser).unwrap().character_rank.unwrap_or(99999);
-            let loser_char = players.get(&loser).unwrap().char_id;
+        let winner_rating = players.get(&winner).unwrap().rating;
+        let winner_rank = players
+            .get(&winner)
+            .unwrap()
+            .character_rank
+            .unwrap_or(99999);
+        let winner_char = players.get(&winner).unwrap().char_id;
+        let loser_rating = players.get(&loser).unwrap().rating;
+        let loser_rank = players.get(&loser).unwrap().character_rank.unwrap_or(99999);
+        let loser_char = players.get(&loser).unwrap().char_id;
+
+        let expected_outcome = winner_rating.expected(loser_rating);
+
+        let valid = expected_outcome > 0.1 && expected_outcome < 0.9 && !has_cheater;
+
+        if valid {
 
             //Update ratings
             players.get_mut(&winner).unwrap().rating = winner_rating.update(loser_rating, 1.0);
@@ -1175,7 +1194,7 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
         }
 
         tx.execute(
-            "INSERT INTO game_ratings VALUES(?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO game_ratings VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)",
             params![
                 g.timestamp,
                 g.id_a,
@@ -1184,6 +1203,8 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
                 g.id_b,
                 old_rating_b.value,
                 old_rating_b.deviation,
+                g.winner,
+                valid,
             ],
         )
         .unwrap();
@@ -1474,7 +1495,17 @@ pub fn update_decay(conn: &mut Connection, timestamp: i64) -> Result<()> {
     Ok(())
 }
 
+pub async fn test_decay_matchups() {
+    let mut conn = Connection::open(DB_NAME).unwrap();
+
+    decay_matchups(&mut conn, Utc::now().timestamp()).unwrap();
+}
+
 fn decay_matchups(conn: &mut Connection, _timestamp: i64) -> Result<()> {
+    conn.create_scalar_function("sqrt", 1, FunctionFlags::SQLITE_DETERMINISTIC, |ctx| {
+        ctx.get::<f64>(0).map(f64::sqrt)
+    })?;
+
     let tx = conn.transaction()?;
 
     //tx.execute(
@@ -1499,7 +1530,6 @@ fn decay_matchups(conn: &mut Connection, _timestamp: i64) -> Result<()> {
         SET rating_deviation = min(
                  :initial_deviation, 
                  sqrt(rating_deviation * rating_deviation + :c * :c)),
-            rating_timestamp = :timestamp
         WHERE 
             rating_deviation < :initial_deviation",
         named_params! {
@@ -1513,7 +1543,6 @@ fn decay_matchups(conn: &mut Connection, _timestamp: i64) -> Result<()> {
         SET rating_deviation = min(
                  :initial_deviation, 
                  sqrt(rating_deviation * rating_deviation + :c * :c)),
-            rating_timestamp = :timestamp
         WHERE 
             rating_deviation < :initial_deviation",
         named_params! {
@@ -1526,7 +1555,6 @@ fn decay_matchups(conn: &mut Connection, _timestamp: i64) -> Result<()> {
         SET rating_deviation = min(
                  :initial_deviation, 
                  sqrt(rating_deviation * rating_deviation + :c * :c)),
-            rating_timestamp = :timestamp
         WHERE 
             rating_deviation < :initial_deviation",
         named_params! {
@@ -1539,7 +1567,6 @@ fn decay_matchups(conn: &mut Connection, _timestamp: i64) -> Result<()> {
         SET rating_deviation = min(
                  :initial_deviation, 
                  sqrt(rating_deviation * rating_deviation + :c * :c)),
-            rating_timestamp = :timestamp
         WHERE 
             rating_deviation < :initial_deviation",
         named_params! {

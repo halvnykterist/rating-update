@@ -32,7 +32,9 @@ CREATE TABLE game_ratings (
     id_b INTEGER NOT NULL,
     value_b REAL NOT NULL,
     deviation_b REAL NOT NULL,
-    PRIMARY KEY (timestamp, id_a, id_b)
+    winner INTEGER NOT NULL,
+    valid BOOLEAN NOT NULL, 
+    PRIMARY KEY (timestamp, id_a, id_b, winner)
 );
 
 CREATE INDEX ratings_value_a ON game_ratings(value_a);
@@ -94,7 +96,7 @@ CREATE TABLE player_matchups (
     opp_char_id INTEGER NOT NULL,
     rating_value REAL NOT NULL,
     rating_deviation REAL NOT NULL,
-    rating_timestamp INTEGER NO NULL,
+    rating_timestamp INTEGER NOT NULL,
     wins INTEGER NOT NULL,
     losses INTEGER NOT NULL,
     PRIMARY KEY(id, char_id, opp_char_id)

@@ -25,6 +25,8 @@
                         <li><a href="#PC_only">Is this PC only?</a></li>
                         <li><a href="#Rating_decay">Does rating change over time?</a></li>
                         <li><a href="#Reading_matchups">How do I read the matchup chart?</a></li>
+                        <li><a href="#No_rating">Why don't all games have a rating change?</a></li>
+                        <li><a href="#Hidden_users">Why are some users hidden?</a></li>
                         <li><a href="#Missing_games">Some of my games are missing.</a></li>
                         <li><a href="#Questions">My question wasn't answered here.</a></li>
                     </ul>
@@ -56,7 +58,7 @@
                     <p>Average rating is about 1200, if you want to compare yourself to others. I've got the "strong player" cutoff at 1800 since those are good enough to beat the average player 90% of the time or so, but above them there are plenty of 2100s that do the same to them.</p>
 
                     <h2 id="Plus_minus">What does the '±' part mean?</h2>
-                    <p>This represents how confident the system is in your rating. If you've got a rating of 1450 ±150, that means the system is 95% confident that your rating is between 1300 and 1600. New players/characters started out at 1500 ±700, which means the system thinks they could be anywhere between an 800-rated newbie or a 2200 rated pro. As you play more games, especailly against opponents close to you in skill, this number will naturally go down.</p>
+                    <p>This represents how confident the system is in your rating. If you've got a rating of 1450 ±150, that means the system is 95% confident that your rating is between 1300 and 1600. New players/characters started out at 1500 ±700, which means the system thinks they could be anywhere between an 800-rated newbie or a 2200 rated pro. As you play more games, especially against opponents close to you in skill, this number will naturally go down.</p>
 
                     <h2 id="Updates">How often does this page update?</h2>
                     <p>New data is scraped from Strive every minute, and ratings are recalculated every hour. This lets the system use multiple games each time it wants to update the ratings, resulting in a more stable system.</p>
@@ -84,9 +86,14 @@
                     <h2 id="Reading_matchups">How do I read the matchup chart?</h2>
                     <p>If you're the character on the left (written in full), and your opponent has the character on top (with a shortened name), the grid cell gives you the win probability.</p>
 
+                    <h2 id="No_rating">Why don't all of games have a rating change?</h2>
+                    <p>If the difference in skill is too great between players, it's simply not taken into account. This makes it impossible to boost by playing against yourself of farming lower skilled players, as well as prevents you from losing points even though you beat someone 8-1. If a match has an expected win rate over 90% or under 10% it's simply not counted.</p>
+
+                    <h2 id="Hidden_users">Why are some users hidden?</h2>
+                    <p>These are users who've personally requested to have their pages hidden. They still have ratings and will affect you as normal, but you won't be able to search for them by name and so on.</p>
+
                     <h2 id="Missing_games">Some of my games are missing.</h2>
                     <p>The site only looks at replays from the tower, so if you've been playing in the park those games won't show up.</p>
-                    <p>I only started grabbing replays in December, and my scraping had a lot of downtime up until about January fifth. Games after that should all be present though.</p>
 
                     <h2 id="Questions">My question wasn't answered here.</h2>
                     <p>Send me a message on 

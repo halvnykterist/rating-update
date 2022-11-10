@@ -98,7 +98,7 @@ impl Rating {
 }
 
 const Q: f64 = 0.0057565;
-const UNCERTAINTY: f64 = 0.2;
+const UNCERTAINTY: f64 = 0.1;
 const UPDATE_SPEED: f64 = 1.0;
 
 pub fn g(rd: f64) -> f64 {

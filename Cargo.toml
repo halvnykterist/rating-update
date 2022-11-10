@@ -14,7 +14,7 @@ rocket_dyn_templates = { version = "0.1.0-rc.1", default-features = false, featu
 ggst-api = { git = "https://github.com/halvnykterist/ggst-api-rs" }
 #ggst-api = { path = "../ggst-api-rs" }
 tokio = { version = "1", features=["full"] }
-rusqlite = { version = "0.25", features = ["bundled"] }
+rusqlite = { version = "0.25", features = ["bundled", "functions"] }
 serde = { version = "1", features = ["derive"] }
 lazy_static = "1"
 glob = "0.3"

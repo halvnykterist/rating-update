@@ -271,8 +271,8 @@ pub struct RankingPlayer {
     character_short: String,
     name: String,
     game_count: i32,
-    rating_value: f64,
-    rating_deviation: f64,
+    rating_value: i64,
+    rating_deviation: i64,
     vip_status: Option<String>,
     cheater_status: Option<String>,
     hidden_status: Option<String>,
@@ -298,8 +298,8 @@ impl RankingPlayer {
                 .0
                 .to_owned(),
             game_count: (rated_player.win_count + rated_player.loss_count) as i32,
-            rating_value: rated_player.rating.value.round(),
-            rating_deviation: (rated_player.rating.deviation * 2.0).round(),
+            rating_value: rated_player.rating.value.round() as i64,
+            rating_deviation: (rated_player.rating.deviation * 2.0).round() as i64,
             vip_status,
             cheater_status,
             hidden_status,
@@ -625,8 +625,8 @@ pub struct SearchResultPlayer {
     id: String,
     character: String,
     character_short: String,
-    rating_value: f64,
-    rating_deviation: f64,
+    rating_value: i64,
+    rating_deviation: i64,
     game_count: i32,
 }
 
@@ -684,8 +684,8 @@ pub async fn search_inner(
                 character_short: website::CHAR_NAMES[row.get::<_, usize>("char_id").unwrap()]
                     .0
                     .to_owned(),
-                rating_value: rating.value.round(),
-                rating_deviation: (rating.deviation * 2.0).round(),
+                rating_value: rating.value.round() as i64,
+                rating_deviation: (rating.deviation * 2.0).round() as i64,
                 game_count: row.get::<_, i32>("wins").unwrap()
                     + row.get::<_, i32>("losses").unwrap(),
                 vip_status: row.get::<_, Option<String>>("vip_status").unwrap(),
@@ -773,21 +773,21 @@ pub struct PlayerDataChar {
 struct OtherPlayerCharacter {
     character_name: String,
     character_shortname: String,
-    rating_value: f64,
-    rating_deviation: f64,
+    rating_value: i64,
+    rating_deviation: i64,
     game_count: i32,
 }
 
 #[derive(Serialize)]
 struct PlayerCharacterData {
     character_name: String,
-    rating_value: f64,
-    rating_deviation: f64,
+    rating_value: i64,
+    rating_deviation: i64,
     global_rank: Option<i32>,
     character_rank: Option<i32>,
 
-    top_rating_value: Option<f64>,
-    top_rating_deviation: Option<f64>,
+    top_rating_value: Option<i64>,
+    top_rating_deviation: Option<i64>,
     top_rating_timestamp: Option<String>,
 
     top_defeated_id: Option<String>,
@@ -813,8 +813,8 @@ const MATCHUP_MIN_GAMES: i64 = 250;
 #[derive(Serialize)]
 struct PlayerSet {
     timestamp: String,
-    own_rating_value: f64,
-    own_rating_deviation: f64,
+    own_rating_value: i64,
+    own_rating_deviation: i64,
     floor: String,
     opponent_name: String,
     opponent_vip: Option<&'static str>,
@@ -823,8 +823,8 @@ struct PlayerSet {
     opponent_id: String,
     opponent_character: &'static str,
     opponent_character_short: &'static str,
-    opponent_rating_value: f64,
-    opponent_rating_deviation: f64,
+    opponent_rating_value: i64,
+    opponent_rating_deviation: i64,
     expected_outcome: String,
     rating_change: String,
     rating_change_class: &'static str,
@@ -884,6 +884,7 @@ pub async fn get_player_char_history(
                             value_b AS opponent_value,
                             deviation_b AS opponent_deviation,
                             winner,
+                            valid,
                             vip_status,
                             cheater_status,
                             hidden_status
@@ -906,6 +907,7 @@ pub async fn get_player_char_history(
                             value_a AS opponent_value,
                             deviation_a AS opponent_deviation,
                             winner + 2  as winner,
+                            valid,
                             vip_status,
                             cheater_status,
                             hidden_status
@@ -938,6 +940,7 @@ pub async fn get_player_char_history(
                 let opponent_value: f64 = row.get("opponent_value").unwrap();
                 let opponent_deviation: f64 = row.get("opponent_deviation").unwrap();
                 let winner: i64 = row.get("winner").unwrap();
+                let valid: bool = row.get("valid").unwrap();
                 let opponent_vip: Option<String> = row.get("vip_status").unwrap();
                 let opponent_cheater: Option<String> = row.get("cheater_status").unwrap();
                 let opponent_hidden: Option<String> = row.get("hidden_status").unwrap();
@@ -959,6 +962,7 @@ pub async fn get_player_char_history(
                             2 | 3 => false,
                             _ => panic!("Bad winner"),
                         },
+                        valid,
                         opponent_vip.is_some(),
                         opponent_cheater.is_some(),
                         opponent_hidden.is_some(),
@@ -980,6 +984,7 @@ pub async fn get_player_char_history(
                             2 | 3 => false,
                             _ => panic!("Bad winner"),
                         },
+                        valid,
                         opponent_vip.is_some(),
                         opponent_cheater.is_some(),
                         opponent_hidden.is_some(),
@@ -989,7 +994,7 @@ pub async fn get_player_char_history(
 
             history
                 .into_iter()
-                .map(RawPlayerSet::to_formated_set)
+                .map(RawPlayerSet::to_formatted_set)
                 .collect()
         };
 
@@ -1106,8 +1111,8 @@ fn get_player_other_characters(conn: &Connection, id: i64) -> Vec<OtherPlayerCha
             character_name,
             character_shortname,
             game_count,
-            rating_value: rating.value.round(),
-            rating_deviation: (rating.deviation * 2.0).round(),
+            rating_value: rating.value.round() as i64,
+            rating_deviation: (rating.deviation * 2.0).round() as i64,
         });
     }
 
@@ -1240,10 +1245,10 @@ fn get_player_character_data(
             character_name,
             game_count: wins + losses,
             win_rate: (100.0 * wins as f64 / (wins + losses) as f64).round(),
-            rating_value: value.round(),
-            rating_deviation: (deviation * 2.0).round(),
-            top_rating_value: top_rating_value.map(|r| r.round()),
-            top_rating_deviation: top_rating_deviation.map(|d| (2.0 * d).round()),
+            rating_value: value.round() as i64,
+            rating_deviation: (deviation * 2.0).round() as i64,
+            top_rating_value: top_rating_value.map(|r| r.round() as i64),
+            top_rating_deviation: top_rating_deviation.map(|d| (2.0 * d).round() as i64),
             top_rating_timestamp: top_rating_timestamp.map(|t| {
                 NaiveDateTime::from_timestamp(t, 0)
                     .format("%Y-%m-%d")
@@ -1280,6 +1285,7 @@ struct RawPlayerSet {
     opponent_char: i64,
     opponent_value: f64,
     opponent_deviation: f64,
+    valid: bool,
 
     rating_change_sequence: Vec<f64>,
     result_wins: i32,
@@ -1287,7 +1293,7 @@ struct RawPlayerSet {
 }
 
 impl RawPlayerSet {
-    fn to_formated_set(self) -> PlayerSet {
+    fn to_formatted_set(self) -> PlayerSet {
         let timestamp = NaiveDateTime::from_timestamp(self.timestamp, 0)
             .format("%Y-%m-%d %H:%M")
             .to_string();
@@ -1318,19 +1324,25 @@ impl RawPlayerSet {
 
         PlayerSet {
             timestamp,
-            own_rating_value: self.own_value.round(),
-            own_rating_deviation: (2.0 * self.own_deviation).round(),
+            own_rating_value: self.own_value.round() as i64,
+            own_rating_deviation: (2.0 * self.own_deviation).round() as i64,
             floor: stringify_floor(self.floor),
             opponent_name: self.opponent_name,
             opponent_id: format!("{:X}", self.opponent_id),
             opponent_character_short: website::CHAR_NAMES[self.opponent_char as usize].0,
             opponent_character: website::CHAR_NAMES[self.opponent_char as usize].1,
 
-            opponent_rating_value: self.opponent_value.round(),
-            opponent_rating_deviation: (2.0 * self.opponent_deviation).round(),
+            opponent_rating_value: self.opponent_value.round() as i64,
+            opponent_rating_deviation: (2.0 * self.opponent_deviation).round() as i64,
 
-            rating_change: format!("{:+.1}", rating_change_sum,),
-            rating_change_class: if average_rating_change >= 2.0 {
+            rating_change: if self.valid {
+                format!("{:+.1}", rating_change_sum,)
+            } else {
+                format!("---")
+            },
+            rating_change_class: if !self.valid {
+                "rating-same"
+            } else if average_rating_change >= 2.0 {
                 "rating-up"
             } else if average_rating_change >= 0.0 {
                 "rating-barely-up"
@@ -1381,6 +1393,7 @@ fn add_to_grouped_sets(
     opponent_value: f64,
     opponent_deviation: f64,
     winner: bool,
+    valid: bool,
     opponent_vip: bool,
     opponent_cheater: bool,
     opponent_hidden: bool,
@@ -1388,13 +1401,15 @@ fn add_to_grouped_sets(
     let own_rating = Rating::new(own_value, own_deviation);
     let opp_rating = Rating::new(opponent_value, opponent_deviation);
 
-    let rating_change =
-        Rating::rating_change(own_rating, opp_rating, if winner { 1.0 } else { 0.0 });
+    let rating_change = if valid {
+        Rating::rating_change(own_rating, opp_rating, if winner { 1.0 } else { 0.0 })
+    } else {
+        0.0
+    };
 
-    if let Some(set) = sets
-        .last_mut()
-        .filter(|set| set.opponent_id == opponent_id && set.opponent_char == opponent_char)
-    {
+    if let Some(set) = sets.last_mut().filter(|set| {
+        set.opponent_id == opponent_id && set.opponent_char == opponent_char && set.valid == valid
+    }) {
         set.timestamp = timestamp;
         set.own_value = own_value;
         set.own_deviation = own_deviation;
@@ -1420,6 +1435,7 @@ fn add_to_grouped_sets(
             opponent_char,
             opponent_value,
             opponent_deviation,
+            valid,
             rating_change_sequence: vec![rating_change],
             result_wins: if winner { 1 } else { 0 },
             result_losses: if winner { 0 } else { 1 },
@@ -1439,6 +1455,7 @@ fn add_ungrouped_set(
     opponent_value: f64,
     opponent_deviation: f64,
     winner: bool,
+    valid: bool,
     opponent_vip: bool,
     opponent_cheater: bool,
     opponent_hidden: bool,
@@ -1446,8 +1463,11 @@ fn add_ungrouped_set(
     let own_rating = Rating::new(own_value, own_deviation);
     let opp_rating = Rating::new(opponent_value, opponent_deviation);
 
-    let rating_change =
-        Rating::rating_change(own_rating, opp_rating, if winner { 1.0 } else { 0.0 });
+    let rating_change = if valid {
+        Rating::rating_change(own_rating, opp_rating, if winner { 1.0 } else { 0.0 })
+    } else {
+        0.0
+    };
 
     sets.push(RawPlayerSet {
         timestamp,
@@ -1462,6 +1482,7 @@ fn add_ungrouped_set(
         opponent_char,
         opponent_value,
         opponent_deviation,
+        valid,
         rating_change_sequence: vec![rating_change],
         result_wins: if winner { 1 } else { 0 },
         result_losses: if winner { 0 } else { 1 },

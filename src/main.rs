@@ -62,11 +62,17 @@ async fn main() {
         Some("mark_vip") => {
             rater::mark_vip(args.get(1).unwrap(), args.get(2).unwrap());
         }
+        Some("mark_hidden") => {
+            rater::mark_hidden(args.get(1).unwrap(), args.get(2).unwrap());
+        }
         Some("print_rankings") => {
             rater::print_rankings();
         }
         Some("decay") => {
             rater::update_decay_once().await;
+        }
+        Some("decay_matchups") => {
+            rater::test_decay_matchups().await;
         }
         Some("names") => {
             rater::reset_names().unwrap();
