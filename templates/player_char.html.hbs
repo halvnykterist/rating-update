@@ -19,21 +19,14 @@
     <script src="https://kit.fontawesome.com/ec45b90910.js" crossorigin="anonymous"></script>
     <script src="/scripts.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+
   </head>
 
   
-  <body onload="(() => {
-        let req = new XMLHttpRequest();
-        req.onreadystatechange = function() {
-            if (this.readyState = 4 && this.status == 200) {
-                console.log('got history');
-                document.getElementById('history').innerHTML = this.responseText;
-            }
-        };
-        console.log('requesting history');
-        req.open('GET', '{{char_id}}/history', true);
-        req.send();
-    })()" >
+  <body onload="
+      char_id = '{{char_id}}';
+        load_history();
+    ">
     {{> navbar}}
     <section class="hero is-primary">
       <div class="hero-body has-text-centered">
@@ -90,8 +83,14 @@
                   </h4>
               {{/if}}
 
-              <div id="history">
-                  <p>Loading match history..<p>
+              <div id="history_wrapper">
+                  <h2>Match History</h2>
+                  <button id="decrement_button" onclick="decrement_page()">←</button>
+                  <span id="current_page" style="min-width: 7em; display: inline-block;">Loading...</span>
+                  <button onclick="increment_page()">→</button>
+                  <div id="history">
+                      <p>Loading match history..<p>
+                  </div>
               </div>
           {{#if player.data.matchups}}
             <h2>Matchups</h2>

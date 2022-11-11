@@ -6,7 +6,6 @@
 
   <body>
     {{#if history}}
-      <h2>Match History</h2>
       <div class="table-container">
         <table>
           <tr>
@@ -26,10 +25,10 @@
               {{#if ../cheater_status}}
                 <td><span class="cheater">Cheater</span></td>
               {{else}}
-                <td class="centered">{{this.own_rating_value}} ±{{this.own_rating_deviation}}</td>
+                <td class="centered rating_column">{{this.own_rating_value}} ±{{this.own_rating_deviation}}</td>
               {{/if}}
               <td class="centered">{{this.floor}}</td>
-              <td>{{>player_link
+              <td class="opponent_column">{{>player_link
                             name=this.opponent_name 
                             id=this.opponent_id char=this.opponent_character_short
                             vip_status=this.opponent_vip

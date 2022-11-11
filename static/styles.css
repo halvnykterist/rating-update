@@ -86,6 +86,14 @@ table {
   white-space: nowrap !important;
 }
 
+.rating_column { 
+    min-width: 5em;
+    max-width: 5em;
+}
+.opponent_column {
+    min-width: 17em;
+}
+
 .maybe_long_name {
   display: inline-block;
   max-width: 10em;

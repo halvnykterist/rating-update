@@ -867,6 +867,7 @@ pub async fn get_player_char_history(
     id: i64,
     char_id: i64,
     game_count: i64,
+    offset: i64,
     group_games: bool,
 ) -> Option<PlayerCharacterHistory> {
     conn.run(move |conn| {
@@ -917,7 +918,7 @@ pub async fn get_player_char_history(
                         LEFT JOIN hidden_status ON hidden_status.id = games.id_a
                         WHERE games.id_b = :id AND games.char_b = :char_id
 
-                        ORDER BY timestamp DESC LIMIT :game_count",
+                        ORDER BY timestamp DESC LIMIT :game_count OFFSET :offset",
                 )
                 .unwrap();
 
@@ -926,6 +927,7 @@ pub async fn get_player_char_history(
                     ":id" : id,
                     ":char_id": char_id,
                     ":game_count":game_count,
+                    ":offset":offset,
                 })
                 .unwrap();
             let mut history = Vec::<RawPlayerSet>::new();

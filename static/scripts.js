@@ -23,3 +23,33 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+
+var page_index = 0;
+var char_id = "SO";
+const load_history = () => {
+
+    let req = new XMLHttpRequest();
+    req.onreadystatechange = function() {
+        if (this.readyState = 4 && this.status == 200) {
+            console.log('got history');
+
+            document.getElementById('history').innerHTML = this.responseText;
+            document.getElementById("decrement_button").disabled = page_index == 0;
+            document.getElementById("current_page").innerHTML = "Games " + (page_index * 100 + 1) + "–" + (page_index * 100 + 100)
+        }
+    };
+    console.log('requesting history');
+    req.open('GET', char_id + '/history?offset=' + page_index * 100, true);
+    req.send();
+}
+const increment_page = () => {
+    page_index += 1;
+    load_history();
+}
+const decrement_page = () => {
+    if (page_index > 0) {
+        page_index -= 1;
+        load_history()
+    }
+}
