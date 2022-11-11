@@ -1529,7 +1529,7 @@ fn decay_matchups(conn: &mut Connection, _timestamp: i64) -> Result<()> {
         "UPDATE global_matchups
         SET rating_deviation = min(
                  :initial_deviation, 
-                 sqrt(rating_deviation * rating_deviation + :c * :c)),
+                 sqrt(rating_deviation * rating_deviation + :c * :c))
         WHERE 
             rating_deviation < :initial_deviation",
         named_params! {
@@ -1542,7 +1542,7 @@ fn decay_matchups(conn: &mut Connection, _timestamp: i64) -> Result<()> {
         "UPDATE top_1000_matchups
         SET rating_deviation = min(
                  :initial_deviation, 
-                 sqrt(rating_deviation * rating_deviation + :c * :c)),
+                 sqrt(rating_deviation * rating_deviation + :c * :c))
         WHERE 
             rating_deviation < :initial_deviation",
         named_params! {
@@ -1554,7 +1554,7 @@ fn decay_matchups(conn: &mut Connection, _timestamp: i64) -> Result<()> {
         "UPDATE top_100_matchups
         SET rating_deviation = min(
                  :initial_deviation, 
-                 sqrt(rating_deviation * rating_deviation + :c * :c)),
+                 sqrt(rating_deviation * rating_deviation + :c * :c))
         WHERE 
             rating_deviation < :initial_deviation",
         named_params! {
@@ -1566,7 +1566,7 @@ fn decay_matchups(conn: &mut Connection, _timestamp: i64) -> Result<()> {
         "UPDATE proportional_matchups
         SET rating_deviation = min(
                  :initial_deviation, 
-                 sqrt(rating_deviation * rating_deviation + :c * :c)),
+                 sqrt(rating_deviation * rating_deviation + :c * :c))
         WHERE 
             rating_deviation < :initial_deviation",
         named_params! {
