@@ -892,10 +892,12 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
 
         let expected_outcome = winner_rating.expected(loser_rating);
 
-        let valid = expected_outcome > 0.095 && expected_outcome < 0.905 && !has_cheater;
+        let valid = ((expected_outcome > 0.095 && expected_outcome < 0.905)
+            || winner_rating.deviation > 150.0
+            || loser_rating.deviation > 150.0)
+            && !has_cheater;
 
         if valid {
-
             //Update ratings
             players.get_mut(&winner).unwrap().rating = winner_rating.update(loser_rating, 1.0);
             players.get_mut(&winner).unwrap().win_count += 1;

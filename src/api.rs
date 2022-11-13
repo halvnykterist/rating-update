@@ -793,8 +793,8 @@ struct PlayerCharacterData {
     top_defeated_id: Option<String>,
     top_defeated_char_id: Option<&'static str>,
     top_defeated_name: Option<String>,
-    top_defeated_value: Option<f64>,
-    top_defeated_deviation: Option<f64>,
+    top_defeated_value: Option<i64>,
+    top_defeated_deviation: Option<i64>,
     top_defeated_floor: Option<String>,
     top_defeated_timestamp: Option<String>,
 
@@ -1259,8 +1259,8 @@ fn get_player_character_data(
             top_defeated_id: top_defeated_id.map(|id| format!("{:X}", id)),
             top_defeated_char_id: top_defeated_char_id.map(|id| website::CHAR_NAMES[id as usize].0),
             top_defeated_name,
-            top_defeated_value: top_defeated_value.map(f64::round),
-            top_defeated_deviation: top_defeated_deviation.map(|r| (2.0 * r).round()),
+            top_defeated_value: top_defeated_value.map(|r| r.round() as i64),
+            top_defeated_deviation: top_defeated_deviation.map(|r| (2.0 * r).round() as i64),
             top_defeated_floor: top_defeated_floor.map(stringify_floor),
             top_defeated_timestamp: top_defeated_timestamp.map(|t| {
                 NaiveDateTime::from_timestamp(t, 0)
