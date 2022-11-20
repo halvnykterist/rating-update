@@ -897,7 +897,7 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
             + 0.5 * loser_rating.deviation.powf(2.0))
         .sqrt();
         let valid = ((expected_outcome > MARGIN && expected_outcome < 1.0 - MARGIN)
-            || rsm_deviation >= 100.0)
+            || rsm_deviation >= 50.0)
             && !has_cheater;
 
         if valid {
