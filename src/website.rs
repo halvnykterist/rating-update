@@ -76,6 +76,7 @@ pub async fn run() {
                 api::player_lookup,
                 api::active_players,
                 api::daily_games,
+                api::weekly_games,
                 api::daily_character_games,
             ],
         )

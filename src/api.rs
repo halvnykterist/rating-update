@@ -204,6 +204,61 @@ pub async fn daily_games(
     )
 }
 
+#[get("/api/weekly_games?<length>")]
+pub async fn weekly_games(
+    conn: RatingsDbConn,
+    length: Option<i64>,
+) -> Json<(Vec<String>, Vec<i64>, Vec<i64>)> {
+    Json(
+        conn.run(move |conn| {
+            let tx = conn.transaction().unwrap();
+            let now = NaiveDateTime::from_timestamp(Utc::now().timestamp(), 0);
+            let now_date = now.date();
+            let length = length.unwrap_or(8);
+            let then = now_date - Duration::weeks(length);
+
+            (
+                then.iter_days()
+                    .take(length as usize)
+                    .map(|date| date.format("%Y-%m-%d").to_string())
+                    .collect(),
+                then.iter_days()
+                    .take(length as usize)
+                    .map(|date| {
+                        let from = date.and_hms(0, 0, 0).timestamp();
+                        let to = from + 7 * 24 * 60 * 60;
+                        tx.query_row(
+                            "select count(*) from games where timestamp > ? and timestamp < ?",
+                            params![from, to],
+                            |r| r.get(0),
+                        )
+                        .unwrap()
+                    })
+                    .collect(),
+                then.iter_days()
+                    .take(length as usize)
+                    .map(|date| {
+                        let from = date.and_hms(0, 0, 0).timestamp();
+                        let to = from + 7 * 24 * 60 * 60;
+                        tx.query_row(
+                            "select count(distinct id) from (
+                                select id_a as id from games where timestamp > ? and timestamp < ?
+                                union
+                                select id_b as id from games where timestamp > ? and timestamp < ?
+                            )
+                            ",
+                            params![from, to, from, to],
+                            |r| r.get(0),
+                        )
+                        .unwrap()
+                    })
+                    .collect(),
+            )
+        })
+        .await,
+    )
+}
+
 #[get("/api/daily_character_games?<length>")]
 pub async fn daily_character_games(
     conn: RatingsDbConn,
