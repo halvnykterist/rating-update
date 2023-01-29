@@ -12,7 +12,7 @@ use serde::Deserialize;
 use std::{fs::File, io::BufReader, sync::Mutex, time::Duration};
 use tokio::{time, try_join};
 
-use crate::{glicko, glicko::Rating, website};
+use crate::{ggst_api, glicko, glicko::Rating, website};
 
 const DECAY_CONSTANT: f64 = 3.1;
 
@@ -84,88 +84,6 @@ pub fn reset_distribution() -> Result<()> {
     let mut conn = Connection::open(DB_NAME)?;
 
     update_player_distribution(&mut conn);
-
-    Ok(())
-}
-
-pub fn load_json_data(path: &str) -> Result<()> {
-    let mut conn = Connection::open(DB_NAME)?;
-
-    #[derive(Deserialize)]
-    #[allow(non_snake_case)]
-    struct RawGame {
-        time: String,
-        floor: u32,
-        winner: u32,
-        playerAID: String,
-        playerBID: String,
-        playerAName: String,
-        playerBName: String,
-        playerACharCode: usize,
-        playerBCharCode: usize,
-    }
-
-    for entry in glob(&format!("{}*.json", path)).unwrap() {
-        let tx = conn.transaction().unwrap();
-        match entry {
-            Ok(path) => {
-                info!("Loading replays from: {:?}", path);
-                let file = File::open(path).unwrap();
-                let reader = BufReader::new(file);
-                let games: Vec<RawGame> = serde_json::from_reader(reader).unwrap();
-                for g in games {
-                    if g.time != "" {
-                        let mut dt = g.time.split(' ');
-                        let mut date = dt.next().unwrap().split('-');
-                        let mut time = dt.next().unwrap().split(':');
-                        let timestamp = NaiveDate::from_ymd(
-                            date.next().unwrap().parse().unwrap(),
-                            date.next().unwrap().parse().unwrap(),
-                            date.next().unwrap().parse().unwrap(),
-                        )
-                        .and_hms(
-                            time.next().unwrap().parse().unwrap(),
-                            time.next().unwrap().parse().unwrap(),
-                            time.next().unwrap().parse().unwrap(),
-                        );
-                        let timestamp = DateTime::<Utc>::from_utc(timestamp, Utc);
-                        add_game(
-                            &tx,
-                            ggst_api::Match {
-                                timestamp,
-                                floor: ggst_api::Floor::from_u8(g.floor as u8).unwrap(),
-                                winner: match g.winner {
-                                    1 => ggst_api::Winner::Player1,
-                                    2 => ggst_api::Winner::Player2,
-                                    _ => panic!("Bad winner"),
-                                },
-                                players: (
-                                    ggst_api::Player {
-                                        id: g.playerAID.parse().unwrap(),
-                                        character: ggst_api::Character::from_u8(
-                                            g.playerACharCode as u8,
-                                        )
-                                        .unwrap(),
-                                        name: g.playerAName.clone(),
-                                    },
-                                    ggst_api::Player {
-                                        id: g.playerBID.parse().unwrap(),
-                                        character: ggst_api::Character::from_u8(
-                                            g.playerBCharCode as u8,
-                                        )
-                                        .unwrap(),
-                                        name: g.playerBName.clone(),
-                                    },
-                                ),
-                            },
-                        );
-                    }
-                }
-            }
-            Err(e) => error!("Couldn't read path: {:?}", e),
-        }
-        tx.commit().unwrap();
-    }
 
     Ok(())
 }
@@ -470,17 +388,7 @@ pub async fn pull() {
 async fn grab_games(conn: &mut Connection, pages: usize) -> Result<()> {
     let then = Utc::now();
     info!("Grabbing replays");
-    let (replays, errors) = ggst_api::get_replays(
-        &ggst_api::Context::default(),
-        ggst_api::Platform::PC,
-        pages,
-        127,
-        ggst_api::QueryParameters::default(),
-    )
-    .await?;
-
-    let replays: Vec<_> = replays.collect();
-    let errors: Vec<_> = errors.collect();
+    let replays = ggst_api::get_replays().await;
 
     let old_count: i64 = conn.query_row("SELECT COUNT(*) FROM games", [], |r| r.get(0))?;
 
@@ -519,23 +427,22 @@ async fn grab_games(conn: &mut Connection, pages: usize) -> Result<()> {
         warn!("Over half the grabbed replays are new, consider increasing page count.");
     }
 
-    if errors.len() > 0 {
-        warn!("{} replays failed to parse!", errors.len());
-        for e in errors.iter().take(1) {
-            error!("{:?}", e);
-        }
-    }
-
     Ok(())
 }
 
-fn add_game(conn: &Transaction, game: ggst_api::Match) -> Option<Game> {
-    let ggst_api::Match {
+fn add_game(conn: &Transaction, game: ggst_api::Replay) -> Option<Game> {
+    //2023-01-30 01:52:15"
+    let ggst_api::Replay {
         timestamp,
-        players: (a, b),
+        player1,
+        player1_character,
+        player2,
+        player2_character,
         floor: game_floor,
         winner,
+        ..
     } = game;
+    let timestamp = NaiveDateTime::parse_from_str(&timestamp, "%Y-%m-%d %H:%M:%S").unwrap();
 
     let count = conn
         .execute(
@@ -552,17 +459,14 @@ fn add_game(conn: &Transaction, game: ggst_api::Match) -> Option<Game> {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             params![
                 timestamp.timestamp(),
-                a.id,
-                a.name,
-                a.character.to_u8(),
-                b.id,
-                b.name,
-                b.character.to_u8(),
-                match winner {
-                    ggst_api::Winner::Player1 => 1,
-                    ggst_api::Winner::Player2 => 2,
-                },
-                game_floor.to_u8(),
+                player1.id,
+                player1.name,
+                player1_character,
+                player2.id,
+                player2.name,
+                player2_character,
+                winner,
+                game_floor,
             ],
         )
         .unwrap();
@@ -570,17 +474,14 @@ fn add_game(conn: &Transaction, game: ggst_api::Match) -> Option<Game> {
     if count == 1 {
         Some(Game {
             timestamp: timestamp.timestamp(),
-            id_a: a.id,
-            char_a: a.character.to_u8() as i64,
-            name_a: a.name,
-            id_b: b.id,
-            char_b: b.character.to_u8() as i64,
-            name_b: b.name,
-            winner: match winner {
-                ggst_api::Winner::Player1 => 1,
-                ggst_api::Winner::Player2 => 2,
-            },
-            game_floor: game_floor.to_u8() as i64,
+            id_a: player1.id.parse().unwrap(),
+            char_a: player1_character,
+            name_a: player1.name,
+            id_b: player2.id.parse().unwrap(),
+            char_b: player2_character,
+            name_b: player2.name,
+            winner,
+            game_floor,
         })
     } else {
         None

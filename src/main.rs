@@ -80,9 +80,6 @@ async fn main() {
         Some("distribution") => {
             rater::reset_distribution().unwrap();
         }
-        Some("preload") => {
-            rater::load_json_data(args.get(1).unwrap()).unwrap();
-        }
         Some("pull") => {
             rater::pull().await;
         }
