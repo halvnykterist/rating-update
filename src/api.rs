@@ -541,7 +541,7 @@ pub async fn top_all_inner(conn: &RatingsDbConn) -> Vec<RankingPlayer> {
                     player_ratings.id as id, char_id, 
                     wins, losses, 
                     value, deviation, last_decay, 
-                    name, vip_status, cheater_status, hidden_status
+                    name, platform, vip_status, cheater_status, hidden_status
                  FROM ranking_global
                  NATURAL JOIN player_ratings
                  NATURAL JOIN players
@@ -786,7 +786,7 @@ pub async fn top_char_inner(conn: &RatingsDbConn, char_id: i64) -> Vec<RankingPl
                     player_ratings.id as id, char_id, 
                     wins, losses, 
                     value, deviation, last_decay, 
-                    name, vip_status, cheater_status, hidden_status
+                    name, platform, vip_status, cheater_status, hidden_status
                  FROM ranking_character
                  NATURAL JOIN player_ratings
                  NATURAL JOIN players
