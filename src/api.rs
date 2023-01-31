@@ -1027,8 +1027,6 @@ pub async fn get_player_char_history(
                 let opponent_cheater: Option<String> = row.get("cheater_status").unwrap();
                 let opponent_hidden: Option<String> = row.get("hidden_status").unwrap();
 
-                println!("{opponent_name}: {opponent_platform}");
-
                 if group_games {
                     add_to_grouped_sets(
                         &mut history,
