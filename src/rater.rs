@@ -806,7 +806,7 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
 
         let expected_outcome = winner_rating.expected(loser_rating);
 
-        const MARGIN: f64 = 0.095;
+        const MARGIN: f64 = 0.045;
         let rsm_deviation = (0.5 * winner_rating.deviation.powf(2.0)
             + 0.5 * loser_rating.deviation.powf(2.0))
         .sqrt();
