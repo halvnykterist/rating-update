@@ -828,6 +828,7 @@ pub async fn top_char_inner(conn: &RatingsDbConn, char_id: i64) -> Vec<RankingPl
 #[derive(Serialize)]
 pub struct PlayerData {
     name: String,
+    platform: String,
     other_names: Option<Vec<String>>,
     characters: Vec<PlayerCharacterData>,
 }
