@@ -33,6 +33,14 @@ pub struct Activity {
     sub_900: i64,
 }
 
+fn to_platform_string(i: i64) -> &'static str {
+    match i {
+        1 => "PS",
+        3 => "PC",
+        _ => "??",
+    }
+}
+
 impl Activity {
     fn calculate(conn: &mut Connection, time_offset: i64) -> Self {
         let t = Utc::now().timestamp() - time_offset;
@@ -322,6 +330,7 @@ pub async fn add_hit(_conn: &RatingsDbConn, _page: String) {
 pub struct RankingPlayer {
     pos: i32,
     id: String,
+    platform: &'static str,
     character: String,
     character_short: String,
     name: String,
@@ -337,6 +346,7 @@ impl RankingPlayer {
     fn from_db(
         pos: i32,
         name: String,
+        platform: i64,
         vip_status: Option<String>,
         cheater_status: Option<String>,
         hidden_status: Option<String>,
@@ -345,6 +355,7 @@ impl RankingPlayer {
         Self {
             pos,
             name,
+            platform: to_platform_string(platform),
             id: format!("{:X}", rated_player.id),
             character: website::CHAR_NAMES[rated_player.char_id as usize]
                 .1
@@ -547,12 +558,14 @@ pub async fn top_all_inner(conn: &RatingsDbConn) -> Vec<RankingPlayer> {
 
         while let Some(row) = rows.next().unwrap() {
             let name = row.get("name").unwrap();
+            let platform = row.get("platform").unwrap();
             let vip_status = row.get("vip_status").unwrap();
             let cheater_status = row.get("cheater_status").unwrap();
             let hidden_status = row.get("hidden_status").unwrap();
             res.push(RankingPlayer::from_db(
                 i,
                 name,
+                platform,
                 vip_status,
                 cheater_status,
                 hidden_status,
@@ -674,6 +687,7 @@ pub async fn player_lookup(conn: RatingsDbConn, name: String) -> Json<Vec<Player
 #[derive(Serialize)]
 pub struct SearchResultPlayer {
     name: String,
+    platform: &'static str,
     vip_status: Option<String>,
     cheater_status: Option<String>,
     hidden_status: bool,
@@ -707,6 +721,7 @@ pub async fn search_inner(
             .prepare(
                 "SELECT * FROM
                     player_names
+                    NATURAL JOIN players
                     NATURAL JOIN player_ratings
                     LEFT JOIN vip_status ON vip_status.id = player_names.id
                     LEFT JOIN cheater_status ON cheater_status.id = player_names.id
@@ -730,8 +745,10 @@ pub async fn search_inner(
         while let Some(row) = rows.next().unwrap() {
             let rating: Rating =
                 Rating::new(row.get("value").unwrap(), row.get("deviation").unwrap());
+                let platform: i64 = row.get("platform").unwrap();
             res.push(SearchResultPlayer {
                 name: row.get("name").unwrap(),
+                platform: to_platform_string(platform),
                 id: format!("{:X}", row.get::<_, i64>("id").unwrap()),
                 character: website::CHAR_NAMES[row.get::<_, usize>("char_id").unwrap()]
                     .1
@@ -787,12 +804,14 @@ pub async fn top_char_inner(conn: &RatingsDbConn, char_id: i64) -> Vec<RankingPl
         let mut i = 1;
         while let Some(row) = rows.next().unwrap() {
             let name = row.get("name").unwrap();
+            let platform = row.get("platform").unwrap();
             let vip_status = row.get("vip_status").unwrap();
             let cheater_status = row.get("cheater_status").unwrap();
             let hidden_status = row.get("hidden_status").unwrap();
             res.push(RankingPlayer::from_db(
                 i,
                 name,
+                platform,
                 vip_status,
                 cheater_status,
                 hidden_status,
@@ -873,6 +892,7 @@ struct PlayerSet {
     own_rating_deviation: i64,
     floor: String,
     opponent_name: String,
+    opponent_platform: &'static str,
     opponent_vip: Option<&'static str>,
     opponent_cheater: Option<&'static str>,
     opponent_hidden: Option<&'static str>,
@@ -938,6 +958,7 @@ pub async fn get_player_char_history(
                             name_b AS opponent_name,
                             id_b AS opponent_id,
                             char_b AS opponent_character,
+                            platform_b AS opponent_platform,
                             value_b AS opponent_value,
                             deviation_b AS opponent_deviation,
                             winner,
@@ -961,6 +982,7 @@ pub async fn get_player_char_history(
                             name_a AS opponent_name,
                             id_a AS opponent_id,
                             char_a AS opponent_character,
+                            platform_a AS opponent_platform,
                             value_a AS opponent_value,
                             deviation_a AS opponent_deviation,
                             winner + 2  as winner,
@@ -999,6 +1021,7 @@ pub async fn get_player_char_history(
                 let opponent_deviation: f64 = row.get("opponent_deviation").unwrap();
                 let winner: i64 = row.get("winner").unwrap();
                 let valid: bool = row.get("valid").unwrap();
+                let opponent_platform: i64 = row.get("opponent_platform").unwrap();
                 let opponent_vip: Option<String> = row.get("vip_status").unwrap();
                 let opponent_cheater: Option<String> = row.get("cheater_status").unwrap();
                 let opponent_hidden: Option<String> = row.get("hidden_status").unwrap();
@@ -1013,6 +1036,7 @@ pub async fn get_player_char_history(
                         opponent_name,
                         opponent_id,
                         opponent_char,
+                        to_platform_string(opponent_platform),
                         opponent_value,
                         opponent_deviation,
                         match winner {
@@ -1035,6 +1059,7 @@ pub async fn get_player_char_history(
                         opponent_name,
                         opponent_id,
                         opponent_char,
+                        to_platform_string(opponent_platform),
                         opponent_value,
                         opponent_deviation,
                         match winner {
@@ -1112,11 +1137,7 @@ pub async fn get_player_data_char(
             Some(PlayerDataChar {
                 id: format!("{:X}", id),
                 name,
-                platform: match platform {
-                    1 => "Console",
-                    3 => "PC",
-                    _ => "?",
-                },
+                platform: to_platform_string(platform),
                 vip_status,
                 cheater_status,
                 other_characters,
@@ -1342,6 +1363,7 @@ struct RawPlayerSet {
     own_deviation: f64,
     floor: i64,
     opponent_name: String,
+    opponent_platform: &'static str,
     opponent_vip: bool,
     opponent_cheater: bool,
     opponent_hidden: bool,
@@ -1392,6 +1414,7 @@ impl RawPlayerSet {
             own_rating_deviation: (2.0 * self.own_deviation).round() as i64,
             floor: stringify_floor(self.floor),
             opponent_name: self.opponent_name,
+            opponent_platform: self.opponent_platform,
             opponent_id: format!("{:X}", self.opponent_id),
             opponent_character_short: website::CHAR_NAMES[self.opponent_char as usize].0,
             opponent_character: website::CHAR_NAMES[self.opponent_char as usize].1,
@@ -1454,6 +1477,7 @@ fn add_to_grouped_sets(
     opponent_name: String,
     opponent_id: i64,
     opponent_char: i64,
+    opponent_platform: &'static str,
     opponent_value: f64,
     opponent_deviation: f64,
     winner: bool,
@@ -1492,6 +1516,7 @@ fn add_to_grouped_sets(
             own_deviation,
             floor,
             opponent_name,
+            opponent_platform,
             opponent_vip,
             opponent_cheater,
             opponent_hidden,
@@ -1516,6 +1541,7 @@ fn add_ungrouped_set(
     opponent_name: String,
     opponent_id: i64,
     opponent_char: i64,
+    opponent_platform: &'static str,
     opponent_value: f64,
     opponent_deviation: f64,
     winner: bool,
@@ -1539,6 +1565,7 @@ fn add_ungrouped_set(
         own_deviation,
         floor,
         opponent_name,
+        opponent_platform,
         opponent_vip,
         opponent_cheater,
         opponent_hidden,

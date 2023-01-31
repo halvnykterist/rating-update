@@ -24,7 +24,13 @@
                             </tr>
                             {{#each players}}
                                 <tr>
-                                    <td>{{>player_link name=this.name id=this.id char=this.character_short vip_status=this.vip_status}}</td>
+                                    <td>{{>player_link 
+                                        name=this.name 
+                                        platform=this.platform 
+                                        id=this.id 
+                                        char=this.character_short 
+                                        vip_status=this.vip_status
+                                    }}</td>
                                     <td>{{this.character}}</td>
                                     {{#if this.cheater_status}}
                                         <td><span class="cheater">Cheater</span></td>
