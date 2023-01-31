@@ -771,7 +771,7 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
         }
 
         update_player(&tx, g.id_a, &g.name_a, g.game_floor, g.platform_a);
-        update_player(&tx, g.id_b, &g.name_b, g.game_floor, g.platform_a);
+        update_player(&tx, g.id_b, &g.name_b, g.game_floor, g.platform_b);
 
         let has_cheater = cheaters.contains(&g.id_a) || cheaters.contains(&g.id_b);
 
