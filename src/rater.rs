@@ -1,16 +1,12 @@
 use crate::{ggst_api, glicko, glicko::Rating, responses, website};
-use all_asserts::*;
 use anyhow::Context;
-use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
+use chrono::{NaiveDateTime, Utc};
 use fxhash::{FxHashMap, FxHashSet};
-use glob::glob;
 use lazy_static::lazy_static;
-use rocket::serde::json::serde_json;
 use rusqlite::{
     functions::FunctionFlags, named_params, params, Connection, OptionalExtension, Row, Transaction,
 };
-use serde::Deserialize;
-use std::{fs::File, io::BufReader, sync::Mutex, time::Duration};
+use std::{sync::Mutex, time::Duration};
 use tokio::{time, try_join};
 
 const DECAY_CONSTANT: f64 = 3.1;
@@ -384,7 +380,7 @@ pub async fn pull() {
     grab_games(&mut conn, 100).await.unwrap();
 }
 
-async fn grab_games(conn: &mut Connection, pages: usize) -> Result<()> {
+async fn grab_games(conn: &mut Connection, _pages: usize) -> Result<()> {
     let then = Utc::now();
     info!("Grabbing replays");
     let replays = ggst_api::get_replays().await;

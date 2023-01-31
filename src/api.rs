@@ -817,6 +817,7 @@ pub struct PlayerData {
 pub struct PlayerDataChar {
     id: String,
     name: String,
+    platform: &'static str,
     vip_status: Option<String>,
     cheater_status: Option<String>,
     other_names: Option<Vec<String>>,
@@ -1074,21 +1075,22 @@ pub async fn get_player_data_char(
             )
             .unwrap()
         {
-            let (name, vip_status, cheater_status, hidden_status): (
+            let (name, platform, vip_status, cheater_status, hidden_status): (
                 String,
+                i64,
                 Option<String>,
                 Option<String>,
                 Option<String>,
             ) = conn
                 .query_row(
-                    "SELECT name, vip_status, cheater_status, hidden_status FROM players
+                    "SELECT name, platform, vip_status, cheater_status, hidden_status FROM players
                         LEFT JOIN vip_status ON vip_status.id = players.id
                         LEFT JOIN cheater_status ON cheater_status.id = players.id
                         LEFT JOIN hidden_status ON hidden_status.id = players.id
                            WHERE players.id=?
                            ",
                     params![id],
-                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
                 )
                 .unwrap();
             info!(
@@ -1110,6 +1112,11 @@ pub async fn get_player_data_char(
             Some(PlayerDataChar {
                 id: format!("{:X}", id),
                 name,
+                platform: match platform {
+                    1 => "Console",
+                    3 => "PC",
+                    _ => "?",
+                },
                 vip_status,
                 cheater_status,
                 other_characters,
