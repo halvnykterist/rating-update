@@ -3,9 +3,11 @@ CREATE TABLE games (
     id_a INTEGER NOT NULL,
     name_a TEXT NOT NULL,
     char_a INTEGER NOT NULL,
+    platform_a INTEGER NOT NULL,
     id_b INTEGER NOT NULL,
     name_b TEXT NOT NULL,
     char_b INTEGER NOT NULL,
+    platform_b INTEGER NOT NULL,
     winner INTEGER NOT NULL,
     game_floor INTEGER NOT NULL,
     PRIMARY KEY (timestamp, id_a, id_b)
@@ -45,7 +47,8 @@ CREATE INDEX ratings_dev_b ON game_ratings(deviation_b);
 CREATE TABLE players  (
     id INTEGER NOT NULL PRIMARY KEY,
     floor INTEGER NOT NULL,
-    name TEXT NOT NULL
+    name TEXT NOT NULL,
+    platform INTEGER NOT NULL
 );
 
 CREATE TABLE player_names (
@@ -237,4 +240,4 @@ CREATE TABLE hits (
     PRIMARY KEY(page)
 );
 
-INSERT INTO config VALUES(1635717600, 0);
+INSERT INTO config VALUES(1675132574);

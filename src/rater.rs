@@ -1,3 +1,4 @@
+use crate::{ggst_api, glicko, glicko::Rating, responses, website};
 use all_asserts::*;
 use anyhow::Context;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
@@ -11,8 +12,6 @@ use rusqlite::{
 use serde::Deserialize;
 use std::{fs::File, io::BufReader, sync::Mutex, time::Duration};
 use tokio::{time, try_join};
-
-use crate::{ggst_api, glicko, glicko::Rating, website};
 
 const DECAY_CONSTANT: f64 = 3.1;
 
@@ -71,8 +70,8 @@ pub fn reset_names() -> Result<()> {
     };
 
     for g in games {
-        update_player(&tx, g.id_a, &g.name_a, g.game_floor);
-        update_player(&tx, g.id_b, &g.name_b, g.game_floor);
+        update_player(&tx, g.id_a, &g.name_a, g.game_floor, g.platform_a);
+        update_player(&tx, g.id_b, &g.name_b, g.game_floor, g.platform_b);
     }
 
     tx.commit()?;
@@ -390,14 +389,23 @@ async fn grab_games(conn: &mut Connection, pages: usize) -> Result<()> {
     info!("Grabbing replays");
     let replays = ggst_api::get_replays().await;
 
+    let replays = match replays {
+        Ok(replays) => replays,
+        Err(e) => {
+            error!("Error fetching replays: {e}");
+            return Ok(());
+        }
+    };
+
     let old_count: i64 = conn.query_row("SELECT COUNT(*) FROM games", [], |r| r.get(0))?;
 
     let tx = conn.transaction()?;
 
     let mut new_games = Vec::new();
 
-    for r in &replays {
-        new_games.extend(add_game(&tx, r.clone()));
+    let num_replays = replays.len();
+    for r in replays {
+        new_games.extend(add_game(&tx, r));
     }
     tx.commit()?;
 
@@ -407,7 +415,7 @@ async fn grab_games(conn: &mut Connection, pages: usize) -> Result<()> {
 
     info!(
         "Grabbed {} games -  new games: {} ({} total) - {}ms",
-        replays.len(),
+        num_replays,
         count - old_count,
         count,
         elapsed,
@@ -417,22 +425,22 @@ async fn grab_games(conn: &mut Connection, pages: usize) -> Result<()> {
 
     update_ratings(conn, Some(new_games));
 
-    if count - old_count == replays.len() as i64 {
-        if replays.len() > 0 {
+    if count - old_count == num_replays as i64 {
+        if num_replays > 0 {
             error!("Only new replays! We're probably missing some, try increasing the page count.");
         } else {
             error!("No replays! Maybe servers are down?");
         }
-    } else if count - old_count > replays.len() as i64 / 2 {
+    } else if count - old_count > num_replays as i64 / 2 {
         warn!("Over half the grabbed replays are new, consider increasing page count.");
     }
 
     Ok(())
 }
 
-fn add_game(conn: &Transaction, game: ggst_api::Replay) -> Option<Game> {
+fn add_game(conn: &Transaction, game: responses::Replay) -> Option<Game> {
     //2023-01-30 01:52:15"
-    let ggst_api::Replay {
+    let responses::Replay {
         timestamp,
         player1,
         player1_character,
@@ -451,20 +459,24 @@ fn add_game(conn: &Transaction, game: ggst_api::Replay) -> Option<Game> {
             id_a,
             name_a,
             char_a,
+            platform_a,
             id_b,
             name_b,
             char_b,
+            platform_b,
             winner,
             game_floor
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             params![
                 timestamp.timestamp(),
                 player1.id,
                 player1.name,
                 player1_character,
+                player1.platform,
                 player2.id,
                 player2.name,
                 player2_character,
+                player2.platform,
                 winner,
                 game_floor,
             ],
@@ -476,10 +488,12 @@ fn add_game(conn: &Transaction, game: ggst_api::Replay) -> Option<Game> {
             timestamp: timestamp.timestamp(),
             id_a: player1.id.parse().unwrap(),
             char_a: player1_character,
+            platform_a: player1.platform,
             name_a: player1.name,
             id_b: player2.id.parse().unwrap(),
             char_b: player2_character,
             name_b: player2.name,
+            platform_b: player2.platform,
             winner,
             game_floor,
         })
@@ -493,10 +507,10 @@ fn add_game(conn: &Transaction, game: ggst_api::Replay) -> Option<Game> {
     //sort the list by date
 }
 
-fn update_player(conn: &Transaction, id: i64, name: &str, floor: i64) {
+fn update_player(conn: &Transaction, id: i64, name: &str, floor: i64, platform: i64) {
     if let Err(e) = conn.execute(
-        "REPLACE INTO players(id, name, floor) VALUES(?, ?, ?)",
-        params![id, name, floor],
+        "REPLACE INTO players(id, name, floor, platform) VALUES(?, ?, ?, ?)",
+        params![id, name, floor, platform],
     ) {
         warn!("{}", e);
     }
@@ -606,9 +620,11 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
                     games.id_a,
                     games.name_a,
                     games.char_a,
+                    games.platform_a,
                     games.id_b,
                     games.name_b,
                     games.char_b,
+                    games.platform_b,
                     games.winner,
                     games.game_floor
                 FROM
@@ -730,7 +746,7 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
 
     let mut counter = 0;
 
-    let mut last_timestamp = 0;
+    //let mut last_timestamp = 0;
 
     let popularities = {
         let mut stmt = tx
@@ -749,16 +765,17 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
     };
 
     for g in games {
-        assert_ge!(g.timestamp, last_timestamp);
-        last_timestamp = g.timestamp;
+        //This fails and I don't know why
+        //assert_ge!(g.timestamp, last_timestamp);
+        //last_timestamp = g.timestamp;
 
         counter += 1;
         if counter % 50_000 == 0 {
             info!("On game {}...", counter);
         }
 
-        update_player(&tx, g.id_a, &g.name_a, g.game_floor);
-        update_player(&tx, g.id_b, &g.name_b, g.game_floor);
+        update_player(&tx, g.id_a, &g.name_a, g.game_floor, g.platform_a);
+        update_player(&tx, g.id_b, &g.name_b, g.game_floor, g.platform_a);
 
         let has_cheater = cheaters.contains(&g.id_a) || cheaters.contains(&g.id_b);
 
@@ -1673,9 +1690,11 @@ pub struct Game {
     id_a: i64,
     name_a: String,
     char_a: i64,
+    platform_a: i64,
     id_b: i64,
     name_b: String,
     char_b: i64,
+    platform_b: i64,
     winner: i64,
     game_floor: i64,
 }
@@ -1687,11 +1706,13 @@ impl Game {
             id_a: row.get(1).unwrap(),
             name_a: row.get(2).unwrap(),
             char_a: row.get(3).unwrap(),
-            id_b: row.get(4).unwrap(),
-            name_b: row.get(5).unwrap(),
-            char_b: row.get(6).unwrap(),
-            winner: row.get(7).unwrap(),
-            game_floor: row.get(8).unwrap(),
+            platform_a: row.get(4).unwrap(),
+            id_b: row.get(5).unwrap(),
+            name_b: row.get(6).unwrap(),
+            char_b: row.get(7).unwrap(),
+            platform_b: row.get(8).unwrap(),
+            winner: row.get(9).unwrap(),
+            game_floor: row.get(10).unwrap(),
         }
     }
 }

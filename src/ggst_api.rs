@@ -1,64 +1,95 @@
+use crate::{requests, responses};
+use aes_gcm::{
+    aead::{generic_array::GenericArray, Aead},
+    Aes256Gcm, KeyInit,
+};
+//use getrandom::getrandom;
+use hex;
+use reqwest::header;
+use serde::{Deserialize, Serialize};
 use std::error::Error;
-use serde_derive::Deserialize;
 
-pub async fn get_replays() -> Vec<Replay> {
-    todo!()
+pub async fn get_replays() -> Result<Vec<responses::Replay>, String> {
+    let token = std::fs::read_to_string("token.txt").unwrap();
+    let mut replays = Vec::new();
+    for i in 0..10 {
+        let request_data = requests::generate_replay_request(i, 127, &token);
+        let request_data = encrypt_data(&request_data);
+        let client = reqwest::Client::new();
+        let form = client
+            .post("https://ggst-game.guiltygear.com/api/catalog/get_replay")
+            .header(header::USER_AGENT, "GGST/Steam")
+            .header(header::CACHE_CONTROL, "no-store")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .header("x-client-version", "1")
+            .form(&[("data", request_data)]);
+
+        let response = form.send().await.unwrap();
+
+        let response_bytes = response.bytes().await.unwrap();
+
+        if let Ok(r) = decrypt_response::<responses::Replays>(&response_bytes) {
+            replays.extend_from_slice(&r.replays);
+        } else {
+            return Err("Couldn't load replays".to_owned());
+        }
+    }
+
+    Ok(replays)
 }
 
-#[allow(dead_code)]
-#[derive(Deserialize, Debug)]
-pub struct Response<T> {
-    headers: ResponseHeader,
-    pub body: T,
+fn encrypt_data<T: Serialize>(data: &T) -> String {
+    let key =
+        hex::decode("EEBC1F57487F51921C0465665F8AE6D1658BB26DE6F8A069A3520293A572078F").unwrap();
+
+    let bytes = rmp_serde::to_vec(data).unwrap();
+    //let mut nonce = [0u8; 12];
+    //getrandom(&mut nonce).unwrap();
+    let nonce: [u8; 12] = *b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
+    let nonce_ga = nonce.into();
+
+    let aes_gcm = Aes256Gcm::new_from_slice(&key).unwrap();
+    let encrypted = aes_gcm.encrypt(&nonce_ga, &bytes[..]).unwrap();
+
+    let mut data: Vec<u8> = Vec::new();
+    data.extend_from_slice(&nonce);
+    data.extend_from_slice(&encrypted);
+
+    let r = base64_url::encode(&data);
+
+    r
 }
 
-#[allow(dead_code)]
-#[derive(Deserialize, Debug)]
-struct ResponseHeader {
-    id: String,
-    int1: i64,
-    date: String,
-    version1: String,
-    version2: String,
-    version3: String,
-    string1: String,
-    string2: String,
-}
+fn decrypt_response<T: for<'a> Deserialize<'a>>(bytes: &[u8]) -> Result<T, Box<dyn Error>> {
+    let key =
+        hex::decode("EEBC1F57487F51921C0465665F8AE6D1658BB26DE6F8A069A3520293A572078F").unwrap();
+    let aes_gcm = Aes256Gcm::new_from_slice(&key).unwrap();
 
-#[allow(dead_code)]
-#[derive(Deserialize, Debug)]
-pub struct Replays {
-    int1: i64,
-    int2: i64,
-    int3: i64,
-    replays: Vec<Replay>,
-}
+    let mut nonce = [0; 12];
+    for i in 0..12 {
+        nonce[i] = bytes[i];
+    }
 
-#[allow(dead_code)]
-#[derive(Deserialize, Debug, Clone)]
-pub struct Replay {
-    pub int1: u64,
-    pub int2: i64,
-    pub floor: i64,
-    pub player1_character: i64,
-    pub player2_character: i64,
-    pub player1: Player,
-    pub player2: Player,
-    pub winner: i64,
-    pub timestamp: String,
-    pub int7: i64,
-    pub views: u64,
-    pub int8: i64,
-    pub likes: u64,
-}
+    //let nonce: GenericArray<_, _> = todo!();// GenericArray::from(&response_bytes[..12]);
+    let nonce = GenericArray::from(nonce);
 
-#[allow(dead_code)]
-#[derive(Deserialize, Debug, Clone)]
-pub struct Player {
-    pub id: String,
-    pub name: String,
-    pub string1: String,
-    pub string2: String,
-    pub platform: i64,
-    pub int1: i64,
+    let decrypted = match aes_gcm.decrypt(&nonce, &bytes[12..]) {
+        Ok(decrypted) => decrypted,
+        Err(e) => {
+            panic!("Error decrypting: {:?}", e);
+        }
+    };
+
+    match rmp_serde::from_slice::<responses::Response<T>>(&decrypted) {
+        Ok(r) => Ok(r.body),
+        Err(e) => {
+            error!("Error in received msgpack!");
+            println!();
+            for b in &decrypted {
+                print!("{:02X}", b);
+            }
+
+            Err(Box::new(e))
+        }
+    }
 }
