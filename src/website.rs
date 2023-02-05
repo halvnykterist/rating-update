@@ -272,8 +272,25 @@ async fn character_popularity(conn: RatingsDbConn) -> Cached<Template> {
         api::get_fraud_highest_rated(&conn),
     );
 
+    let mut char_pop: Vec<((f64, _), &'static str)> = global_character_popularity
+        .into_iter()
+        .zip(rank_character_popularity.into_iter())
+        .zip(CHAR_NAMES.iter().map(|c| c.0))
+        .collect();
+
+    char_pop.sort_by(|a, b| b.0.0.partial_cmp(&a.0.0).unwrap());
+    let mut global_character_popularity = Vec::new();
+    let mut rank_character_popularity = Vec::new();
+    let mut character_shortnames = Vec::new();
+
+    for ((g, r), n) in char_pop {
+        global_character_popularity.push(g);
+        rank_character_popularity.push(r);
+        character_shortnames.push(n);
+    }
+
     let context = Context {
-        character_shortnames: CHAR_NAMES.iter().map(|c| c.0).collect(),
+        character_shortnames,
         global_character_popularity,
         rank_character_popularity,
         fraud_stats,
