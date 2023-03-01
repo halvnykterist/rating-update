@@ -59,6 +59,7 @@ pub async fn run() {
                 stats,
                 supporters,
                 rating_calculator,
+                recent,
                 api::stats,
                 api::player_rating,
                 api::player_rating_all,
@@ -413,6 +414,19 @@ async fn search(conn: RatingsDbConn, name: String) -> Template {
         },
     )
 }
+
+#[get("/recent")]
+async fn recent(conn: RatingsDbConn) -> Template {
+    #[derive(Serialize)]
+    struct Context {
+        sets: Vec<api::RecentSet>
+    }
+
+    let sets = api::get_recent_sets(&conn).await;
+
+    Template::render("recent games", &Context {sets})
+}
+
 
 #[catch(404)]
 async fn catch_404() -> NamedFile {

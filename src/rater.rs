@@ -740,6 +740,24 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
         cheaters
     };
 
+    let hidden = {
+        let mut hidden = FxHashSet::<i64>::default();
+
+        let mut stmt = tx
+            .prepare(
+                "SELECT
+                    id
+                FROM cheater_status",
+            )
+            .unwrap();
+        let mut rows = stmt.query([]).unwrap();
+
+        while let Some(row) = rows.next().unwrap() {
+            hidden.insert(row.get(0).unwrap());
+        }
+        hidden
+    };
+
     let mut counter = 0;
 
     //let mut last_timestamp = 0;
@@ -774,6 +792,7 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
         update_player(&tx, g.id_b, &g.name_b, g.game_floor, g.platform_b);
 
         let has_cheater = cheaters.contains(&g.id_a) || cheaters.contains(&g.id_b);
+        let has_hidden = hidden.contains(&g.id_a) || hidden.contains(&g.id_b);
 
         let old_rating_a = players.get(&(g.id_a, g.char_a)).unwrap().rating;
         let old_rating_b = players.get(&(g.id_b, g.char_b)).unwrap().rating;
@@ -812,16 +831,10 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
         .sqrt();
         let valid = ((expected_outcome > MARGIN && expected_outcome < 1.0 - MARGIN)
             || rsm_deviation >= 50.0)
-            && !has_cheater;
+            && !has_cheater
+            && !has_hidden;
 
-        if valid {
-            //Update ratings
-            players.get_mut(&winner).unwrap().rating = winner_rating.update(loser_rating, 1.0);
-            players.get_mut(&winner).unwrap().win_count += 1;
-
-            players.get_mut(&loser).unwrap().rating = loser_rating.update(winner_rating, 0.0);
-            players.get_mut(&loser).unwrap().loss_count += 1;
-
+        if !has_cheater && !has_hidden {
             //Update top rating and top defeated
             players
                 .get_mut(&winner)
@@ -845,6 +858,16 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
                 .get_mut(&loser)
                 .unwrap()
                 .update_top_rating(g.timestamp);
+        }
+
+        if valid {
+            //Update ratings
+            players.get_mut(&winner).unwrap().rating = winner_rating.update(loser_rating, 1.0);
+            players.get_mut(&winner).unwrap().win_count += 1;
+
+            players.get_mut(&loser).unwrap().rating = loser_rating.update(winner_rating, 0.0);
+            players.get_mut(&loser).unwrap().loss_count += 1;
+
 
             //Update player matchups
             fn update_player_matchup(

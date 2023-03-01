@@ -1,6 +1,6 @@
 use serde_derive::{Deserialize, Serialize};
 
-const VERSION: &str = "0.1.7";
+const VERSION: &str = "0.1.8";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Request<T> {

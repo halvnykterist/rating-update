@@ -939,6 +939,52 @@ pub async fn get_player_highest_rated_character(conn: &RatingsDbConn, id: i64) -
     .await
 }
 
+#[derive(Serialize)]
+pub struct RecentSet {
+    timestamp: String,
+    player_a: SetPlayer,
+    player_b: SetPlayer,
+    win_chance: String,
+    wins_a: i64,
+    wins_b: i64,
+}
+
+#[derive(Serialize)]
+pub struct SetPlayer {
+    id: i64,
+    character_short: &'static str,
+    name: String,
+    character_name: &'static str,
+    rating_value: i64,
+    rating_deviation: i64,
+}
+
+pub async fn get_recent_sets(
+    conn: &RatingsDbConn) -> Vec<RecentSet> {
+    conn.run(move |conn| {
+        let mut stmt = conn.prepare(
+            "SELECT
+                timestamp,
+                id_a, char_a, name_a, platform_a, 
+                value_a, deviation_a,
+                vip_a.vip_status, cheater_a.cheater_status, hidden_a.hidden_status, 
+                id_b, char_b, name_b, platform_b, 
+                value_b, deviation_b,
+                vip_b.vip_status, cheater_b.cheater_status, hidden_b.hidden_status
+            FROM games NATURAL JOIN game_ratings
+            LEFT JOIN vip_status AS vip_a on vip_a.id = games.id_a
+            LEFT JOIN cheater_status AS cheater_a on cheater_a.id = games.id_a
+            LEFT JOIN hidden_status AS hidden_a on hidden_a.id = games.id_a
+            LEFT JOIN vip_status AS vip_b on vip_b.id = games.id_b
+            LEFT JOIN cheater_status AS cheater_b on cheater_b.id = games.id_b
+            LEFT JOIN hidden_status AS hidden_b on hidden_b.id = games.id_b
+            ORDER BY timestamp DESC limit 100
+                ").unwrap();
+
+        todo!()
+    }).await
+}
+
 pub async fn get_player_char_history(
     conn: &RatingsDbConn,
     id: i64,

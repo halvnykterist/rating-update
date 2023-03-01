@@ -17,8 +17,8 @@ def main():
     user = os.environ['USER']
     password = os.environ['PASSWORD']
     token = login(user, password)
-    #replays = get_replays(token)
-    #print(replays)
+    replays = get_replays(token)
+    print(replays)
 
 
 game_tokens = []
@@ -103,7 +103,7 @@ def login(user, password, auth=None, padding=0):
             "",
             "",
             2,
-            "0.1.7",
+            "0.1.8",
             3
         ],
         [
