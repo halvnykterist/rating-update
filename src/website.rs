@@ -123,7 +123,7 @@ async fn rating_calculator(conn: RatingsDbConn) -> Cached<Template> {
     let context = Context {
         all_characters: CHAR_NAMES,
     };
-
+    
     Cached::new(Template::render("rating_calculator", &context), 999)
 }
 
@@ -195,6 +195,7 @@ async fn top_char(conn: RatingsDbConn, character_short: &str) -> Option<Cached<T
         character_short: &'static str,
         all_characters: &'static [(&'static str, &'static str)],
     }
+    
 
     if let Some(char_code) = CHAR_NAMES.iter().position(|(c, _)| *c == character_short) {
         let (character_short, character) = CHAR_NAMES[char_code];
@@ -272,6 +273,25 @@ async fn character_popularity(conn: RatingsDbConn) -> Cached<Template> {
         api::get_fraud_higher_rated(&conn),
         api::get_fraud_highest_rated(&conn),
     );
+
+    //let mut char_pop: Vec<((f64, _), &'static str)> = global_character_popularity
+    //    .into_iter()
+    //    .zip(rank_character_popularity.into_iter())
+    //    .zip(CHAR_NAMES.iter().map(|c| c.0))
+    //    .collect();
+
+    //char_pop.sort_by(|a, b| b.0.0.partial_cmp(&a.0.0).unwrap());
+    //let mut global_character_popularity = Vec::new();
+    //let mut rank_character_popularity = Vec::new();
+    //let mut character_shortnames = Vec::new();
+
+    //info!("{}", char_pop.len());
+
+    //for ((g, r), n) in char_pop {
+    //    global_character_popularity.push(g);
+    //    rank_character_popularity.push(r);
+    //    character_shortnames.push(n);
+    //}
 
     let context = Context {
         character_shortnames: CHAR_NAMES.iter().map(|c| c.0).collect(),
