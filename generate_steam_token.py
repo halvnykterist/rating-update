@@ -152,7 +152,7 @@ def get_replays(token):
         "230129212655563979",
         token,
         2,
-        "0.1.7",
+        "0.1.8",
         3
     ]
     data_params = [
