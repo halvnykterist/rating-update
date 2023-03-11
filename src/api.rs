@@ -36,6 +36,7 @@ pub struct Activity {
 fn to_platform_string(i: i64) -> &'static str {
     match i {
         1 => "PS",
+        2 => "XB",
         3 => "PC",
         _ => "??",
     }
