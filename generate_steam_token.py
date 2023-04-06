@@ -103,7 +103,7 @@ def login(user, password, auth=None, padding=0):
             "",
             "",
             2,
-            "0.1.8",
+            "0.1.9",
             3
         ],
         [
@@ -152,7 +152,7 @@ def get_replays(token):
         "230129212655563979",
         token,
         2,
-        "0.1.8",
+        "0.1.9",
         3
     ]
     data_params = [
