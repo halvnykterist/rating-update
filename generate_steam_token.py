@@ -103,7 +103,7 @@ def login(user, password, auth=None, padding=0):
             "",
             "",
             2,
-            "0.1.9",
+            "0.2.0",
             3
         ],
         [
@@ -140,7 +140,7 @@ def login(user, password, auth=None, padding=0):
     #This is where I print it?
     token = login_response[0][0]
     print(f"Strive token obtained for user: {steam_id} - {token}")
-    file = open("token.txt", "wb")
+    file = open("token.txt", "w")
     file.write(token)
     file.close()
     return token
@@ -152,7 +152,7 @@ def get_replays(token):
         "230129212655563979",
         token,
         2,
-        "0.1.9",
+        "0.2.0",
         3
     ]
     data_params = [
