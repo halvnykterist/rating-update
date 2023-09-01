@@ -160,7 +160,7 @@ pub async fn update_statistics_continuous() -> Result<()> {
 
             info!(
                 "Last ranking period: {}",
-                NaiveDateTime::from_timestamp(last_ranking_update, 0)
+                NaiveDateTime::from_timestamp_opt(last_ranking_update, 0).unwrap()
             );
 
             conn.execute(
@@ -868,7 +868,6 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
             players.get_mut(&loser).unwrap().rating = loser_rating.update(winner_rating, 0.0);
             players.get_mut(&loser).unwrap().loss_count += 1;
 
-
             //Update player matchups
             fn update_player_matchup(
                 tx: &Transaction,
@@ -1097,9 +1096,11 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
 
             //Update daily ratings
             {
-                let day_timestamp = NaiveDateTime::from_timestamp(g.timestamp, 0)
+                let day_timestamp = NaiveDateTime::from_timestamp_opt(g.timestamp, 0)
+                    .unwrap()
                     .date()
-                    .and_hms(0, 0, 0)
+                    .and_hms_opt(0, 0, 0)
+                    .unwrap()
                     .timestamp();
 
                 let winner_new_rating = players.get(&winner).unwrap().rating;

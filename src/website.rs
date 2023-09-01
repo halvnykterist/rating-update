@@ -125,7 +125,7 @@ async fn rating_calculator(conn: RatingsDbConn) -> Cached<Template> {
     let context = Context {
         all_characters: CHAR_NAMES,
     };
-    
+
     Cached::new(Template::render("rating_calculator", &context), 999)
 }
 
@@ -197,7 +197,6 @@ async fn top_char(conn: RatingsDbConn, character_short: &str) -> Option<Cached<T
         character_short: &'static str,
         all_characters: &'static [(&'static str, &'static str)],
     }
-    
 
     if let Some(char_code) = CHAR_NAMES.iter().position(|(c, _)| *c == character_short) {
         let (character_short, character) = CHAR_NAMES[char_code];
@@ -441,14 +440,13 @@ async fn search(conn: RatingsDbConn, name: String) -> Template {
 async fn recent(conn: RatingsDbConn) -> Template {
     #[derive(Serialize)]
     struct Context {
-        sets: Vec<api::RecentSet>
+        sets: Vec<api::RecentSet>,
     }
 
     let sets = api::get_recent_sets(&conn).await;
 
-    Template::render("recent games", &Context {sets})
+    Template::render("recent games", &Context { sets })
 }
-
 
 #[catch(404)]
 async fn catch_404() -> NamedFile {

@@ -1,6 +1,9 @@
 use serde_derive::{Deserialize, Serialize};
+use std::sync::Arc;
+use steamworks::{Client, TicketForWebApiResponse};
+use tokio::sync::Mutex;
 
-const VERSION: &str = "0.2.0";
+const VERSION: &str = "0.2.2";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Request<T> {
@@ -74,4 +77,65 @@ pub fn generate_replay_request(
             platforms: 6, //All
         },
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LoginRequest {
+    int1: i64,
+    steam_id: i64,
+    steam_hex: String,
+    int2: i64,
+    steam_token: String,
+}
+
+pub async fn generate_login_request() -> Request<LoginRequest> {
+    let (client, single) = Client::init().unwrap();
+    let user = client.user();
+
+    let token = Arc::new(Mutex::new(Option::None));
+    {
+        let token = token.clone();
+
+        let _cb = client.register_callback(move |v: TicketForWebApiResponse| {
+            //println!("Got webapi auth response: {:?}", v)
+            let hex: String = v
+                .ticket
+                .iter()
+                .map(|b| format!("{:02X}", b).to_string())
+                .collect::<Vec<String>>()
+                .join("");
+            println!("Login steam token for strive {}", hex);
+            *token.try_lock().unwrap() = Some(hex);
+        });
+    };
+
+    user.authentication_session_ticket_for_webapi("ggst-game.guiltygear.com");
+
+    for _ in 0..50 {
+        single.run_callbacks();
+        std::thread::sleep(::std::time::Duration::from_millis(100));
+
+        let steam_token = token.try_lock().unwrap();
+        if steam_token.is_some() {
+            let steam_token = steam_token.clone().unwrap();
+            return Request {
+                header: RequestHeader {
+                    player_id: "".to_owned(),
+                    token: "".to_owned(),
+                    int1: 2,
+                    version: "0.2.2".to_owned(),
+                    platform: 3,
+                },
+                body: LoginRequest {
+                    int1: 1,
+                    steam_id: 76561198201330023,
+                    steam_hex: "11000010e5e5967".to_owned(),
+                    int2: 256,
+                    steam_token,
+                },
+            };
+        }
+    }
+
+    panic!("Timed out");
 }

@@ -166,7 +166,7 @@ pub async fn daily_games(
     Json(
         conn.run(move |conn| {
             let tx = conn.transaction().unwrap();
-            let now = NaiveDateTime::from_timestamp(Utc::now().timestamp(), 0);
+            let now = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
             let now_date = now.date();
             let length = length.unwrap_or(60);
             let then = now_date - Duration::days(length);
@@ -179,7 +179,7 @@ pub async fn daily_games(
                 then.iter_days()
                     .take(length as usize)
                     .map(|date| {
-                        let from = date.and_hms(0, 0, 0).timestamp();
+                        let from = date.and_hms_opt(0, 0, 0).unwrap().timestamp();
                         let to = from + 24 * 60 * 60;
                         tx.query_row(
                             "select count(*) from games where timestamp > ? and timestamp < ?",
@@ -192,7 +192,7 @@ pub async fn daily_games(
                 then.iter_days()
                     .take(length as usize)
                     .map(|date| {
-                        let from = date.and_hms(0, 0, 0).timestamp();
+                        let from = date.and_hms_opt(0, 0, 0).unwrap().timestamp();
                         let to = from + 24 * 60 * 60;
                         tx.query_row(
                             "select count(distinct id) from (
@@ -221,7 +221,7 @@ pub async fn weekly_games(
     Json(
         conn.run(move |conn| {
             let tx = conn.transaction().unwrap();
-            let now = NaiveDateTime::from_timestamp(Utc::now().timestamp(), 0);
+            let now = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
             let now_date = now.date();
             let length = length.unwrap_or(8);
             let then = now_date - Duration::weeks(length);
@@ -234,7 +234,7 @@ pub async fn weekly_games(
                 then.iter_days()
                     .take(length as usize)
                     .map(|date| {
-                        let from = date.and_hms(0, 0, 0).timestamp();
+                        let from = date.and_hms_opt(0, 0, 0).unwrap().timestamp();
                         let to = from + 7 * 24 * 60 * 60;
                         tx.query_row(
                             "select count(*) from games where timestamp > ? and timestamp < ?",
@@ -247,7 +247,7 @@ pub async fn weekly_games(
                 then.iter_days()
                     .take(length as usize)
                     .map(|date| {
-                        let from = date.and_hms(0, 0, 0).timestamp();
+                        let from = date.and_hms_opt(0, 0, 0).unwrap().timestamp();
                         let to = from + 7 * 24 * 60 * 60;
                         tx.query_row(
                             "select count(distinct id) from (
@@ -276,7 +276,7 @@ pub async fn daily_character_games(
     Json(
         conn.run(move |conn| {
             let tx = conn.transaction().unwrap();
-            let now = NaiveDateTime::from_timestamp(Utc::now().timestamp(), 0);
+            let now = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
             let now_date = now.date();
             let length = length.unwrap_or(60);
             let then = now_date - Duration::days(length);
@@ -292,7 +292,7 @@ pub async fn daily_character_games(
                         then.iter_days()
                             .take(length as usize)
                             .map(|date| {
-                                let from = date.and_hms(0, 0, 0).timestamp();
+                                let from = date.and_hms_opt(0, 0, 0).unwrap().timestamp();
                                 let to = from + 24 * 60 * 60;
                                 tx.query_row(
                                     "SELECT COUNT(*) 
@@ -746,7 +746,7 @@ pub async fn search_inner(
         while let Some(row) = rows.next().unwrap() {
             let rating: Rating =
                 Rating::new(row.get("value").unwrap(), row.get("deviation").unwrap());
-                let platform: i64 = row.get("platform").unwrap();
+            let platform: i64 = row.get("platform").unwrap();
             res.push(SearchResultPlayer {
                 name: row.get("name").unwrap(),
                 platform: to_platform_string(platform),
@@ -960,11 +960,11 @@ pub struct SetPlayer {
     rating_deviation: i64,
 }
 
-pub async fn get_recent_sets(
-    conn: &RatingsDbConn) -> Vec<RecentSet> {
+pub async fn get_recent_sets(conn: &RatingsDbConn) -> Vec<RecentSet> {
     conn.run(move |conn| {
-        let mut stmt = conn.prepare(
-            "SELECT
+        let _stmt = conn
+            .prepare(
+                "SELECT
                 timestamp,
                 id_a, char_a, name_a, platform_a, 
                 value_a, deviation_a,
@@ -980,10 +980,13 @@ pub async fn get_recent_sets(
             LEFT JOIN cheater_status AS cheater_b on cheater_b.id = games.id_b
             LEFT JOIN hidden_status AS hidden_b on hidden_b.id = games.id_b
             ORDER BY timestamp DESC limit 100
-                ").unwrap();
+                ",
+            )
+            .unwrap();
 
         todo!()
-    }).await
+    })
+    .await
 }
 
 pub async fn get_player_char_history(
@@ -1383,7 +1386,8 @@ fn get_player_character_data(
             top_rating_value: top_rating_value.map(|r| r.round() as i64),
             top_rating_deviation: top_rating_deviation.map(|d| (2.0 * d).round() as i64),
             top_rating_timestamp: top_rating_timestamp.map(|t| {
-                NaiveDateTime::from_timestamp(t, 0)
+                NaiveDateTime::from_timestamp_opt(t, 0)
+                    .unwrap()
                     .format("%Y-%m-%d")
                     .to_string()
             }),
@@ -1394,7 +1398,8 @@ fn get_player_character_data(
             top_defeated_deviation: top_defeated_deviation.map(|r| (2.0 * r).round() as i64),
             top_defeated_floor: top_defeated_floor.map(stringify_floor),
             top_defeated_timestamp: top_defeated_timestamp.map(|t| {
-                NaiveDateTime::from_timestamp(t, 0)
+                NaiveDateTime::from_timestamp_opt(t, 0)
+                    .unwrap()
                     .format("%Y-%m-%d")
                     .to_string()
             }),
@@ -1428,7 +1433,8 @@ struct RawPlayerSet {
 
 impl RawPlayerSet {
     fn to_formatted_set(self) -> PlayerSet {
-        let timestamp = NaiveDateTime::from_timestamp(self.timestamp, 0)
+        let timestamp = NaiveDateTime::from_timestamp_opt(self.timestamp, 0)
+            .unwrap()
             .format("%Y-%m-%d %H:%M")
             .to_string();
 

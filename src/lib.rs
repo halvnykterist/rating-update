@@ -4,9 +4,9 @@ extern crate rocket;
 extern crate log;
 
 mod api;
-mod glicko;
 mod ggst_api;
-mod responses;
-mod requests;
+mod glicko;
 pub mod rater;
+mod requests;
+mod responses;
 pub mod website;
