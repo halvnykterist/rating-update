@@ -82,7 +82,7 @@ pub fn generate_replay_request(
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoginRequest {
     int1: i64,
-    steam_id: i64,
+    steam_id: String,
     steam_hex: String,
     int2: i64,
     steam_token: String,
@@ -128,7 +128,7 @@ pub async fn generate_login_request() -> Request<LoginRequest> {
                 },
                 body: LoginRequest {
                     int1: 1,
-                    steam_id: 76561198201330023,
+                    steam_id: "76561198201330023".to_owned(),
                     steam_hex: "11000010e5e5967".to_owned(),
                     int2: 256,
                     steam_token,

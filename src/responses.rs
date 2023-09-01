@@ -21,7 +21,7 @@ pub struct ResponseHeader {
 #[derive(Deserialize, Debug)]
 pub struct Login {
     _int1: i64,
-    pub data: Vec<InnerLogin>,
+    pub data: InnerLogin,
 }
 
 #[derive(Deserialize, Debug)]
