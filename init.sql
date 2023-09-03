@@ -224,8 +224,9 @@ CREATE TABLE cheater_status (
 
 CREATE TABLE hidden_status (
     id INTEGER NOT NULL,
-    hidden_status TEXT NOT NULL,
+    hidden_status TEXT,
     notes TEXT NOT NULL,
+    code TEXT,
     PRIMARY KEY(id)
 );
 

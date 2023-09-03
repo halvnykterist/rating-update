@@ -1655,6 +1655,7 @@ dependencies = [
  "lazy_static",
  "log",
  "num-format",
+ "rand",
  "reqwest",
  "rmp-serde",
  "rocket",

@@ -45,6 +45,37 @@ struct ReplayQuery {
     int2: i64,
 }
 
+#[allow(dead_code)]
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PlayerStatsRequest {
+    player_id: String,
+    int1: i64,
+    int2: i64,
+    int3: i64,
+    int4: i64,
+    int5: i64
+}
+
+pub fn generate_player_stats_request(player_id: String) -> Request<PlayerStatsRequest> {
+    Request {
+        header: RequestHeader {
+            player_id: "210611080230642425".to_owned(),
+            token: std::fs::read_to_string("token.txt").unwrap(),
+            int1: 2,
+            version: VERSION.to_owned(),
+            platform: 3, //PC
+        },
+        body: PlayerStatsRequest {
+            player_id: player_id,
+            int1: 7,
+            int2: -1,
+            int3: 1,
+            int4: -1,
+            int5: -1
+        },
+    }
+}
+
 pub fn generate_replay_request(
     index: usize,
     replays_per_page: usize,
@@ -52,7 +83,7 @@ pub fn generate_replay_request(
 ) -> Request<ReplayRequest> {
     Request {
         header: RequestHeader {
-            player_id: "230129212655563979".to_owned(),
+            player_id: "210611080230642425".to_owned(),
             token: token.to_owned(),
             int1: 2,
             version: VERSION.to_owned(),

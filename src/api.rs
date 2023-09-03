@@ -1,5 +1,7 @@
+use crate::{ggst_api};
 use chrono::{Duration, NaiveDateTime, Utc};
 use fxhash::FxHashMap;
+use rand::distributions::{Alphanumeric, DistString};
 use rocket::serde::{json::Json, Serialize};
 use rusqlite::{named_params, params, Connection, OptionalExtension};
 
@@ -2472,6 +2474,67 @@ pub async fn outcomes(conn: RatingsDbConn) -> Json<(Vec<i64>, Vec<f64>, Vec<f64>
         })
         .await,
     )
+}
+
+#[get("/api/hide/<player>")]
+pub async fn start_hide_player(conn: RatingsDbConn, player: &str) -> Json<String> {
+    let id = i64::from_str_radix(&player, 16).unwrap();
+    let player_code = Alphanumeric.sample_string(&mut rand::thread_rng(), 8);
+
+    let code = conn.run(move |conn| {
+        let tx = conn.transaction().unwrap();
+        tx.execute(
+            "INSERT or replace INTO hidden_status(id, hidden_status, code, notes)
+            VALUES(?, NULL, ?, 'temp')",
+            params![&id, &player_code]
+        ).unwrap();
+        let _ = tx.commit();
+        player_code
+    }).await;
+
+    Json(code)
+}
+
+#[get("/api/hide/poll/<player>")]
+pub async fn poll_hide_player(conn: RatingsDbConn, player: &str) -> Json<bool> {
+    let id = i64::from_str_radix(&player, 16).unwrap();
+
+    let code: String = conn.run(move |conn| {
+        conn.query_row(
+            "SELECT code FROM hidden_status WHERE id=? and hidden_status is null",
+            params![&id],
+            |r| r.get(0),
+        ).unwrap()
+    }).await;
+
+    if code.is_empty() {
+        Json(false)
+    } else {
+        let json = ggst_api::get_player_stats(id.to_string()).await;
+        let lookup = format!("PublicComment\":\"{code}");
+
+        println!("{}", lookup);
+        let found = match json {
+            Ok(json) => json.contains(&lookup),
+            Err(er) => {
+                println!("error {}", er);
+                false
+            }
+        };
+
+        if found {
+            println!("Running update");
+            let _ = conn.run(move |conn| {
+                conn.execute(
+                    "UPDATE hidden_status SET hidden_status='enabled', code=NULL WHERE id=?",
+                    params![&id]
+                ).unwrap();
+            }).await;
+
+            return Json(true);
+        }
+        Json(false)
+    }
 }
 
 #[get("/api/outcomes_delta")]

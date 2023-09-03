@@ -32,6 +32,7 @@ base64-url = "1.4"
 reqwest = "0.11"
 getrandom = "*"
 steamworks = { git = "https://github.com/Noxime/steamworks-rs.git"}
+rand = "0.8.5"
 
 [dev-dependencies]
 criterion = { version = "0.3", features = ["async_tokio"] }

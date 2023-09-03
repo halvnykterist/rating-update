@@ -9,6 +9,29 @@ use reqwest::header;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 
+pub async fn get_player_stats(player_id: String) -> Result<String, String> {
+    let request_data = requests::generate_player_stats_request(player_id);
+    let request_data = encrypt_data(&request_data);
+
+    let client = reqwest::Client::new();
+    let form = client
+        .post("https://ggst-game.guiltygear.com/api/statistics/get")
+        .header(header::USER_AGENT, "GGST/Steam")
+        .header(header::CACHE_CONTROL, "no-store")
+        .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+        .header("x-client-version", "1")
+        .form(&[("data", request_data)]);
+
+    let response = form.send().await.unwrap();
+    let response_bytes = response.bytes().await.unwrap();
+
+    if let Ok(r) = decrypt_response::<responses::PlayerStats>(&response_bytes) {
+        Ok(r.body.json)
+    } else {
+        return Err("Couldn't get player stats".to_owned());
+    }
+}
+
 pub async fn get_token() -> Result<String, String> {
     println!("Grabbing steam token");
     let request_data = requests::generate_login_request().await;
@@ -35,6 +58,8 @@ pub async fn get_token() -> Result<String, String> {
 
 pub async fn get_replays() -> Result<Vec<responses::Replay>, String> {
     let token = get_token().await?;
+    // save off token
+    let _ = std::fs::write("token.txt", token.clone());
     let mut replays = Vec::new();
     for i in 0..10 {
         let request_data = requests::generate_replay_request(i, 127, &token);

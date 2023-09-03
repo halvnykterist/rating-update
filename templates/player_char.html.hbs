@@ -36,6 +36,7 @@
           {{/if}}
           {{player.name}}
           <span class="tag is-medium">{{player.platform}}</span>
+          <button class="tag is-danger is-medium" onclick="request_hide('{{player.id}}');">Opt out</button>
         </p>
         {{#if player.cheater_status}}
           <strong class="subtitle">This user has been flagged for cheating by community reports. ({{player.cheater_status}})</strong>
@@ -55,6 +56,24 @@
         <div class="columns is-flex-wrap-wrap-reverse">
           <div class="column is-three-quarters-fullhd">
             <div class="content">
+
+              <div id="modal" class="modal">
+
+                <!-- Modal content -->
+                <div class="modal-content">
+                  <div class="modal-header">
+                    <span class="close">&times;</span>
+                    <h2>Opt out from rating update</h2>
+                  </div>
+                  <div class="modal-body">
+                    To opt out put the following code in your R-Code comment section: <span id="code" class="bold"></span> <span id="loader" class="loader"/></span> </hr>
+                    <img src="/example.jpg"/>
+                  </div>
+
+                </div>
+
+              </div>
+
               <h2>
                 {{player.data.character_name}} Rating:
                 {{#if player.cheater_status}}
@@ -147,6 +166,63 @@
       </div>
     </section>
   </body>
+
+  <script type="text/javascript">
+
+  var span = document.getElementsByClassName("close")[0];
+
+
+  span.onclick = function() {
+    var modal = document.getElementById("modal");
+    modal.style.display = "none";
+  }
+
+  window.onclick = function(event) {
+    var modal = document.getElementById("modal");
+    if (event.target == modal) {
+      modal.style.display = "none";
+    }
+  }
+
+  let timer = null;
+  function request_hide(player_id) {
+    var modal = document.getElementById("modal");
+    modal.style.display = "block";
+
+    const req = new XMLHttpRequest();
+    req.open("GET", `/api/hide/${player_id}`);
+    req.send();
+
+    req.onreadystatechange = (e) => {
+      document.getElementById("code").textContent = req.responseText.replaceAll('"', '');
+    }
+
+    timer = setInterval(() => {
+      poll_player(player_id);
+    }, 1000);
+  }
+
+  function poll_player(player_id) {
+    // 	✅
+
+    const req = new XMLHttpRequest();
+    req.open("GET", `/api/hide/poll/${player_id}`);
+    req.send();
+
+    req.onreadystatechange = (e) => {
+      if (req.readyState == 4 && req.status == 200 && req.response != 'false') {
+        clearInterval(timer);
+        let loader = document.getElementById("loader");
+        loader.className = "";
+        loader.textContent = "✅";
+        setTimeout(() => {
+          location.reload();
+        }, 5000);
+
+      }
+    }
+  }
+  </script>
   {{> footer }}
 
 </html>

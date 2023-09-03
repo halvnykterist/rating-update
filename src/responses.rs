@@ -67,3 +67,10 @@ pub struct Player {
     pub platform: i64,
     _int1: i64,
 }
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct PlayerStats {
+    _int1: i64,
+    pub json: String,
+    _int2: i64
+}

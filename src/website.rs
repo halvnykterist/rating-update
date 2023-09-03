@@ -81,6 +81,8 @@ pub async fn run() {
                 api::daily_games,
                 api::weekly_games,
                 api::daily_character_games,
+                api::start_hide_player,
+                api::poll_hide_player
             ],
         )
         .register("/", catchers![catch_404, catch_500, catch_503])
