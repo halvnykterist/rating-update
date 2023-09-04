@@ -728,7 +728,6 @@ pub async fn search_inner(
                     NATURAL JOIN player_ratings
                     LEFT JOIN vip_status ON vip_status.id = player_names.id
                     LEFT JOIN cheater_status ON cheater_status.id = player_names.id
-                    LEFT JOIN hidden_status ON hidden_status.id = player_names.id
                     WHERE name LIKE ?
                     ORDER BY wins DESC
                     LIMIT 1000
@@ -765,10 +764,7 @@ pub async fn search_inner(
                     + row.get::<_, i32>("losses").unwrap(),
                 vip_status: row.get::<_, Option<String>>("vip_status").unwrap(),
                 cheater_status: row.get::<_, Option<String>>("cheater_status").unwrap(),
-                hidden_status: row
-                    .get::<_, Option<String>>("hidden_status")
-                    .unwrap()
-                    .is_some(),
+                hidden_status: false,
             });
         }
         res.into_iter().filter(|p| !p.hidden_status).collect()
@@ -846,6 +842,7 @@ pub struct PlayerDataChar {
     other_names: Option<Vec<String>>,
     other_characters: Vec<OtherPlayerCharacter>,
     data: PlayerCharacterData,
+    pub hidden_status: Option<String>
 }
 
 #[derive(Serialize)]
@@ -1177,9 +1174,6 @@ pub async fn get_player_data_char(
                 website::CHAR_NAMES[char_id as usize].0
             );
 
-            if hidden_status.is_some() {
-                return None;
-            }
 
             let other_names = get_player_other_names(conn, id, &name);
 
@@ -1196,6 +1190,7 @@ pub async fn get_player_data_char(
                 other_characters,
                 other_names,
                 data: character_data,
+                hidden_status: hidden_status
             })
         } else {
             None
@@ -2483,11 +2478,26 @@ pub async fn start_hide_player(conn: RatingsDbConn, player: &str) -> Json<String
 
     let code = conn.run(move |conn| {
         let tx = conn.transaction().unwrap();
-        tx.execute(
-            "INSERT or replace INTO hidden_status(id, hidden_status, code, notes)
-            VALUES(?, NULL, ?, 'temp')",
-            params![&id, &player_code]
+        
+        let exists: i64 = tx.query_row(
+            "SELECT count(id) FROM hidden_status WHERE id=? and hidden_status is not null",
+            params![&id],
+            |r| r.get(0)
         ).unwrap();
+
+        if exists > 0 {
+            tx.execute(
+                "UPDATE hidden_status SET code=? WHERE id=?",
+                params![&player_code, &id],
+            ).unwrap();
+
+        } else {
+            tx.execute(
+                "INSERT or replace INTO hidden_status(id, hidden_status, code, notes)
+                VALUES(?, NULL, ?, 'PlayerAutomated')",
+                params![&id, &player_code]
+            ).unwrap();
+        }
         let _ = tx.commit();
         player_code
     }).await;
@@ -2501,7 +2511,7 @@ pub async fn poll_hide_player(conn: RatingsDbConn, player: &str) -> Json<bool> {
 
     let code: String = conn.run(move |conn| {
         conn.query_row(
-            "SELECT code FROM hidden_status WHERE id=? and hidden_status is null",
+            "SELECT code FROM hidden_status WHERE id=?",
             params![&id],
             |r| r.get(0),
         ).unwrap()
@@ -2513,7 +2523,6 @@ pub async fn poll_hide_player(conn: RatingsDbConn, player: &str) -> Json<bool> {
         let json = ggst_api::get_player_stats(id.to_string()).await;
         let lookup = format!("PublicComment\":\"{code}");
 
-        println!("{}", lookup);
         let found = match json {
             Ok(json) => json.contains(&lookup),
             Err(er) => {
@@ -2523,12 +2532,24 @@ pub async fn poll_hide_player(conn: RatingsDbConn, player: &str) -> Json<bool> {
         };
 
         if found {
-            println!("Running update");
             let _ = conn.run(move |conn| {
-                conn.execute(
-                    "UPDATE hidden_status SET hidden_status='enabled', code=NULL WHERE id=?",
-                    params![&id]
+                let exists: i64 = conn.query_row(
+                    "SELECT count(id) FROM hidden_status WHERE id=? and hidden_status is not null",
+                    params![&id],
+                    |r| r.get(0)
                 ).unwrap();
+        
+                if exists > 0 {
+                    conn.execute(
+                        "UPDATE hidden_status SET hidden_status=NULL, code=NULL WHERE id=?",
+                        params![&id]
+                    ).unwrap();
+                } else {
+                    conn.execute(
+                        "UPDATE hidden_status SET hidden_status='enabled', code=NULL WHERE id=?",
+                        params![&id]
+                    ).unwrap();
+                }
             }).await;
 
             return Json(true);
