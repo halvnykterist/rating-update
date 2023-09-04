@@ -768,7 +768,7 @@ pub async fn search_inner(
                 hidden_status: row.get::<_, Option<String>>("hidden_status").unwrap(),
             });
         }
-        res.into_iter().filter(|p| !p.hidden_status).collect()
+        res.into_iter().collect()
     })
     .await
 }
