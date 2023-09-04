@@ -72,5 +72,5 @@ pub struct Player {
 pub struct PlayerStats {
     _int1: i64,
     pub json: String,
-    _int2: i64
+    _int2: i64,
 }

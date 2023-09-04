@@ -343,14 +343,16 @@ async fn player_distribution(conn: RatingsDbConn) -> Cached<Template> {
 async fn player(conn: RatingsDbConn, player_id: &str) -> Option<Redirect> {
     api::add_hit(&conn, format!("player/{}", player_id)).await;
 
-    let id = i64::from_str_radix(player_id, 16).unwrap();
-
-    if let Some(char_id) = api::get_player_highest_rated_character(&conn, id).await {
-        let char_short = CHAR_NAMES[char_id as usize].0;
-        Some(Redirect::to(uri!(player_char(
-            player_id = player_id,
-            char_id = char_short,
-        ))))
+    if let Ok(id) = i64::from_str_radix(player_id, 16) {
+        if let Some(char_id) = api::get_player_highest_rated_character(&conn, id).await {
+            let char_short = CHAR_NAMES[char_id as usize].0;
+            Some(Redirect::to(uri!(player_char(
+                player_id = player_id,
+                char_id = char_short,
+            ))))
+        } else {
+            None
+        }
     } else {
         None
     }
@@ -366,19 +368,22 @@ async fn player_char_history(
 ) -> Option<Cached<Template>> {
     api::add_hit(&conn, format!("player/{}/{}/history", player_id, char_id)).await;
 
-    let id = i64::from_str_radix(player_id, 16).unwrap();
-    let char_id = CHAR_NAMES.iter().position(|(c, _)| *c == char_id)? as i64;
-    let game_count = game_count.unwrap_or(100);
-    let offset = offset.unwrap_or(0);
-    let group_games = group_games.unwrap_or(true);
+    if let Ok(id) = i64::from_str_radix(player_id, 16) {
+        let char_id = CHAR_NAMES.iter().position(|(c, _)| *c == char_id)? as i64;
+        let game_count = game_count.unwrap_or(100);
+        let offset = offset.unwrap_or(0);
+        let group_games = group_games.unwrap_or(true);
 
-    if let Some(history) =
-        api::get_player_char_history(&conn, id, char_id, game_count, offset, group_games).await
-    {
-        Some(Cached::new(
-            Template::render("player_char_history", &history),
-            60,
-        ))
+        if let Some(history) =
+            api::get_player_char_history(&conn, id, char_id, game_count, offset, group_games).await
+        {
+            Some(Cached::new(
+                Template::render("player_char_history", &history),
+                60,
+            ))
+        } else {
+            None
+        }
     } else {
         None
     }
@@ -392,34 +397,36 @@ async fn player_char(
 ) -> Option<Cached<Template>> {
     api::add_hit(&conn, format!("player/{}/{}", player_id, char_id)).await;
 
-    let id = i64::from_str_radix(player_id, 16).unwrap();
+    if let Ok(id) = i64::from_str_radix(player_id, 16) {
+        let char_id_i64 = CHAR_NAMES.iter().position(|(c, _)| *c == char_id)? as i64;
 
-    let char_id_i64 = CHAR_NAMES.iter().position(|(c, _)| *c == char_id)? as i64;
-
-    #[derive(Serialize)]
-    struct Context {
-        player_id: String,
-        char_id: String,
-        player: api::PlayerDataChar,
-        all_characters: &'static [(&'static str, &'static str)],
-        hidden_status: bool
-    }
-
-    if let Some(player) = api::get_player_data_char(&conn, id, char_id_i64).await {
-        let mut hidden_status = false;
-
-        if player.hidden_status.is_some() {
-            hidden_status = true;
+        #[derive(Serialize)]
+        struct Context {
+            player_id: String,
+            char_id: String,
+            player: api::PlayerDataChar,
+            all_characters: &'static [(&'static str, &'static str)],
+            hidden_status: bool,
         }
-        
-        let context = Context {
-            player_id: player_id.to_owned(),
-            char_id: char_id.to_owned(),
-            hidden_status: hidden_status,
-            player,
-            all_characters: CHAR_NAMES,
-        };
-        Some(Cached::new(Template::render("player_char", &context), 999))
+
+        if let Some(player) = api::get_player_data_char(&conn, id, char_id_i64).await {
+            let mut hidden_status = false;
+
+            if player.hidden_status.is_some() {
+                hidden_status = true;
+            }
+
+            let context = Context {
+                player_id: player_id.to_owned(),
+                char_id: char_id.to_owned(),
+                hidden_status,
+                player,
+                all_characters: CHAR_NAMES,
+            };
+            Some(Cached::new(Template::render("player_char", &context), 999))
+        } else {
+            None
+        }
     } else {
         None
     }
