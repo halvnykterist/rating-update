@@ -1,4 +1,4 @@
-use crate::{ggst_api};
+use crate::ggst_api;
 use chrono::{Duration, NaiveDateTime, Utc};
 use fxhash::FxHashMap;
 use rand::distributions::{Alphanumeric, DistString};
@@ -843,7 +843,7 @@ pub struct PlayerDataChar {
     other_names: Option<Vec<String>>,
     other_characters: Vec<OtherPlayerCharacter>,
     data: PlayerCharacterData,
-    pub hidden_status: Option<String>
+    pub hidden_status: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -1174,7 +1174,6 @@ pub async fn get_player_data_char(
                 name,
                 website::CHAR_NAMES[char_id as usize].0
             );
-
 
             let other_names = get_player_other_names(conn, id, &name);
 
@@ -2477,84 +2476,97 @@ pub async fn start_hide_player(conn: RatingsDbConn, player: &str) -> Json<String
     let id = i64::from_str_radix(&player, 16).unwrap();
     let player_code = Alphanumeric.sample_string(&mut rand::thread_rng(), 8);
 
-    let code = conn.run(move |conn| {
-        let tx = conn.transaction().unwrap();
-        
-        let exists: i64 = tx.query_row(
-            "SELECT count(id) FROM hidden_status WHERE id=? and hidden_status is not null",
-            params![&id],
-            |r| r.get(0)
-        ).unwrap();
+    let code = conn
+        .run(move |conn| {
+            let tx = conn.transaction().unwrap();
 
-        if exists > 0 {
-            tx.execute(
-                "UPDATE hidden_status SET code=? WHERE id=?",
-                params![&player_code, &id],
-            ).unwrap();
+            let exists: i64 = tx
+                .query_row(
+                    "SELECT count(id) FROM hidden_status WHERE id=? and hidden_status is not null",
+                    params![&id],
+                    |r| r.get(0),
+                )
+                .unwrap();
 
-        } else {
-            tx.execute(
-                "INSERT or replace INTO hidden_status(id, hidden_status, code, notes)
+            if exists > 0 {
+                tx.execute(
+                    "UPDATE hidden_status SET code=? WHERE id=?",
+                    params![&player_code, &id],
+                )
+                .unwrap();
+            } else {
+                tx.execute(
+                    "INSERT or replace INTO hidden_status(id, hidden_status, code, notes)
                 VALUES(?, NULL, ?, 'PlayerAutomated')",
-                params![&id, &player_code]
-            ).unwrap();
-        }
-        let _ = tx.commit();
-        player_code
-    }).await;
+                    params![&id, &player_code],
+                )
+                .unwrap();
+            }
+            let _ = tx.commit();
+            player_code
+        })
+        .await;
 
     Json(code)
 }
 
 #[get("/api/hide/poll/<player>")]
 pub async fn poll_hide_player(conn: RatingsDbConn, player: &str) -> Json<bool> {
-    let id = i64::from_str_radix(&player, 16).unwrap();
-
-    let code: String = conn.run(move |conn| {
-        conn.query_row(
-            "SELECT code FROM hidden_status WHERE id=?",
-            params![&id],
-            |r| r.get(0),
-        ).unwrap()
-    }).await;
-
-    if code.is_empty() {
-        Json(false)
-    } else {
-        let json = ggst_api::get_player_stats(id.to_string()).await;
-        let lookup = format!("PublicComment\":\"{code}");
-
-        let found = match json {
-            Ok(json) => json.contains(&lookup),
-            Err(er) => {
-                println!("error {}", er);
-                false
-            }
-        };
-
-        if found {
-            let _ = conn.run(move |conn| {
-                let exists: i64 = conn.query_row(
-                    "SELECT count(id) FROM hidden_status WHERE id=? and hidden_status is not null",
+    if let Ok(id) = i64::from_str_radix(&player, 16) {
+        let code: String = conn
+            .run(move |conn| {
+                conn.query_row(
+                    "SELECT code FROM hidden_status WHERE id=?",
                     params![&id],
-                    |r| r.get(0)
-                ).unwrap();
-        
-                if exists > 0 {
-                    conn.execute(
-                        "UPDATE hidden_status SET hidden_status=NULL, code=NULL WHERE id=?",
-                        params![&id]
-                    ).unwrap();
-                } else {
-                    conn.execute(
-                        "UPDATE hidden_status SET hidden_status='enabled', code=NULL WHERE id=?",
-                        params![&id]
-                    ).unwrap();
-                }
-            }).await;
+                    |r| r.get(0),
+                )
+                .unwrap()
+            })
+            .await;
 
-            return Json(true);
+        if code.is_empty() {
+            Json(false)
+        } else {
+            let json = ggst_api::get_player_stats(id.to_string()).await;
+            let lookup = format!("PublicComment\":\"{code}");
+
+            let found = match json {
+                Ok(json) => json.contains(&lookup),
+                Err(er) => {
+                    println!("error {}", er);
+                    false
+                }
+            };
+
+            if found {
+                let _ = conn
+                    .run(move |conn| {
+                        let exists: i64 = conn.query_row(
+                        "SELECT count(id) FROM hidden_status WHERE id=? and hidden_status is not null",
+                        params![&id],
+                        |r| r.get(0)
+                    ).unwrap();
+
+                        if exists > 0 {
+                            conn.execute(
+                                "UPDATE hidden_status SET hidden_status=NULL, code=NULL WHERE id=?",
+                                params![&id],
+                            )
+                            .unwrap();
+                        } else {
+                            conn.execute(
+                            "UPDATE hidden_status SET hidden_status='enabled', code=NULL WHERE id=?",
+                            params![&id]
+                        ).unwrap();
+                        }
+                    })
+                    .await;
+
+                return Json(true);
+            }
+            Json(false)
         }
+    } else {
         Json(false)
     }
 }
