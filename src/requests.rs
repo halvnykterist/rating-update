@@ -155,7 +155,7 @@ pub async fn generate_login_request() -> Request<LoginRequest> {
                     player_id: "".to_owned(),
                     token: "".to_owned(),
                     int1: 2,
-                    version: "0.2.2".to_owned(),
+                    version: VERSION.to_owned(),
                     platform: 3,
                 },
                 body: LoginRequest {
