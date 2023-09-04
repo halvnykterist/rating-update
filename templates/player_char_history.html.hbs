@@ -41,9 +41,13 @@
                 {{#if this.opponent_cheater}}
                   <span class="cheater">Cheater</span>
                 {{else}}
-                  {{this.opponent_rating_value}} ±{{this.opponent_rating_deviation}}
+                  {{#if this.opponent_hidden}}
+                      (Hidden)
+                  {{else}}
+                      {{this.opponent_rating_value}} ±{{this.opponent_rating_deviation}} aaah
+                  {{/if}}
+                {{/if}}
               </td>
-        {{/if}}
           <td>
             {{#if this.opponent_cheater}}
               <span class="cheater">Cheater</span>
@@ -51,7 +55,11 @@
               {{#if ../cheater_status}}
                 <span class="cheater">Cheater</span>
               {{else}}
-                {{this.expected_outcome}}
+                  {{#if this.opponent_hidden}}
+                      (Hidden)
+                  {{else}}
+                     {{this.expected_outcome}}
+                  {{/if}}
               {{/if}}
             {{/if}}
           </td>
