@@ -5,9 +5,15 @@ use aes_gcm::{
 };
 //use getrandom::getrandom;
 use hex;
+use lazy_static::lazy_static;
 use reqwest::header;
 use serde::{Deserialize, Serialize};
-use std::error::Error;
+use std::{error::Error, ops::Deref};
+use tokio::sync::Mutex;
+
+lazy_static! {
+    pub static ref TOKEN: Mutex<Option<String>> = Mutex::new(None);
+}
 
 pub async fn get_player_stats(player_id: String) -> Result<String, String> {
     let request_data = requests::generate_player_stats_request(player_id);
@@ -33,7 +39,15 @@ pub async fn get_player_stats(player_id: String) -> Result<String, String> {
 }
 
 pub async fn get_token() -> Result<String, String> {
-    println!("Grabbing steam token");
+    {
+        let token = TOKEN.lock().await;
+        if let Some(t) = token.deref() {
+            info!("Already have a token");
+            return Ok(t.to_owned());
+        }
+    }
+
+    warn!("Grabbing steam token");
     let request_data = requests::generate_login_request().await;
     let request_data = encrypt_data(&request_data);
 
@@ -48,8 +62,13 @@ pub async fn get_token() -> Result<String, String> {
 
     let response = form.send().await.unwrap();
     let response_bytes = response.bytes().await.unwrap();
+    info!("Waiting for strive token");
+
+    let mut t = TOKEN.lock().await;
 
     if let Ok(r) = decrypt_response::<responses::Login>(&response_bytes) {
+        info!("Got token: {}", r.header.token);
+        *t = Some(r.header.token.to_owned());
         Ok(r.header.token)
     } else {
         return Err("Couldn't get strive token".to_owned());
@@ -62,6 +81,7 @@ pub async fn get_replays() -> Result<Vec<responses::Replay>, String> {
     let _ = std::fs::write("token.txt", token.clone());
     let mut replays = Vec::new();
     for i in 0..10 {
+        info!("Grabbing replays (page {i})");
         let request_data = requests::generate_replay_request(i, 127, &token);
         let request_data = encrypt_data(&request_data);
         let client = reqwest::Client::new();

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use steamworks::{Client, TicketForWebApiResponse};
 use tokio::sync::Mutex;
 
-const VERSION: &str = "0.2.2";
+const VERSION: &str = "0.2.3";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Request<T> {
@@ -53,7 +53,7 @@ pub struct PlayerStatsRequest {
     int2: i64,
     int3: i64,
     int4: i64,
-    int5: i64
+    int5: i64,
 }
 
 pub fn generate_player_stats_request(player_id: String) -> Request<PlayerStatsRequest> {
@@ -71,7 +71,7 @@ pub fn generate_player_stats_request(player_id: String) -> Request<PlayerStatsRe
             int2: -1,
             int3: 1,
             int4: -1,
-            int5: -1
+            int5: -1,
         },
     }
 }
@@ -147,6 +147,7 @@ pub async fn generate_login_request() -> Request<LoginRequest> {
         std::thread::sleep(::std::time::Duration::from_millis(100));
 
         let steam_token = token.try_lock().unwrap();
+
         if steam_token.is_some() {
             let steam_token = steam_token.clone().unwrap();
             return Request {
