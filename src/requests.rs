@@ -4,6 +4,7 @@ use steamworks::{Client, TicketForWebApiResponse};
 use tokio::sync::Mutex;
 
 const VERSION: &str = "0.2.3";
+const PLAYER_ID: &str = "230129212655563979";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Request<T> {
@@ -59,7 +60,7 @@ pub struct PlayerStatsRequest {
 pub fn generate_player_stats_request(player_id: String) -> Request<PlayerStatsRequest> {
     Request {
         header: RequestHeader {
-            player_id: "210611080230642425".to_owned(),
+            player_id: PLAYER_ID.to_owned(),
             token: std::fs::read_to_string("token.txt").unwrap(),
             int1: 2,
             version: VERSION.to_owned(),
@@ -83,7 +84,7 @@ pub fn generate_replay_request(
 ) -> Request<ReplayRequest> {
     Request {
         header: RequestHeader {
-            player_id: "210611080230642425".to_owned(),
+            player_id: PLAYER_ID.to_owned(),
             token: token.to_owned(),
             int1: 2,
             version: VERSION.to_owned(),
