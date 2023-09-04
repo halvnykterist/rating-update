@@ -128,8 +128,8 @@ pub async fn generate_login_request() -> Request<LoginRequest> {
                 },
                 body: LoginRequest {
                     int1: 1,
-                    steam_id: "76561198201330023".to_owned(),
-                    steam_hex: "11000010e5e5967".to_owned(),
+                    steam_id: "76561199474089169".to_owned(),
+                    steam_hex: "11000015a3b1cd1".to_owned(),
                     int2: 256,
                     steam_token,
                 },

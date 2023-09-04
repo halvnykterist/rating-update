@@ -27,6 +27,7 @@ pub async fn get_token() -> Result<String, String> {
     let response_bytes = response.bytes().await.unwrap();
 
     if let Ok(r) = decrypt_response::<responses::Login>(&response_bytes) {
+        println!("Token is: {}", r.header.token);
         Ok(r.header.token)
     } else {
         return Err("Couldn't get strive token".to_owned());
