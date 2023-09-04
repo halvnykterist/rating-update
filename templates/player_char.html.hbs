@@ -36,7 +36,6 @@
           {{/if}}
           {{player.name}}
           <span class="tag is-medium">{{player.platform}}</span>
-          <button class="tag is-danger is-medium" onclick="request_hide('{{player.id}}');">Opt out</button>
         </p>
         {{#if player.cheater_status}}
           <strong class="subtitle">This user has been flagged for cheating by community reports. ({{player.cheater_status}})</strong>
@@ -139,6 +138,9 @@
               </table>
             </div>
           {{/if}}
+            <div>
+          <button class="tag is-danger is-medium" onclick="request_hide('{{player.id}}');">Hide my profile</button>
+          </div>
         </div>
       </div>
       <div class="column is-one-quarter-fullhd">
