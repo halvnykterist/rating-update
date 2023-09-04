@@ -28,6 +28,7 @@
         load_history();
     ">
     {{> navbar}}
+    {{#if (not player.hidden_status)}}
     <section class="hero is-primary">
       <div class="hero-body has-text-centered">
         <p class="title">
@@ -139,7 +140,7 @@
             </div>
           {{/if}}
             <div>
-          <button class="tag is-danger is-medium" onclick="request_hide('{{player.id}}');">Hide my profile</button>
+          <button class="tag is-danger is-medium" onclick="toggle_profile('{{player.id}}');">Hide my profile</button>
           </div>
         </div>
       </div>
@@ -167,12 +168,37 @@
       </div>
       </div>
     </section>
+    {{else}}
+        <section class="hero is-primary">
+      <div class="hero-body has-text-centered">
+                      <div id="modal" class="modal">
+
+                <!-- Modal content -->
+                <div class="modal-content">
+                  <div class="modal-header">
+                    <span class="close">&times;</span>
+                    <h2>Opt out from rating update</h2>
+                  </div>
+                  <div class="modal-body">
+                    To opt out put the following code in your R-Code comment section: <span id="code" class="bold"></span> <span id="loader" class="loader"/></span> </hr>
+                    <img src="/example.jpg"/>
+                  </div>
+
+                </div>
+
+              </div>
+        <p class="title bold">Player has chosen to opt out of rating update.</p>
+        <div><button class="tag is-danger is-medium" onclick="toggle_profile('{{player.id}}');">Enable my profile</button></div>
+        </div>
+        </section>
+    {{/if}}
+
   </body>
 
   <script type="text/javascript">
 
   var span = document.getElementsByClassName("close")[0];
-
+  let timer = null;
 
   span.onclick = function() {
     var modal = document.getElementById("modal");
@@ -183,11 +209,15 @@
     var modal = document.getElementById("modal");
     if (event.target == modal) {
       modal.style.display = "none";
+
+      if (timer != null) {
+        clearInterval(timer);
+      }
     }
   }
 
-  let timer = null;
-  function request_hide(player_id) {
+  
+  function toggle_profile(player_id) {
     var modal = document.getElementById("modal");
     modal.style.display = "block";
 
@@ -201,12 +231,21 @@
 
     timer = setInterval(() => {
       poll_player(player_id);
-    }, 1000);
+    }, 2000);
   }
 
+  let counter = 0;
   function poll_player(player_id) {
     // 	✅
 
+    if (counter >= 40) {
+      clearInterval(timer);
+
+      var modal = document.getElementById("modal");
+      modal.style.display = "none";
+
+      alert("You have idled for too long. Please retry the hide feature");
+    }
     const req = new XMLHttpRequest();
     req.open("GET", `/api/hide/poll/${player_id}`);
     req.send();
@@ -223,6 +262,8 @@
 
       }
     }
+
+    counter++;
   }
   </script>
   {{> footer }}
