@@ -402,12 +402,20 @@ async fn player_char(
         char_id: String,
         player: api::PlayerDataChar,
         all_characters: &'static [(&'static str, &'static str)],
+        hidden_status: bool
     }
 
     if let Some(player) = api::get_player_data_char(&conn, id, char_id_i64).await {
+        let mut hidden_status = false;
+
+        if player.hidden_status.is_some() {
+            hidden_status = true;
+        }
+        
         let context = Context {
             player_id: player_id.to_owned(),
             char_id: char_id.to_owned(),
+            hidden_status: hidden_status,
             player,
             all_characters: CHAR_NAMES,
         };
