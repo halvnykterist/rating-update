@@ -2,13 +2,13 @@ use serde_derive::Deserialize;
 
 #[derive(Deserialize, Debug)]
 pub struct Response<T> {
-    _headers: ResponseHeader,
+    pub header: ResponseHeader,
     pub body: T,
 }
 
 #[derive(Deserialize, Debug)]
-struct ResponseHeader {
-    _id: String,
+pub struct ResponseHeader {
+    pub token: String,
     _int1: i64,
     _date: String,
     _version1: String,
@@ -16,6 +16,21 @@ struct ResponseHeader {
     _version3: String,
     _string1: String,
     _string2: String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct Login {
+    _int1: i64,
+    pub data: InnerLogin,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct InnerLogin {
+    _string1: String,
+    pub name: String,
+    _steam_id: String,
+    _strive_id: String,
+    _platform: i64,
 }
 
 #[derive(Deserialize, Debug)]
@@ -51,4 +66,11 @@ pub struct Player {
     _string2: String,
     pub platform: i64,
     _int1: i64,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct PlayerStats {
+    _int1: i64,
+    pub json: String,
+    _int2: i64
 }

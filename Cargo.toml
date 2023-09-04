@@ -8,13 +8,13 @@ edition = "2021"
 [dependencies]
 anyhow = "1"
 #glicko2 = "0.3.1"
-rocket = { version = "0.5.0-rc.1", features = ["json"] }
-rocket_sync_db_pools = { version = "0.1.0-rc.1", default-features = false, features = ["sqlite_pool"] }
-rocket_dyn_templates = { version = "0.1.0-rc.1", default-features = false, features = ["handlebars"] }
+rocket = { version = "0.5.0-rc.3", features = ["json"] }
+rocket_sync_db_pools = { version = "0.1.0-rc.3", default-features = false, features = ["sqlite_pool"] }
+rocket_dyn_templates = { version = "0.1.0-rc.3", default-features = false, features = ["handlebars"] }
 #ggst-api = { git = "https://github.com/halvnykterist/ggst-api-rs" }
 #ggst-api = { path = "../ggst-api-rs" }
 tokio = { version = "1", features=["full"] }
-rusqlite = { version = "0.25", features = ["bundled", "functions"] }
+rusqlite = { version = "0.27", features = ["bundled", "functions"] }
 serde = { version = "1", features = ["derive"] }
 serde_derive = "1"
 lazy_static = "1"
@@ -31,6 +31,8 @@ rmp-serde = "1"
 base64-url = "1.4"
 reqwest = "0.11"
 getrandom = "*"
+steamworks = { git = "https://github.com/Noxime/steamworks-rs.git"}
+rand = "0.8.5"
 
 [dev-dependencies]
 criterion = { version = "0.3", features = ["async_tokio"] }
