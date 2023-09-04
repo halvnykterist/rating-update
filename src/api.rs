@@ -693,7 +693,7 @@ pub struct SearchResultPlayer {
     platform: &'static str,
     vip_status: Option<String>,
     cheater_status: Option<String>,
-    hidden_status: bool,
+    hidden_status: Option<String>,
     id: String,
     character: String,
     character_short: String,
@@ -728,6 +728,7 @@ pub async fn search_inner(
                     NATURAL JOIN player_ratings
                     LEFT JOIN vip_status ON vip_status.id = player_names.id
                     LEFT JOIN cheater_status ON cheater_status.id = player_names.id
+                    LEFT JOIN hidden_status ON hidden_status.id = player_names.id
                     WHERE name LIKE ?
                     ORDER BY wins DESC
                     LIMIT 1000
@@ -764,7 +765,7 @@ pub async fn search_inner(
                     + row.get::<_, i32>("losses").unwrap(),
                 vip_status: row.get::<_, Option<String>>("vip_status").unwrap(),
                 cheater_status: row.get::<_, Option<String>>("cheater_status").unwrap(),
-                hidden_status: false,
+                hidden_status: row.get::<_, Option<String>>("hidden_status").unwrap(),
             });
         }
         res.into_iter().filter(|p| !p.hidden_status).collect()
@@ -1190,7 +1191,7 @@ pub async fn get_player_data_char(
                 other_characters,
                 other_names,
                 data: character_data,
-                hidden_status: hidden_status
+                hidden_status,
             })
         } else {
             None

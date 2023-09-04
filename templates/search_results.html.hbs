@@ -35,7 +35,12 @@
                                     {{#if this.cheater_status}}
                                         <td><span class="cheater">Cheater</span></td>
                                     {{else}}
-                                        <td>{{this.rating_value}} ±{{this.rating_deviation}}</td>
+                                        {{#if this.hidden_status}}
+                                            <td>(Hidden)</td>
+                                        {{else}}
+                                            <td>{{this.rating_value}} ±{{this.rating_deviation}}</td>
+                                        {{/if}
+
                                     {{/if}}
                                     <td>{{this.game_count}}</td>
                                 </tr>
