@@ -2512,6 +2512,7 @@ pub async fn start_hide_player(conn: RatingsDbConn, player: &str) -> Json<String
 
 #[get("/api/hide/poll/<player>")]
 pub async fn poll_hide_player(conn: RatingsDbConn, player: &str) -> Json<bool> {
+    info!("Starting poll hide player");
     if let Ok(id) = i64::from_str_radix(&player, 16) {
         let code: String = conn
             .run(move |conn| {
@@ -2523,44 +2524,50 @@ pub async fn poll_hide_player(conn: RatingsDbConn, player: &str) -> Json<bool> {
                 .unwrap()
             })
             .await;
+        info!("Grabbed code {code}");
 
         if code.is_empty() {
+            info!("No code, returning false");
             Json(false)
         } else {
+            info!("Getting player stats");
             let json = ggst_api::get_player_stats(id.to_string()).await;
             let lookup = format!("PublicComment\":\"{code}");
 
             let found = match json {
                 Ok(json) => json.contains(&lookup),
                 Err(er) => {
-                    println!("error {}", er);
+                    error!("error {}", er);
                     false
                 }
             };
 
             if found {
-                let _ = conn
-                    .run(move |conn| {
-                        let exists: i64 = conn.query_row(
+                info!("Found code, setting hidden status");
+                conn.run(move |conn| {
+                    let exists: i64 = conn.query_row(
                         "SELECT count(id) FROM hidden_status WHERE id=? and hidden_status is not null",
                         params![&id],
                         |r| r.get(0)
                     ).unwrap();
 
-                        if exists > 0 {
-                            conn.execute(
-                                "UPDATE hidden_status SET hidden_status=NULL, code=NULL WHERE id=?",
-                                params![&id],
-                            )
-                            .unwrap();
-                        } else {
-                            conn.execute(
+                    info!("Does code exist? {exists}");
+
+                    if exists > 0 {
+                        info!("Setting hidden status to null");
+                        conn.execute(
+                            "UPDATE hidden_status SET hidden_status=NULL, code=NULL WHERE id=?",
+                            params![&id],
+                        ).unwrap();
+
+                    } else {
+                        info!("Setting hidden status to enabled");
+                        conn.execute(
                             "UPDATE hidden_status SET hidden_status='enabled', code=NULL WHERE id=?",
                             params![&id]
                         ).unwrap();
-                        }
-                    })
-                    .await;
+                    }
+                }).await;
 
                 return Json(true);
             }
