@@ -2521,7 +2521,7 @@ pub async fn poll_hide_player(conn: RatingsDbConn, player: &str) -> Json<bool> {
                     params![&id],
                     |r| r.get(0),
                 )
-                .unwrap()
+                .unwrap_or_else(|_| "".to_owned())
             })
             .await;
         info!("Grabbed code {code}");
