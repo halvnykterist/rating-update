@@ -193,9 +193,12 @@ pub async fn update_once() {
     if let Err(e) = update_rankings(&mut conn) {
         error!("update_rankings failed: {}", e);
     }
-    //if let Err(e) = calc_character_popularity(&mut conn, last_rating_timestamp) {
-    //    error!("calc_character_popularity failed: {}", e);
-    //}
+
+    let now = Utc::now().timestamp();
+
+    if let Err(e) = calc_character_popularity(&mut conn, now) {
+        error!("calc_character_popularity failed: {}", e);
+    }
 }
 
 pub fn print_rankings() {
