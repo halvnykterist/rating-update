@@ -384,8 +384,6 @@ pub async fn pull() {
 }
 
 async fn grab_games(conn: &mut Connection, _pages: usize) -> Result<()> {
-    return Ok(());
-
     let then = Utc::now();
     info!("Grabbing replays");
     let replays = ggst_api::get_replays().await;
