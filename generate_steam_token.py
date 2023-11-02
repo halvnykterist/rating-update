@@ -103,7 +103,7 @@ def login(user, password, auth=None, padding=0):
             "",
             "",
             2,
-            "0.2.0",
+            "0.2.1",
             3
         ],
         [
@@ -133,14 +133,15 @@ def login(user, password, auth=None, padding=0):
 
     try:
         login_response = decrypt_response_data(r.content.hex())
-        #print(login_response)
     except:
         return login(user, password, auth, padding - 2)
+
+    print(login_response);
 
     #This is where I print it?
     token = login_response[0][0]
     print(f"Strive token obtained for user: {steam_id} - {token}")
-    file = open("token.txt", "w")
+    file = open("token.txt", "wb")
     file.write(token)
     file.close()
     return token
@@ -152,7 +153,7 @@ def get_replays(token):
         "230129212655563979",
         token,
         2,
-        "0.2.0",
+        "0.2.1",
         3
     ]
     data_params = [

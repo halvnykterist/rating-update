@@ -20,7 +20,7 @@ pub const POP_RATING_BRACKETS: usize = 13;
 
 pub const RATING_PERIOD: i64 = 60 * 60;
 pub const RANKING_PERIOD: i64 = 1 * 60 * 60;
-pub const STATISTICS_PERIOD: i64 = 24 * 60 * 60;
+pub const STATISTICS_PERIOD: i64 = 6 * 60 * 60;
 
 lazy_static! {
     pub static ref RUNTIME_DATA: Mutex<RuntimeData> = Mutex::new(RuntimeData {});
@@ -750,7 +750,9 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
             .prepare(
                 "SELECT
                     id
-                FROM cheater_status",
+                FROM hidden_status
+                WHERE hidden_status='enabled'
+                ",
             )
             .unwrap();
         let mut rows = stmt.query([]).unwrap();
@@ -797,9 +799,6 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
         let has_cheater = cheaters.contains(&g.id_a) || cheaters.contains(&g.id_b);
         let has_hidden = hidden.contains(&g.id_a) || hidden.contains(&g.id_b);
 
-        let old_rating_a = players.get(&(g.id_a, g.char_a)).unwrap().rating;
-        let old_rating_b = players.get(&(g.id_b, g.char_b)).unwrap().rating;
-
         players
             .get_mut(&(g.id_a, g.char_a))
             .unwrap()
@@ -808,6 +807,9 @@ fn update_ratings(conn: &mut Connection, games: Option<Vec<Game>>) -> i64 {
             .get_mut(&(g.id_b, g.char_b))
             .unwrap()
             .decay(g.timestamp);
+
+        let old_rating_a = players.get(&(g.id_a, g.char_a)).unwrap().rating;
+        let old_rating_b = players.get(&(g.id_b, g.char_b)).unwrap().rating;
 
         let (winner, loser) = match g.winner {
             1 => ((g.id_a, g.char_a), (g.id_b, g.char_b)),
@@ -1267,7 +1269,7 @@ pub fn calc_character_popularity(conn: &mut Connection, last_timestamp: i64) -> 
         let rating_max = if r < POP_RATING_BRACKETS - 1 {
             (1000 + (r + 1) * 100) as f64
         } else {
-            99.0
+            3000.0
         };
 
         let rating_game_count: f64 = tx.query_row(
