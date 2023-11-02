@@ -997,7 +997,7 @@ pub async fn get_player_char_history(
     offset: i64,
     group_games: bool,
 ) -> Option<PlayerCharacterHistory> {
-    conn.run(move |conn| {
+    if let Ok(res) = conn.run(move |conn| {
         let history = {
             let mut stmt = conn
                 .prepare_cached(
@@ -1049,7 +1049,7 @@ pub async fn get_player_char_history(
 
                         ORDER BY timestamp DESC LIMIT :game_count OFFSET :offset",
                 )
-                .unwrap();
+                ?;
 
             let mut rows = stmt
                 .query(named_params! {
@@ -1132,9 +1132,13 @@ pub async fn get_player_char_history(
                 .collect()
         };
 
-        Some(PlayerCharacterHistory { history })
+        Result::Ok(Some(PlayerCharacterHistory { history }))
     })
-    .await
+    .await {
+        res
+    } else {
+        None
+    }
 }
 
 pub async fn get_player_data_char(
