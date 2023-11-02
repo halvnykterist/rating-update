@@ -1383,7 +1383,7 @@ pub fn update_rankings(conn: &mut Connection) -> Result<()> {
     Ok(())
 }
 
-pub fn update_decay(conn: &mut Connection, timestamp: i64) -> Result<()> {
+pub async fn update_decay(conn: &mut Connection, timestamp: i64) -> Result<()> {
     info!("Updating decay");
     let then = Utc::now();
 
@@ -1431,8 +1431,7 @@ pub fn update_decay(conn: &mut Connection, timestamp: i64) -> Result<()> {
                 player.id,
                 player.char_id,
             ],
-        )
-        .unwrap();
+        )?;
     }
 
     tx.commit()?;
