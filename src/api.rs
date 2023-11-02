@@ -1141,34 +1141,29 @@ pub async fn get_player_data_char(
     conn: &RatingsDbConn,
     id: i64,
     char_id: i64,
-) -> Option<PlayerDataChar> {
+) -> Result<Option<PlayerDataChar>> {
     conn.run(move |conn| {
-        if conn
-            .query_row(
-                "SELECT EXISTS(SELECT 1 FROM players WHERE id=?)",
-                params![id],
-                |r| r.get(0),
-            )
-            .unwrap()
-        {
+        if conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM players WHERE id=?)",
+            params![id],
+            |r| r.get(0),
+        )? {
             let (name, platform, vip_status, cheater_status, hidden_status): (
                 String,
                 i64,
                 Option<String>,
                 Option<String>,
                 Option<String>,
-            ) = conn
-                .query_row(
-                    "SELECT name, platform, vip_status, cheater_status, hidden_status FROM players
+            ) = conn.query_row(
+                "SELECT name, platform, vip_status, cheater_status, hidden_status FROM players
                         LEFT JOIN vip_status ON vip_status.id = players.id
                         LEFT JOIN cheater_status ON cheater_status.id = players.id
                         LEFT JOIN hidden_status ON hidden_status.id = players.id
                            WHERE players.id=?
                            ",
-                    params![id],
-                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
-                )
-                .unwrap();
+                params![id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
+            )?;
             info!(
                 "Loading data for {} ({})",
                 name,
@@ -1179,9 +1174,9 @@ pub async fn get_player_data_char(
 
             let other_characters = get_player_other_characters(conn, id);
 
-            let character_data = get_player_character_data(conn, id, char_id).unwrap()?;
+            let character_data = get_player_character_data(conn, id, char_id)?.unwrap();
 
-            Some(PlayerDataChar {
+            Ok(Some(PlayerDataChar {
                 id: format!("{:X}", id),
                 name,
                 platform: to_platform_string(platform),
@@ -1191,9 +1186,9 @@ pub async fn get_player_data_char(
                 other_names,
                 data: character_data,
                 hidden_status,
-            })
+            }))
         } else {
-            None
+            Ok(None)
         }
     })
     .await

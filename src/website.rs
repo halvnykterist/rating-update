@@ -409,7 +409,7 @@ async fn player_char(
             hidden_status: bool,
         }
 
-        if let Some(player) = api::get_player_data_char(&conn, id, char_id_i64).await {
+        if let Ok(Some(player)) = api::get_player_data_char(&conn, id, char_id_i64).await {
             let mut hidden_status = false;
 
             if player.hidden_status.is_some() {

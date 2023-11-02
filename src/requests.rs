@@ -3,7 +3,7 @@ use std::sync::Arc;
 use steamworks::{Client, TicketForWebApiResponse};
 use tokio::sync::Mutex;
 
-const VERSION: &str = "0.2.3";
+const VERSION: &str = "0.2.4";
 const PLAYER_ID: &str = "230129212655563979";
 
 #[derive(Debug, Serialize, Deserialize)]
