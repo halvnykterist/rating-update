@@ -80,7 +80,7 @@ pub async fn get_replays() -> Result<Vec<responses::Replay>, String> {
     // save off token
     let _ = std::fs::write("token.txt", token.clone());
     let mut replays = Vec::new();
-    for i in 0..10 {
+    for i in 0..5 {
         info!("Grabbing replays (page {i})");
         let request_data = requests::generate_replay_request(i, 127, &token);
         let request_data = encrypt_data(&request_data);
