@@ -717,7 +717,7 @@ pub async fn search_inner(
     search: String,
     exact: bool,
 ) -> Vec<SearchResultPlayer> {
-    conn.run(move |c| {
+    if let Ok(res) = conn.run(move |c| {
         info!("Searching for {}", search);
 
         let mut stmt = c
@@ -733,8 +733,7 @@ pub async fn search_inner(
                     ORDER BY wins DESC
                     LIMIT 1000
                     ",
-            )
-            .unwrap();
+            )?;
 
         let mut rows = if exact {
             stmt.query(params![search])
@@ -768,9 +767,13 @@ pub async fn search_inner(
                 hidden_status: row.get::<_, Option<String>>("hidden_status").unwrap(),
             });
         }
-        res.into_iter().collect()
+        Result::Ok(res.into_iter().collect())
     })
-    .await
+    .await {
+        res
+    } else {
+        Vec::new()
+    }
 }
 
 #[get("/api/top/<char_id>")]
