@@ -84,38 +84,12 @@ pub fn reset_distribution() -> Result<()> {
 }
 
 pub async fn run() -> Result<()> {
-    try_join! {
-        async {
-            tokio::spawn(pull_continuous()).await?;
-            Ok(())
-        },
-        async {
-            tokio::spawn(
-                async {
-                    update_statistics_continuous()
-                    .await
-                    .context("Inside `update_rating_continuous`")
-                }).await?
-        },
-    }?;
-
-    Ok(())
+    pull_and_update_continuous().await
 }
 
-async fn pull_continuous() {
+async fn pull_and_update_continuous() -> Result<()> {
     let mut conn = Connection::open(DB_NAME).unwrap();
     grab_games(&mut conn, 100).await.unwrap();
-    let mut interval = time::interval(Duration::from_secs(60));
-    loop {
-        interval.tick().await;
-        if let Err(e) = grab_games(&mut conn, 10).await {
-            error!("grab_games failed: {}", e)
-        }
-    }
-}
-
-pub async fn update_statistics_continuous() -> Result<()> {
-    let mut conn = Connection::open(DB_NAME)?;
 
     let mut last_ranking_update: i64 =
         conn.query_row("SELECT last_update FROM config", [], |r| r.get(0))?;
@@ -125,51 +99,72 @@ pub async fn update_statistics_continuous() -> Result<()> {
 
     loop {
         interval.tick().await;
+        if let Err(e) = grab_games(&mut conn, 10).await {
+            error!("grab_games failed: {}", e)
+        }
+
         let now = Utc::now().timestamp();
         if now - last_ranking_update > RANKING_PERIOD {
-            info!("New ranking period, updating decay and rankings");
-
-            if last_ranking_update - last_statistics_update >= STATISTICS_PERIOD {
-                info!("New statistics period, updating statistics.");
-                last_statistics_update = last_ranking_update;
-                update_player_distribution(&mut conn);
-                //if let Err(e) = calc_versus_matchups(&mut conn) {
-                //    error!("calc_versus_matchups failed: {}", e);
-                //}
-                if let Err(e) = calc_fraud_index(&mut conn) {
-                    error!("calc_fraud_index failed: {}", e);
-                }
-                if let Err(e) = calc_character_popularity(&mut conn, last_ranking_update) {
-                    error!("calc_character_popularity failed: {}", e);
-                }
-            }
-
-            if let Err(e) = update_decay(&mut conn, Utc::now().timestamp()) {
-                error!("update_decay failed: {}", e);
-            }
-            if let Err(e) = decay_matchups(&mut conn, Utc::now().timestamp()) {
-                error!("decay_matchups failed: {}", e);
-            }
-            if let Err(e) = update_rankings(&mut conn) {
-                error!("update_rankings failed: {}", e);
-            }
-
-            while now - last_ranking_update > RANKING_PERIOD {
-                last_ranking_update += RANKING_PERIOD;
-            }
-
-            info!(
-                "Last ranking period: {}",
-                NaiveDateTime::from_timestamp_opt(last_ranking_update, 0).unwrap()
-            );
-
-            conn.execute(
-                "UPDATE config SET last_update = ?",
-                params![last_ranking_update],
+            update_statistics(
+                &mut conn,
+                now,
+                &mut last_ranking_update,
+                &mut last_statistics_update,
             )
-            .unwrap();
+            .await?
         }
     }
+}
+
+pub async fn update_statistics(
+    conn: &mut Connection,
+    now: i64,
+    last_ranking_update: &mut i64,
+    last_statistics_update: &mut i64,
+) -> Result<()> {
+    info!("New ranking period, updating decay and rankings");
+
+    if *last_ranking_update - *last_statistics_update >= STATISTICS_PERIOD {
+        info!("New statistics period, updating statistics.");
+        *last_statistics_update = *last_ranking_update;
+        update_player_distribution(conn);
+        //if let Err(e) = calc_versus_matchups(&mut conn) {
+        //    error!("calc_versus_matchups failed: {}", e);
+        //}
+        if let Err(e) = calc_fraud_index(conn) {
+            error!("calc_fraud_index failed: {}", e);
+        }
+        if let Err(e) = calc_character_popularity(conn, *last_ranking_update) {
+            error!("calc_character_popularity failed: {}", e);
+        }
+    }
+
+    if let Err(e) = update_decay(conn, Utc::now().timestamp()) {
+        error!("update_decay failed: {}", e);
+    }
+    if let Err(e) = decay_matchups(conn, Utc::now().timestamp()) {
+        error!("decay_matchups failed: {}", e);
+    }
+    if let Err(e) = update_rankings(conn) {
+        error!("update_rankings failed: {}", e);
+    }
+
+    while now - *last_ranking_update > RANKING_PERIOD {
+        *last_ranking_update += RANKING_PERIOD;
+    }
+
+    info!(
+        "Last ranking period: {}",
+        NaiveDateTime::from_timestamp_opt(*last_ranking_update, 0).unwrap()
+    );
+
+    conn.execute(
+        "UPDATE config SET last_update = ?",
+        params![*last_ranking_update],
+    )
+    .unwrap();
+
+    Ok(())
 }
 
 pub async fn update_once() {
