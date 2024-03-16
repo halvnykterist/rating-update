@@ -12,12 +12,19 @@ from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 from msgpack import packb, unpackb
 from struct import pack
+from os.path import exists
 
 def main():
-    user = os.environ['USER']
-    password = os.environ['PASSWORD']
-    token = login(user, password)
+    if (not exists("./token.txt")):
+        user = os.environ['USER']
+        password = ''
+        token = login(user, password)
+    else:
+        f = open("./token.txt", "r")
+        token = f.read() 
+
     replays = get_replays(token)
+    print("Replay Data:")
     print(replays)
 
 
@@ -55,7 +62,7 @@ def steam_login(user, password):
     client = SteamClient()
     client.on(EMsg.ClientGameConnectTokens, on_game_tokens)
     session_time = time()
-    client.cli_login(user, password)
+    client.cli_login(user)
 
     print("Successfully logged in")
 
@@ -141,7 +148,7 @@ def login(user, password, auth=None, padding=0):
     #This is where I print it?
     token = login_response[0][0]
     print(f"Strive token obtained for user: {steam_id} - {token}")
-    file = open("token.txt", "wb")
+    file = open("token.txt", "w")
     file.write(token)
     file.close()
     return token
@@ -153,7 +160,7 @@ def get_replays(token):
         "230129212655563979",
         token,
         2,
-        "0.2.1",
+        "0.2.7",
         3
     ]
     data_params = [
@@ -210,6 +217,7 @@ def decrypt_response_data(data):
     iv = decoded[:12]
     cipher = AES.new(key, AES.MODE_GCM, iv)
     decrypted = cipher.decrypt(decoded[12:])
+    print(decrypted)
     return unpackb(decrypted[:-16])
 
 if __name__ == "__main__":
