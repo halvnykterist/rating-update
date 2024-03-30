@@ -32,6 +32,6 @@ cargo run pull #Pulls data, without updating anything
 You can find more in `main.rs`
 
 
-Once the database is setup you can start a local server that is accessible on `localhost`
+Once the database is setup you can start a local server that is accessible on `localhost:8085`
 with `cargo run`. By default the server will continuously pull down new replays and update the rankings. If you do not
 want this behaviour you may run `cargo run -- nothoughts` instead to only start the website.
