@@ -226,7 +226,6 @@ async fn matchups(conn: RatingsDbConn) -> Cached<Template> {
 
     #[derive(Serialize)]
     struct Context {
-        character_shortnames: Vec<&'static str>,
         matchups_global: Vec<api::CharacterMatchups>,
         matchups_top_1000: Vec<api::CharacterMatchups>,
         matchups_proportional: Vec<api::CharacterMatchups>,
@@ -242,7 +241,6 @@ async fn matchups(conn: RatingsDbConn) -> Cached<Template> {
     );
 
     let context = Context {
-        character_shortnames: CHAR_NAMES.iter().map(|c| c.0).collect(),
         matchups_global,
         matchups_top_1000,
         matchups_proportional,
@@ -259,7 +257,6 @@ async fn character_popularity(conn: RatingsDbConn) -> Cached<Template> {
 
     #[derive(Serialize)]
     struct Context {
-        character_shortnames: Vec<&'static str>,
         global_character_popularity: Vec<f64>,
         rank_character_popularity: Vec<api::RankCharacterPopularities>,
         fraud_stats: Vec<api::FraudStats>,
@@ -280,27 +277,7 @@ async fn character_popularity(conn: RatingsDbConn) -> Cached<Template> {
         api::get_fraud_highest_rated(&conn),
     );
 
-    //let mut char_pop: Vec<((f64, _), &'static str)> = global_character_popularity
-    //    .into_iter()
-    //    .zip(rank_character_popularity.into_iter())
-    //    .zip(CHAR_NAMES.iter().map(|c| c.0))
-    //    .collect();
-
-    //char_pop.sort_by(|a, b| b.0.0.partial_cmp(&a.0.0).unwrap());
-    //let mut global_character_popularity = Vec::new();
-    //let mut rank_character_popularity = Vec::new();
-    //let mut character_shortnames = Vec::new();
-
-    //info!("{}", char_pop.len());
-
-    //for ((g, r), n) in char_pop {
-    //    global_character_popularity.push(g);
-    //    rank_character_popularity.push(r);
-    //    character_shortnames.push(n);
-    //}
-
     let context = Context {
-        character_shortnames: CHAR_NAMES.iter().map(|c| c.0).collect(),
         global_character_popularity,
         rank_character_popularity,
         fraud_stats,

@@ -20,8 +20,8 @@
                     <table class="table is-bordered">
                         <tr>
                             <th>&nbsp;</th>
-                            {{#each character_shortnames}}
-                                <th>{{this}}</th>
+                            {{#each all_characters}}
+                                <th title="{{this.[1]}}">{{this.[0]}}</th>
                             {{/each}}
                         </tr>
                         {{#each matchups_global}}
@@ -50,8 +50,8 @@
                         <table class="table is-bordered">
                             <tr>
                                 <th>&nbsp;</th>
-                                {{#each character_shortnames}}
-                                    <th>{{this}}</th>
+                                {{#each all_characters}}
+                                    <th title="{{this.[1]}}">{{this.[0]}}</th>
                                 {{/each}}
                             </tr>
                             {{#each matchups_top_1000}}
@@ -80,8 +80,8 @@
                         <table class="table is-bordered">
                             <tr>
                                 <th>&nbsp;</th>
-                                {{#each character_shortnames}}
-                                    <th>{{this}}</th>
+                                {{#each all_characters}}
+                                    <th title="{{this.[1]}}">{{this.[0]}}</th>
                                 {{/each}}
                             </tr>
                             {{#each matchups_proportional}}
@@ -110,8 +110,8 @@
                     <table class="table is-bordered">
                         <tr>
                             <th>&nbsp;</th>
-                            {{#each character_shortnames}}
-                                <th>{{this}}</th>
+                            {{#each all_characters}}
+                                <th title="{{this.[1]}}">{{this.[0]}}</th>
                             {{/each}}
                         </tr>
                         {{#each matchups_top_100}}
