@@ -38,6 +38,7 @@ pub const CHAR_NAMES: &[(&str, &str)] = &[
     ("AS", "Asuka"),
     ("JN", "Johnny"),
     ("EL", "Elphelt"),
+    ("AB", "A.B.A."),
 ];
 
 pub async fn run() {
