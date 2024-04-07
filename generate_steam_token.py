@@ -12,12 +12,22 @@ from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 from msgpack import packb, unpackb
 from struct import pack
+from os.path import exists
+from dotenv import load_dotenv
 
 def main():
-    user = os.environ['USER']
-    password = os.environ['PASSWORD']
-    token = login(user, password)
+    load_dotenv()
+
+    if (not exists("./token.txt")):
+        user = os.environ['USER']
+        password = os.environ['PASSWORD']
+        token = login(user, password)
+    else:
+        f = open("./token.txt", "r")
+        token = f.read() 
+
     replays = get_replays(token)
+    print("Replay Data:")
     print(replays)
 
 
@@ -55,7 +65,7 @@ def steam_login(user, password):
     client = SteamClient()
     client.on(EMsg.ClientGameConnectTokens, on_game_tokens)
     session_time = time()
-    client.cli_login(user, password)
+    client.cli_login(user)
 
     print("Successfully logged in")
 
@@ -95,8 +105,9 @@ def login(user, password, auth=None, padding=0):
         auth = steam_login(user, password)
 
     steam_id = auth['id']
-    steam_hex = hex(steam_id)[:2]
-    #print(auth)
+    steam_hex = hex(steam_id)[2:]
+    print("steam_id: ", steam_id)
+    print("steam_hex: ", steam_hex)
 
     msg = [
         [
@@ -141,7 +152,7 @@ def login(user, password, auth=None, padding=0):
     #This is where I print it?
     token = login_response[0][0]
     print(f"Strive token obtained for user: {steam_id} - {token}")
-    file = open("token.txt", "wb")
+    file = open("token.txt", "w")
     file.write(token)
     file.close()
     return token
@@ -150,10 +161,10 @@ key = unhexlify('EEBC1F57487F51921C0465665F8AE6D1658BB26DE6F8A069A3520293A572078
 
 def get_replays(token):
     data_header = [
-        "230129212655563979",
+        os.getenv("PLAYER_ID"),
         token,
         2,
-        "0.2.1",
+        "0.2.9",
         3
     ]
     data_params = [
@@ -210,6 +221,7 @@ def decrypt_response_data(data):
     iv = decoded[:12]
     cipher = AES.new(key, AES.MODE_GCM, iv)
     decrypted = cipher.decrypt(decoded[12:])
+    print(decrypted)
     return unpackb(decrypted[:-16])
 
 if __name__ == "__main__":

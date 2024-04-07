@@ -3,6 +3,7 @@
 use simplelog::*;
 use std::{fs::File, ops::Deref};
 use tokio::try_join;
+use dotenv::dotenv;
 
 use rating_update::{rater, website};
 
@@ -32,6 +33,7 @@ fn init_logging() {
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 10)]
 async fn main() {
+    dotenv().ok();
     init_logging();
 
     let args = std::env::args().skip(1).collect::<Vec<_>>();
