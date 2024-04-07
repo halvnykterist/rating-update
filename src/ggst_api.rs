@@ -154,7 +154,7 @@ fn decrypt_response<T: for<'a> Deserialize<'a>>(
     match rmp_serde::from_slice::<responses::Response<T>>(&decrypted) {
         Ok(r) => Ok(r),
         Err(e) => {
-            error!("Error in received msgpack!");
+            error!("Error in received msgpack!  {}", e);
             println!();
             for b in &decrypted {
                 print!("{:02X}", b);

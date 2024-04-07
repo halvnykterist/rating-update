@@ -1,5 +1,4 @@
 use crate::{ggst_api, glicko, glicko::Rating, responses, website};
-use anyhow::Context;
 use chrono::{NaiveDateTime, Utc};
 use fxhash::{FxHashMap, FxHashSet};
 use lazy_static::lazy_static;
@@ -7,7 +6,7 @@ use rusqlite::{
     functions::FunctionFlags, named_params, params, Connection, OptionalExtension, Row, Transaction,
 };
 use std::{sync::Mutex, time::Duration};
-use tokio::{time, try_join};
+use tokio::time;
 
 const DECAY_CONSTANT: f64 = 3.1;
 

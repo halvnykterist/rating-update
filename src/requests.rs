@@ -2,9 +2,16 @@ use serde_derive::{Deserialize, Serialize};
 use std::sync::Arc;
 use steamworks::{Client, TicketForWebApiResponse};
 use tokio::sync::Mutex;
+use lazy_static::lazy_static;
 
-const VERSION: &str = "0.2.8";
-const PLAYER_ID: &str = "230129212655563979";
+const VERSION: &str = "0.2.9";
+const STEAM_APP_ID: u32 = 1384160;
+
+lazy_static! {
+    static ref PLAYER_ID: String = std::env::var("PLAYER_ID").expect("PLAYER_ID must be set.");
+    static ref STEAM_ID: String = std::env::var("STEAM_ID").expect("STEAM_ID must be set.");
+    static ref STEAM_HEX: String = std::env::var("STEAM_HEX").expect("STEAM_HEX must be set.");
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Request<T> {
@@ -121,7 +128,7 @@ pub struct LoginRequest {
 }
 
 pub async fn generate_login_request() -> Request<LoginRequest> {
-    let (client, single) = Client::init().unwrap();
+    let (client, single) = Client::init_app(STEAM_APP_ID).unwrap();
     let user = client.user();
 
     let token = Arc::new(Mutex::new(Option::None));
@@ -161,8 +168,8 @@ pub async fn generate_login_request() -> Request<LoginRequest> {
                 },
                 body: LoginRequest {
                     int1: 1,
-                    steam_id: "76561199474089169".to_owned(),
-                    steam_hex: "11000015a3b1cd1".to_owned(),
+                    steam_id: STEAM_ID.to_owned(),
+                    steam_hex: STEAM_HEX.to_owned(),
                     int2: 256,
                     steam_token,
                 },

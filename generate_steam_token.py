@@ -13,11 +13,14 @@ from Crypto.Random import get_random_bytes
 from msgpack import packb, unpackb
 from struct import pack
 from os.path import exists
+from dotenv import load_dotenv
 
 def main():
+    load_dotenv()
+
     if (not exists("./token.txt")):
         user = os.environ['USER']
-        password = ''
+        password = os.environ['PASSWORD']
         token = login(user, password)
     else:
         f = open("./token.txt", "r")
@@ -102,8 +105,9 @@ def login(user, password, auth=None, padding=0):
         auth = steam_login(user, password)
 
     steam_id = auth['id']
-    steam_hex = hex(steam_id)[:2]
-    #print(auth)
+    steam_hex = hex(steam_id)[2:]
+    print("steam_id: ", steam_id)
+    print("steam_hex: ", steam_hex)
 
     msg = [
         [
@@ -157,10 +161,10 @@ key = unhexlify('EEBC1F57487F51921C0465665F8AE6D1658BB26DE6F8A069A3520293A572078
 
 def get_replays(token):
     data_header = [
-        "230129212655563979",
+        os.getenv("PLAYER_ID"),
         token,
         2,
-        "0.2.7",
+        "0.2.9",
         3
     ]
     data_params = [
