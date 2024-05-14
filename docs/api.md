@@ -226,6 +226,57 @@ curl -X GET -H "Content-Type: application/json" http://ratingupdate.info/api/act
 ```
 </details>
 
+<details>
+ <summary><code>GET</code> <code><b>/api/hide/:player</b></code> (starts the hidding process for a player)</summary>
+
+##### Parameters
+
+> | name              |  type     | data type      | description                         | default    |
+> |-------------------|-----------|----------------|-------------------------------------|------------|
+> | `player`          |  required | hex     | Hexadecimal representation of the player id        | -         |
+
+##### Code : `200 OK`
+
+Initiates the hidding process for the player with the given ID. This function returns the `opt-out-code`.
+
+```json
+"fdOK4YSK"
+```
+
+##### Example cURL
+
+```bash
+curl -X GET -H "Content-Type: application/json" http://ratingupdate.info/api/hide/31081E2F439665D
+```
+</details>
+
+<details>
+ <summary><code>GET</code> <code><b>/api/hide/poll/:player</b></code> (checks if a player has a opt-out-code in his r-code)</summary>
+
+##### Parameters
+
+> | name              |  type     | data type      | description                         | default    |
+> |-------------------|-----------|----------------|-------------------------------------|------------|
+> | `player`          |  required | hex     | Hexadecimal representation of the player id        | -         |
+
+##### Code : `200 OK`
+
+If the given player is currently in the process of hidding their profile this function will check for the `opt-out-code` in the players R-Code.
+When the codes match the profile is set to hidden.
+
+Returns either false or true.
+
+```json
+false
+```
+
+##### Example cURL
+
+```bash
+curl -X GET -H "Content-Type: application/json" http://ratingupdate.info/api/hide/poll/31081E2F439665D
+```
+</details>
+
 #### Rating Endpoints
 
 <details>
@@ -431,6 +482,156 @@ The reponse is an array containing 11 values, each corresponding to the winrate?
 
 ```bash
 curl -X GET -H "Content-Type: application/json" http://ratingupdate.info/api/accuracy/31081E2F439665D/PO
+```
+</details>
+
+<details>
+ <summary><code>GET</code> <code><b>/api/player_rating_experience/:player</b></code> (TODO: NOT SURE YET)</summary>
+
+##### Parameters
+
+> | name              |  type     | data type      | description                         | default    |
+> |-------------------|-----------|----------------|-------------------------------------|------------|
+> | `player`          |  required | hex     | Hexadecimal representation of the player id        | -         |
+
+
+##### Code : `200 OK`
+
+TODO: Describe function
+
+```json
+[
+  ?
+]
+``` 
+
+##### Example cURL
+
+```bash
+curl -X GET -H "Content-Type: application/json" http://ratingupdate.info/api/player_rating_experience/31081E2F439665D
+```
+</details>
+
+<details>
+ <summary><code>GET</code> <code><b>/api/player_rating_experience/:player?min_rating=#&max_rating=#</b></code> (TODO: NOT SURE YET)</summary>
+
+##### Parameters
+
+> | name              |  type     | data type      | description                         | default    |
+> |-------------------|-----------|----------------|-------------------------------------|------------|
+> | `player`          |  required | hex     | Hexadecimal representation of the player id        | -         |
+> | `min_rating`          |  required | int ($i64)     | Lower rating bound        | -         |
+> | `max_rating`          |  required | int ($i64)     | Upper rating bound        | -         |
+
+
+##### Code : `200 OK`
+
+TODO: Describe function
+Probably does the same as the normal player_rating_experience but only takes into consideration matches where the rating deviation between the players falls inbetween the bounding values.
+
+```json
+[
+  ?
+]
+``` 
+
+##### Example cURL
+
+```bash
+curl -X GET -H "Content-Type: application/json" http://ratingupdate.info/api/player_rating_experience/31081E2F439665D?min_rating=10&max_rating=100
+```
+</details>
+
+<details>
+ <summary><code>GET</code> <code><b>/api/floor_rating_distribution</b></code> (gets the floor distribution of players and their ratings)</summary>
+
+##### Parameters
+
+> None
+
+##### Code : `200 OK`
+
+The reponse is an object with 3 elements. The first one `ratings` is an array containing all the rating value buckets. The second one, an object `floors` contains all the floors and the amount of players in every rating bucket. And the third `overall` contains the total amount of players in all the buckets.
+
+```json
+{
+    "ratings": [
+        0: -500,
+        1: -450,
+        2: -400,
+        3: -350,
+        ...
+        56: 2300
+    ],
+    "floors": {
+        "99": [
+           0: 0,
+           1: 0,
+           ...
+           56: 7
+        ],
+        "10": [...]
+        "9": [...]
+    }
+    "overall": [
+        0: 1,
+        1: 0,
+        2: 0,
+        3: 0,
+        ...
+        56: 7
+    ],
+}
+``` 
+
+##### Example cURL
+
+```bash
+curl -X GET -H "Content-Type: application/json" http://ratingupdate.info/api/floor_rating_distribution
+```
+</details>
+
+<details>
+ <summary><code>GET</code> <code><b>/api/outcomes</b></code> (TODO: NOT SURE YET)</summary>
+
+##### Parameters
+
+> None
+
+##### Code : `200 OK`
+
+I think this function is supposed to return the actual winrates between bucket of ratings, but i am not sure...
+
+```json
+?
+``` 
+
+##### Example cURL
+
+```bash
+curl -X GET -H "Content-Type: application/json" http://ratingupdate.info/api/outcomes
+```
+</details>
+
+<details>
+ <summary><code>GET</code> <code><b>/api/outcomes_delta</b></code> (TODO: NOT SURE YET)</summary>
+
+##### Parameters
+
+> None
+
+##### Code : `200 OK`
+
+I think this function is supposed to return the delta between the expected winrates and the acctual winrate when comparing players from different bucket of ratings, but i am not sure...
+
+```json
+?
+``` 
+
+##### Example cURL
+
+```bash
+curl -X GET -H "Content-Type: application/json" http://ratingupdate.info/api/outcomes_delta
 ```
 </details>
 
