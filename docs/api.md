@@ -500,9 +500,7 @@ curl -X GET -H "Content-Type: application/json" http://ratingupdate.info/api/acc
 TODO: Describe function
 
 ```json
-[
-  ?
-]
+?
 ``` 
 
 ##### Example cURL
@@ -530,9 +528,7 @@ TODO: Describe function
 Probably does the same as the normal player_rating_experience but only takes into consideration matches where the rating deviation between the players falls inbetween the bounding values.
 
 ```json
-[
-  ?
-]
+?
 ``` 
 
 ##### Example cURL
@@ -556,30 +552,30 @@ The reponse is an object with 3 elements. The first one `ratings` is an array co
 ```json
 {
     "ratings": [
-        0: -500,
-        1: -450,
-        2: -400,
-        3: -350,
+        -500,
+        -450,
+        -400,
+        -350,
         ...
-        56: 2300
+        2300
     ],
     "floors": {
         "99": [
-           0: 0,
-           1: 0,
+           0,
+           0,
            ...
-           56: 7
+           7
         ],
         "10": [...]
         "9": [...]
     }
     "overall": [
-        0: 1,
-        1: 0,
-        2: 0,
-        3: 0,
+        1,
+        0,
+        0,
+        0,
         ...
-        56: 7
+        7
     ],
 }
 ``` 
